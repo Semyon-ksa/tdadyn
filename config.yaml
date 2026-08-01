@@ -1,0 +1,126 @@
+# Все параметры генерации синтетических данных.
+# Магических чисел в коде быть не должно: любое число, влияющее на результат, живёт здесь.
+
+format_version: 1
+seed: 20260201            # базовый seed; каждый генератор получает производный поток
+output_root: data/synthetic   # относительно каталога этого файла, не рабочего каталога
+
+# --- Имена каталогов наборов ---
+naming:
+  float_precision: 6           # значащих цифр для float-параметров в имени каталога
+
+# --- Параметры проверки топологии (общие, НЕ подбираются под датасет) ---
+topology_check:
+  max_homology_dim: 2
+  coeff_field: 2                 # Z/2; влияет на бутылку Клейна (см. docs/method.md)
+  significance_ratio: 0.15       # бар значим, если persistence >= ratio * diam(X)
+  reference_max_nodes: 30        # предел для медленной эталонной реализации
+
+# --- Семейство 1: статические облака ---
+static_clouds:
+  n_points: 400
+  noise_sigma: 0.03
+  ambient_noise: gaussian
+
+  circle:
+    radius: 1.0
+  two_circles:
+    radius: 1.0
+    separation: 3.0              # > 2*radius, иначе компоненты сольются
+  figure_eight:
+    scale: 1.0
+  torus:
+    R: 2.0
+    r: 0.8
+    sampling: rejection          # rejection | naive — naive НЕ равномерен по площади
+  sphere:
+    radius: 1.0
+    sampling: muller             # muller | naive_angles
+  klein_bottle:
+    embedding: r4                # вложение в R^4; r3 даёт самопересечение
+    R: 2.0
+  hopf_link:
+    radius: 1.0
+    offset: 1.0                  # смещение центра второй окружности
+
+# Построение взвешенной сети из облака
+network_from_cloud:
+  method: gaussian_kernel        # gaussian_kernel | knn
+  kernel_sigma: 0.5
+  knn_k: 10
+  distance_from_similarity: sqrt_neg_log   # sqrt_neg_log | one_minus
+
+# --- Семейство 2: динамические графы с событиями ---
+dynamic_events:
+  n_nodes: 24                    # <= reference_max_nodes, иначе эталон не посчитать
+  n_snapshots: 60
+  edge_weight: 1.0
+  threshold: 0.5                 # порог бинаризации для флаг-комплекса
+  scenarios:
+    cycle_lifecycle:
+      path_closes_at: 12         # рождение H1
+      chord_added_at: 27         # рождение второго H1
+      edge_removed_at: 41        # гибель H1
+      component_splits_at: 48    # рождение H0
+      component_merges_at: 55    # гибель H0
+  geometric_loop:
+    n_points: 60
+    radius_schedule: [1.0, 1.4, 1.0]
+    gap_open_at: 20
+    gap_close_at: 45
+
+# --- Семейство 3: SBM и осцилляторы ---
+dynamic_sbm:
+  n_nodes: 60
+  n_snapshots: 60
+  block_sizes: [15, 15, 15, 15]
+  p_in: 0.35
+  p_out: 0.02
+  merge_at: 20                   # два сообщества сливаются
+  split_at: 40                   # сообщество делится
+
+oscillators:
+  model: kuramoto                # kuramoto | roessler
+  n_channels: 30
+  n_timepoints: 4000
+  dt: 0.01
+  kuramoto:
+    K: 1.2
+    omega_dist: normal
+    omega_scale: 1.0
+  roessler:
+    a: 0.2
+    b: 0.2
+    c: 5.7
+    epsilon: 0.15
+  integrator:
+    method: RK45
+    rtol: 1.0e-6
+    atol: 1.0e-9
+  coupling_schedule:
+    regime_length: 1000          # должно быть >> sliding_window.length
+    regimes: [block_2, block_3, block_2]
+
+sliding_window:
+  length: 100
+  step: 10
+  fisher_z: true
+  # Формализует требование "L << длительность режима" из method.md §3.4: окно длиннее
+  # доли режима размазывает событие через границу режима и не даёт его локализовать.
+  max_length_fraction_of_regime: 0.2
+
+# --- Семейство 4: шум и нулевые модели ---
+noise:
+  weight_jitter_sigma: [0.0, 0.05, 0.10, 0.20]
+  spurious_edge_fraction: [0.0, 0.02, 0.05, 0.10]
+  missing_edge_fraction: [0.0, 0.02, 0.05, 0.10]
+  point_jitter_sigma: [0.0, 0.02, 0.05, 0.10]
+  n_repeats: 10                  # повторов на уровень шума
+
+null_models:
+  erdos_renyi:
+    match_density_to: torus      # плотность подбирается под эталонный набор
+  random_geometric:
+    n_nodes: 60
+    match_density_to: torus
+  n_realizations: 20

@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tdadyn"
+version = "0.1.0"
+description = "Synthetic datasets with analytically known topology for validating persistent homology pipelines"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "networkx>=3.2",
+    "gudhi>=3.9",
+    "ripser>=0.6",
+    "persim>=0.3",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# `pytest -q` runs the fast suite; `pytest -m slow` runs only the topological
+# checks, because the last -m on the command line overrides this one.
+addopts = ["-m", "not slow"]
+markers = [
+    "slow: topological checks (persistent homology, reference implementation)",
+]

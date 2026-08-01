@@ -1,0 +1,18 @@
+# Данные генерируются целиком из config.yaml + seed, в репозиторий не попадают.
+# В git хранится manifest.json, чтобы отслеживать, чем именно был собран набор.
+# Исключения перечислены по шагам: git не возвращает файлы из исключённого каталога,
+# поэтому каждый уровень пути приходится открывать отдельно.
+data/*
+!data/synthetic/
+data/synthetic/*
+!data/synthetic/manifest.json
+
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+build/
+dist/
+*.egg-info/
+.DS_Store

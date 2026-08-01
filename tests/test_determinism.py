@@ -1,0 +1,134 @@
+"""Determinism of the scaffolding: names, datasets and comparison semantics."""
+
+from __future__ import annotations
+
+import numpy as np
+import pytest
+
+from tdadyn.synthetic import dataset_equal, format_dataset_id, make_dataset_id
+from tdadyn.synthetic.contracts import values_equal
+from tdadyn.synthetic.naming import register_name_order
+
+from conftest import make_fake_dynamic_graph, make_fake_point_cloud, make_fake_series
+
+FLOAT_PRECISION = 6
+BUILDERS = (make_fake_point_cloud, make_fake_dynamic_graph, make_fake_series)
+
+
+@pytest.mark.parametrize("build", BUILDERS, ids=lambda fn: fn.__name__)
+def test_same_seed_gives_bitwise_identical_arrays(build):
+    first, second = build(), build()
+    assert dataset_equal(first, second)
+
+
+@pytest.mark.parametrize("build", BUILDERS, ids=lambda fn: fn.__name__)
+def test_global_numpy_seed_does_not_change_the_dataset(build):
+    expected = build()
+    np.random.seed(999)
+    np.random.normal(size=1000)
+    assert dataset_equal(build(), expected)
+
+
+def test_different_seeds_give_different_data():
+    assert not dataset_equal(make_fake_point_cloud(seed=1), make_fake_point_cloud(seed=2))
+
+
+def test_equality_operator_does_not_silently_succeed(fake_point_cloud):
+    # eq=False: two distinct objects compare unequal, so a test that reaches for ==
+    # fails loudly instead of comparing arrays with an ambiguous truth value.
+    assert fake_point_cloud != make_fake_point_cloud()
+    assert dataset_equal(fake_point_cloud, make_fake_point_cloud())
+
+
+def test_dataset_equal_notices_a_single_changed_value(fake_point_cloud):
+    modified = make_fake_point_cloud()
+    modified.points[0, 0] += 1e-12
+    assert not dataset_equal(fake_point_cloud, modified)
+
+
+def test_comparison_notices_a_changed_dtype():
+    # Equal values in a different dtype are not the same data: a round-trip that
+    # narrowed float64 to float32 must not pass as identical.
+    values = np.array([1.0, 2.0, 3.0])
+    assert not values_equal(values, values.astype(np.float32))
+    assert values_equal(values, values.copy())
+
+
+# --- naming ----------------------------------------------------------------------
+
+
+def test_dataset_id_depends_only_on_generator_params_and_seed(fake_point_cloud):
+    first = make_dataset_id(fake_point_cloud.ground_truth, float_precision=FLOAT_PRECISION)
+    second = make_dataset_id(make_fake_point_cloud().ground_truth, float_precision=FLOAT_PRECISION)
+    assert first == second
+    assert first == "fake_cloud_N8_dim2_sig0.03_sampling-uniform_seed20260201"
+
+
+def test_every_parameter_appears_in_the_name():
+    # The check that stops a parameter from dropping out of the name: two tori with
+    # different R must not end up in the same directory.
+    with pytest.raises(ValueError, match="Every parameter must appear"):
+        format_dataset_id(
+            "torus",
+            {"n_points": 400, "R": 2.0, "r": 0.8},
+            20260201,
+            order=("n_points", "R"),
+            float_precision=FLOAT_PRECISION,
+        )
+
+
+def test_a_name_order_key_absent_from_params_is_also_an_error():
+    with pytest.raises(ValueError, match="absent from params"):
+        format_dataset_id(
+            "torus",
+            {"n_points": 400},
+            1,
+            order=("n_points", "R"),
+            float_precision=FLOAT_PRECISION,
+        )
+
+
+@pytest.mark.parametrize(
+    ("params", "expected"),
+    [
+        ({"R": 2.0}, "g_R2_seed1"),
+        ({"R": 0.03}, "g_R0.03_seed1"),
+        ({"R": 1e-7}, "g_R1e-07_seed1"),
+        ({"sampling": "rejection"}, "g_sampling-rejection_seed1"),
+        ({"fisher_z": True}, "g_fisher_z-true_seed1"),
+        ({"schedule": [1.0, 1.4, 1.0]}, "g_schedule1-1.4-1_seed1"),
+        ({"n_points": 400}, "g_N400_seed1"),
+    ],
+)
+def test_value_formatting_is_stable(params, expected):
+    key = next(iter(params))
+    assert (
+        format_dataset_id("g", params, 1, order=(key,), float_precision=FLOAT_PRECISION)
+        == expected
+    )
+
+
+def test_unusable_values_are_rejected():
+    with pytest.raises(ValueError, match="not usable in a path"):
+        format_dataset_id("g", {"label": "a/b"}, 1, order=("label",), float_precision=6)
+    with pytest.raises(ValueError, match="non-finite"):
+        format_dataset_id("g", {"x": float("nan")}, 1, order=("x",), float_precision=6)
+    with pytest.raises(TypeError, match="cannot appear in a dataset name"):
+        format_dataset_id("g", {"x": {"y": 1}}, 1, order=("x",), float_precision=6)
+
+
+def test_registering_a_conflicting_order_is_refused(monkeypatch):
+    from tdadyn.synthetic import naming
+
+    monkeypatch.setitem(naming._NAME_ORDER, "duplicate", ("a", "b"))
+    register_name_order("duplicate", ("a", "b"))  # idempotent
+    with pytest.raises(ValueError, match="already registered"):
+        register_name_order("duplicate", ("b", "a"))
+
+
+def test_unregistered_generator_is_reported(fake_point_cloud, monkeypatch):
+    from tdadyn.synthetic import naming
+
+    monkeypatch.delitem(naming._NAME_ORDER, "fake_cloud")
+    with pytest.raises(KeyError, match="no registered name order"):
+        make_dataset_id(fake_point_cloud.ground_truth, float_precision=FLOAT_PRECISION)
