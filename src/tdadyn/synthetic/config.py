@@ -45,6 +45,7 @@ class TopologyCheck:
 
     max_homology_dim: int
     coeff_field: int
+    coeff_field_test_values: tuple[int, ...]
     significance_ratio: float
     reference_max_nodes: int
 
@@ -360,6 +361,9 @@ def _topology_check(reader: _Reader) -> TopologyCheck:
         # docs/task.md fixes the maximum homology dimension at 2.
         max_homology_dim=reader.integer("max_homology_dim", minimum=0, maximum=2),
         coeff_field=reader.integer("coeff_field", minimum=2),
+        coeff_field_test_values=reader.integer_list(
+            "coeff_field_test_values", minimum=2, min_length=1
+        ),
         # Strictly inside (0, 1): at 0 every noise bar counts as significant, at 1 only
         # a bar as long as the diameter would.
         significance_ratio=reader.number(
@@ -368,10 +372,23 @@ def _topology_check(reader: _Reader) -> TopologyCheck:
         reference_max_nodes=reader.integer("reference_max_nodes", minimum=1),
     )
     reader.done()
-    if not _is_prime(section.coeff_field):
+    for field in (section.coeff_field, *section.coeff_field_test_values):
+        if not _is_prime(field):
+            raise ConfigError(
+                f"{reader.origin}: topology_check coefficient fields must be prime "
+                f"(ripser works over Z/p), got {field}"
+            )
+    values = section.coeff_field_test_values
+    if any(later <= earlier for earlier, later in zip(values, values[1:])):
         raise ConfigError(
-            f"{reader.origin}: topology_check.coeff_field must be prime "
-            f"(ripser works over Z/p), got {section.coeff_field}"
+            f"{reader.origin}: topology_check.coeff_field_test_values must be strictly "
+            f"increasing, got {list(values)}"
+        )
+    if section.coeff_field not in values:
+        raise ConfigError(
+            f"{reader.origin}: topology_check.coeff_field ({section.coeff_field}) is not among "
+            f"coeff_field_test_values ({list(values)}); the field the project actually works "
+            "over must be one of the fields the tests exercise"
         )
     return section
 

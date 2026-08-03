@@ -186,6 +186,43 @@ def test_coefficient_field_must_be_prime(raw):
         parse_config(mutate(raw, "topology_check.coeff_field", 4), config_path=CONFIG_PATH)
 
 
+def test_tested_coefficient_fields_must_be_prime(raw):
+    with pytest.raises(ConfigError, match="prime"):
+        parse_config(
+            mutate(raw, "topology_check.coeff_field_test_values", [2, 4]),
+            config_path=CONFIG_PATH,
+        )
+
+
+def test_tested_coefficient_fields_must_be_strictly_increasing(raw):
+    with pytest.raises(ConfigError, match="strictly increasing"):
+        parse_config(
+            mutate(raw, "topology_check.coeff_field_test_values", [3, 2]),
+            config_path=CONFIG_PATH,
+        )
+    with pytest.raises(ConfigError, match="strictly increasing"):
+        parse_config(
+            mutate(raw, "topology_check.coeff_field_test_values", [2, 2, 3]),
+            config_path=CONFIG_PATH,
+        )
+
+
+def test_working_field_must_be_among_the_tested_ones(raw):
+    # Otherwise the field the project actually works over is the one nobody exercises.
+    with pytest.raises(ConfigError, match="not among"):
+        parse_config(
+            mutate(raw, "topology_check.coeff_field_test_values", [3, 5]),
+            config_path=CONFIG_PATH,
+        )
+
+
+def test_repository_config_exercises_both_fields_of_the_klein_bottle(raw):
+    # docs/method.md §1.2: Z/2 gives (1,2,1), p=3 gives (1,1,0); the difference is the
+    # whole point of the parameterised test.
+    config = parse_config(raw, config_path=CONFIG_PATH)
+    assert config.topology_check.coeff_field_test_values == (2, 3)
+
+
 def test_dynamic_graph_must_fit_the_reference_implementation(raw):
     limit = raw["topology_check"]["reference_max_nodes"]
     with pytest.raises(ConfigError, match="reference_max_nodes"):
