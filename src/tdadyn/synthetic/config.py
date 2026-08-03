@@ -48,6 +48,8 @@ class TopologyCheck:
     coeff_field_test_values: tuple[int, ...]
     significance_ratio: float
     reference_max_nodes: int
+    cross_check_n_points: int
+    cross_check_n_scales: int
 
 
 @dataclass(frozen=True)
@@ -370,6 +372,11 @@ def _topology_check(reader: _Reader) -> TopologyCheck:
             "significance_ratio", minimum=0.0, maximum=1.0, exclusive=True
         ),
         reference_max_nodes=reader.integer("reference_max_nodes", minimum=1),
+        # Cross-check of paths A and B on family 1 (docs/validation.md §1.1): both
+        # implementations measure the same complex, and agreement rather than the
+        # expectation table is what the test asserts.
+        cross_check_n_points=reader.integer("cross_check_n_points", minimum=2),
+        cross_check_n_scales=reader.integer("cross_check_n_scales", minimum=1),
     )
     reader.done()
     for field in (section.coeff_field, *section.coeff_field_test_values):
@@ -693,6 +700,20 @@ def _check_cross_section(config: Config, *, origin: str) -> None:
             f"{origin}: static_clouds.hopf_link.offset ({clouds.hopf_link.offset}) must lie "
             f"strictly between 0 and 2 * radius ({2 * clouds.hopf_link.radius}), "
             "otherwise the circles are not linked"
+        )
+
+    topology = config.topology_check
+    if topology.cross_check_n_points > topology.reference_max_nodes:
+        raise ConfigError(
+            f"{origin}: topology_check.cross_check_n_points ({topology.cross_check_n_points}) "
+            f"exceeds reference_max_nodes ({topology.reference_max_nodes}); the reference "
+            "implementation would refuse the subsample"
+        )
+    if topology.cross_check_n_points > config.static_clouds.n_points:
+        raise ConfigError(
+            f"{origin}: topology_check.cross_check_n_points ({topology.cross_check_n_points}) "
+            f"exceeds static_clouds.n_points ({config.static_clouds.n_points}); there is "
+            "nothing to subsample from"
         )
 
     if config.dynamic_events.n_nodes > config.topology_check.reference_max_nodes:

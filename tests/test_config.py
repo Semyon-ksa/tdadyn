@@ -223,6 +223,24 @@ def test_repository_config_exercises_both_fields_of_the_klein_bottle(raw):
     assert config.topology_check.coeff_field_test_values == (2, 3)
 
 
+def test_cross_check_subsample_must_fit_the_reference_implementation(raw):
+    limit = raw["topology_check"]["reference_max_nodes"]
+    with pytest.raises(ConfigError, match="reference_max_nodes"):
+        parse_config(
+            mutate(raw, "topology_check.cross_check_n_points", limit + 1),
+            config_path=CONFIG_PATH,
+        )
+
+
+def test_cross_check_subsample_must_fit_the_cloud(raw):
+    smaller = copy.deepcopy(raw)
+    smaller["topology_check"]["cross_check_n_points"] = 30
+    smaller["topology_check"]["reference_max_nodes"] = 30
+    smaller["static_clouds"]["n_points"] = 20
+    with pytest.raises(ConfigError, match="nothing to subsample from"):
+        parse_config(smaller, config_path=CONFIG_PATH)
+
+
 def test_dynamic_graph_must_fit_the_reference_implementation(raw):
     limit = raw["topology_check"]["reference_max_nodes"]
     with pytest.raises(ConfigError, match="reference_max_nodes"):

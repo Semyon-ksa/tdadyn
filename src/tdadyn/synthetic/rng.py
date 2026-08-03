@@ -57,6 +57,37 @@ def rng_for(base_seed: int, stream: str, repeat: int = 0) -> np.random.Generator
     return np.random.default_rng(np.random.SeedSequence(entropy))
 
 
+def base_seed_of(rng: np.random.Generator) -> int:
+    """Recover the base seed a generator's stream was derived from.
+
+    Parameters
+    ----------
+    rng : numpy.random.Generator
+        A generator produced by :func:`rng_for`, or seeded with a plain integer.
+
+    Returns
+    -------
+    int
+        The base seed, which is the first element of the entropy :func:`rng_for` builds.
+
+    Notes
+    -----
+    Generators need the seed to record it in the ground truth, and taking it from the
+    stream itself is what keeps the two from disagreeing.  Passing ``seed`` and ``rng``
+    as separate arguments would let a caller record one seed while generating from
+    another, and the dataset would then be irreproducible from its own metadata.
+    """
+    seed_seq = getattr(rng.bit_generator, "seed_seq", None)
+    if seed_seq is None:
+        raise ValueError("the generator carries no seed sequence; build it with rng_for")
+    entropy = seed_seq.entropy
+    if isinstance(entropy, (int, np.integer)):
+        return int(entropy)
+    if isinstance(entropy, (list, tuple)) and entropy:
+        return int(entropy[0])
+    raise ValueError(f"cannot recover a base seed from entropy {entropy!r}")
+
+
 def _stream_words(stream: str) -> list[int]:
     """Hash a stream name into 32-bit words for ``SeedSequence`` entropy."""
     digest = hashlib.blake2b(stream.encode("utf-8"), digest_size=_DIGEST_BYTES).digest()

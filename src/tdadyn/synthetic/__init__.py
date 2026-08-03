@@ -22,8 +22,16 @@ from .contracts import (
 from .io import load_dataset, load_ground_truth, save_dataset
 from .manifest import ManifestEntry, entry_payload, make_entry, read_manifest, update_manifest
 from .naming import format_dataset_id, make_dataset_id, register_name_order
-from .rng import rng_for
+from .persistence import (
+    betti_at_scale,
+    cross_check_scales,
+    pairwise_distances,
+    persistence_diagrams,
+    significant_betti,
+)
+from .rng import base_seed_of, rng_for
 from .schema import SchemaError, validate_ground_truth_dict
+from .static_clouds import make_circle, make_figure_eight, make_two_circles
 
 __all__ = [
     "EVENT_TYPES",
@@ -39,6 +47,9 @@ __all__ = [
     "PointCloudDataset",
     "SchemaError",
     "SeriesDataset",
+    "base_seed_of",
+    "betti_at_scale",
+    "cross_check_scales",
     "dataset_equal",
     "entry_payload",
     "format_dataset_id",
@@ -46,13 +57,19 @@ __all__ = [
     "load_config",
     "load_dataset",
     "load_ground_truth",
+    "make_circle",
     "make_dataset_id",
     "make_entry",
+    "make_figure_eight",
+    "make_two_circles",
+    "pairwise_distances",
     "parse_config",
+    "persistence_diagrams",
     "read_manifest",
     "register_name_order",
     "rng_for",
     "save_dataset",
+    "significant_betti",
     "update_manifest",
     "validate_ground_truth_dict",
 ]

@@ -7,6 +7,8 @@ tree.  They are still built through ``rng_for``, so they are reproducible.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import numpy as np
 import pytest
 
@@ -17,11 +19,20 @@ from tdadyn.synthetic import (
     GroundTruth,
     PointCloudDataset,
     SeriesDataset,
+    load_config,
+    make_circle,
+    make_figure_eight,
+    make_two_circles,
     rng_for,
 )
 from tdadyn.synthetic import naming
 
 SEED = 20260201
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+CONFIG_PATH = REPO_ROOT / "config.yaml"
+
+PLANAR_GENERATORS = ("circle", "two_circles", "figure_eight")
 
 FAKE_NAME_ORDERS = {
     "fake_cloud": ("n_points", "dim", "noise_sigma", "sampling"),
@@ -115,6 +126,51 @@ def fake_dynamic_graph() -> DynamicGraphDataset:
 @pytest.fixture
 def fake_series() -> SeriesDataset:
     return make_fake_series()
+
+
+@pytest.fixture(scope="session")
+def config():
+    """The repository configuration, loaded once."""
+    return load_config(CONFIG_PATH)
+
+
+def build_planar_cloud(name, config, *, noise_sigma=None, n_points=None):
+    """Build one family-1 planar cloud from the repository configuration.
+
+    Parameters
+    ----------
+    name : {'circle', 'two_circles', 'figure_eight'}
+        Which generator to call.
+    config : Config
+        Loaded configuration; every geometric parameter comes from it.
+    noise_sigma, n_points : optional
+        Override the configured values, for tests that need the clean cloud or a
+        smaller one.
+
+    Returns
+    -------
+    PointCloudDataset
+        The dataset, from the stream named after the generator.
+    """
+    clouds = config.static_clouds
+    sigma = clouds.noise_sigma if noise_sigma is None else noise_sigma
+    count = clouds.n_points if n_points is None else n_points
+    field = config.topology_check.coeff_field
+    rng = rng_for(config.seed, name)
+    if name == "circle":
+        return make_circle(count, clouds.circle.radius, sigma, field, rng)
+    if name == "two_circles":
+        return make_two_circles(
+            count,
+            clouds.two_circles.radius,
+            clouds.two_circles.separation,
+            sigma,
+            field,
+            rng,
+        )
+    if name == "figure_eight":
+        return make_figure_eight(count, clouds.figure_eight.scale, sigma, field, rng)
+    raise ValueError(f"unknown planar generator {name!r}")
 
 
 @pytest.fixture(params=["point_cloud", "dynamic_graph", "series"])
