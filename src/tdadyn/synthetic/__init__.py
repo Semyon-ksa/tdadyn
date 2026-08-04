@@ -31,7 +31,16 @@ from .persistence import (
 )
 from .rng import base_seed_of, rng_for
 from .schema import SchemaError, validate_ground_truth_dict
-from .static_clouds import make_circle, make_figure_eight, make_two_circles
+from .static_clouds import (
+    klein_bottle_betti,
+    make_circle,
+    make_figure_eight,
+    make_hopf_link,
+    make_klein_bottle,
+    make_sphere,
+    make_torus,
+    make_two_circles,
+)
 
 __all__ = [
     "EVENT_TYPES",
@@ -54,6 +63,7 @@ __all__ = [
     "entry_payload",
     "format_dataset_id",
     "ground_truth_equal",
+    "klein_bottle_betti",
     "load_config",
     "load_dataset",
     "load_ground_truth",
@@ -61,6 +71,10 @@ __all__ = [
     "make_dataset_id",
     "make_entry",
     "make_figure_eight",
+    "make_hopf_link",
+    "make_klein_bottle",
+    "make_sphere",
+    "make_torus",
     "make_two_circles",
     "pairwise_distances",
     "parse_config",

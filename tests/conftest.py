@@ -22,6 +22,10 @@ from tdadyn.synthetic import (
     load_config,
     make_circle,
     make_figure_eight,
+    make_hopf_link,
+    make_klein_bottle,
+    make_sphere,
+    make_torus,
     make_two_circles,
     rng_for,
 )
@@ -33,6 +37,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "config.yaml"
 
 PLANAR_GENERATORS = ("circle", "two_circles", "figure_eight")
+SURFACE_GENERATORS = ("torus", "sphere", "klein_bottle", "hopf_link")
+STATIC_GENERATORS = PLANAR_GENERATORS + SURFACE_GENERATORS
 
 FAKE_NAME_ORDERS = {
     "fake_cloud": ("n_points", "dim", "noise_sigma", "sampling"),
@@ -134,18 +140,20 @@ def config():
     return load_config(CONFIG_PATH)
 
 
-def build_planar_cloud(name, config, *, noise_sigma=None, n_points=None):
-    """Build one family-1 planar cloud from the repository configuration.
+def build_static_cloud(
+    name, config, *, noise_sigma=None, n_points=None, sampling=None, seed=None
+):
+    """Build one family-1 cloud from the repository configuration.
 
     Parameters
     ----------
-    name : {'circle', 'two_circles', 'figure_eight'}
-        Which generator to call.
+    name : str
+        One of :data:`STATIC_GENERATORS`.
     config : Config
         Loaded configuration; every geometric parameter comes from it.
-    noise_sigma, n_points : optional
-        Override the configured values, for tests that need the clean cloud or a
-        smaller one.
+    noise_sigma, n_points, sampling, seed : optional
+        Override the configured values, for tests that need a clean cloud, a smaller
+        one, the deliberately wrong sampling mode, or another seed.
 
     Returns
     -------
@@ -154,23 +162,59 @@ def build_planar_cloud(name, config, *, noise_sigma=None, n_points=None):
     """
     clouds = config.static_clouds
     sigma = clouds.noise_sigma if noise_sigma is None else noise_sigma
-    count = clouds.n_points if n_points is None else n_points
+    count = clouds.n_points_by_generator.get(name, clouds.n_points)
+    if n_points is not None:
+        count = n_points
     field = config.topology_check.coeff_field
-    rng = rng_for(config.seed, name)
+    rng = rng_for(config.seed if seed is None else seed, name)
+
     if name == "circle":
         return make_circle(count, clouds.circle.radius, sigma, field, rng)
     if name == "two_circles":
         return make_two_circles(
-            count,
-            clouds.two_circles.radius,
-            clouds.two_circles.separation,
-            sigma,
-            field,
-            rng,
+            count, clouds.two_circles.radius, clouds.two_circles.separation, sigma, field, rng
         )
     if name == "figure_eight":
         return make_figure_eight(count, clouds.figure_eight.scale, sigma, field, rng)
-    raise ValueError(f"unknown planar generator {name!r}")
+    if name == "torus":
+        return make_torus(
+            count,
+            clouds.torus.R,
+            clouds.torus.r,
+            sigma,
+            clouds.torus.sampling if sampling is None else sampling,
+            field,
+            rng,
+        )
+    if name == "sphere":
+        return make_sphere(
+            count,
+            clouds.sphere.radius,
+            sigma,
+            clouds.sphere.sampling if sampling is None else sampling,
+            field,
+            rng,
+        )
+    if name == "klein_bottle":
+        return make_klein_bottle(
+            count,
+            clouds.klein_bottle.a,
+            clouds.klein_bottle.b,
+            sigma,
+            clouds.klein_bottle.sampling if sampling is None else sampling,
+            field,
+            rng,
+        )
+    if name == "hopf_link":
+        return make_hopf_link(
+            count, clouds.hopf_link.radius, clouds.hopf_link.offset, sigma, field, rng
+        )
+    raise ValueError(f"unknown static-cloud generator {name!r}")
+
+
+def build_planar_cloud(name, config, *, noise_sigma=None, n_points=None):
+    """Backwards-compatible alias used by the S3 tests."""
+    return build_static_cloud(name, config, noise_sigma=noise_sigma, n_points=n_points)
 
 
 @pytest.fixture(params=["point_cloud", "dynamic_graph", "series"])

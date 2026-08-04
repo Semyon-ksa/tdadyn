@@ -94,7 +94,10 @@ def significant_betti(
     *,
     max_homology_dim: int,
     coeff_field: int,
-    significance_ratio: float,
+    criterion: str,
+    significance_ratio: float | None = None,
+    gap_noise_floor_ratio: float | None = None,
+    gap_min_ratio: float | None = None,
 ) -> dict[int, int]:
     """Count the significant bars per dimension — the persistent Betti numbers.
 
@@ -106,10 +109,12 @@ def significant_betti(
         Highest homology dimension to report.
     coeff_field : int
         Prime field of coefficients.
-    significance_ratio : float
-        From ``topology_check.significance_ratio``.  There is deliberately no default:
-        a threshold that can be supplied per call is a threshold that will eventually be
-        tuned per dataset, which ``docs/validation.md`` §2 forbids.
+    criterion : {'gap', 'diam_ratio'}
+        Which rule to apply, from ``topology_check.criterion``.
+    significance_ratio : float, optional
+        Required by ``diam_ratio``.
+    gap_noise_floor_ratio, gap_min_ratio : float, optional
+        Required by ``gap``.
 
     Returns
     -------
@@ -118,21 +123,49 @@ def significant_betti(
 
     Notes
     -----
-    A bar :math:`(b, d)` is significant when :math:`d - b \\ge
-    \\texttt{significance\\_ratio} \\times \\mathrm{diam}(X)`.  An infinite bar is always
-    significant, which is what keeps the one infinite bar of :math:`H_0` in the count of
-    connected components.
+    There are deliberately no defaults for the parameters: a threshold that can be
+    supplied per call is a threshold that will eventually be tuned per dataset, which
+    ``docs/validation.md`` §2 forbids.
+
+    ``diam_ratio`` is the old rule — persistence at least a fixed fraction of
+    :math:`\\mathrm{diam}(X)` — kept only so that the two can be compared.  It is known
+    to be unfit (``docs/method.md`` §1.2a): it loses the cavity of the torus and invents
+    loops on the sphere, and the two ranges overlap in units of the diameter.
+
+    ``gap`` reads the spectrum of persistences instead.  In every dimension the bars are
+    sorted descending, dust below ``gap_noise_floor_ratio`` of the diameter is set aside,
+    and the cut is made at the largest multiplicative step — **including** the step from
+    the last surviving bar down into the dust.  That last step is what the calibration
+    showed to be essential: two disjoint circles leave two nearly equal bars with no gap
+    between them, and a rule that only looks at gaps *between* survivors reports no loops
+    at all.  An infinite bar is always significant, which keeps the one infinite bar of
+    :math:`H_0` in the count of connected components.
     """
-    if not 0.0 < significance_ratio < 1.0:
-        raise ValueError(f"significance_ratio must lie in (0, 1), got {significance_ratio}")
     diagrams = persistence_diagrams(
         distances, max_homology_dim=max_homology_dim, coeff_field=coeff_field
     )
-    threshold = significance_ratio * float(distances.max())
+    diameter = float(distances.max())
+
+    if criterion == "diam_ratio":
+        if significance_ratio is None or not 0.0 < significance_ratio < 1.0:
+            raise ValueError(
+                f"criterion 'diam_ratio' needs significance_ratio in (0, 1), "
+                f"got {significance_ratio!r}"
+            )
+        counter = lambda bars: _count_by_diameter(bars, significance_ratio * diameter)
+    elif criterion == "gap":
+        if gap_noise_floor_ratio is None or gap_min_ratio is None:
+            raise ValueError(
+                "criterion 'gap' needs gap_noise_floor_ratio and gap_min_ratio"
+            )
+        counter = lambda bars: _count_by_gap(
+            bars, diameter, gap_noise_floor_ratio, gap_min_ratio
+        )
+    else:
+        raise ValueError(f"unknown criterion {criterion!r}; expected 'gap' or 'diam_ratio'")
+
     return {
-        dim: _count_significant(diagram, threshold)
-        for dim, diagram in diagrams.items()
-        if dim <= max_homology_dim
+        dim: counter(diagram) for dim, diagram in diagrams.items() if dim <= max_homology_dim
     }
 
 
@@ -211,12 +244,48 @@ def cross_check_scales(distances: np.ndarray, n_scales: int) -> np.ndarray:
     return midpoints[positions]
 
 
-def _count_significant(diagram: np.ndarray, threshold: float) -> int:
+def _split_bars(diagram: np.ndarray) -> tuple[np.ndarray, int]:
+    """Finite persistences sorted descending, plus the count of infinite bars."""
     if diagram.size == 0:
-        return 0
+        return np.empty(0), 0
     lifetimes = diagram[:, 1] - diagram[:, 0]
     infinite = ~np.isfinite(lifetimes)
-    return int(infinite.sum() + (lifetimes[~infinite] >= threshold).sum())
+    return np.sort(lifetimes[~infinite])[::-1], int(infinite.sum())
+
+
+def _count_by_diameter(diagram: np.ndarray, threshold: float) -> int:
+    finite, n_infinite = _split_bars(diagram)
+    return n_infinite + int((finite >= threshold).sum())
+
+
+def _count_by_gap(
+    diagram: np.ndarray,
+    diameter: float,
+    gap_noise_floor_ratio: float,
+    gap_min_ratio: float,
+) -> int:
+    """Cut the spectrum at its largest multiplicative step, dust included."""
+    finite, n_infinite = _split_bars(diagram)
+    floor = gap_noise_floor_ratio * diameter
+    above = finite[finite >= floor]
+    if above.size == 0:
+        return n_infinite
+
+    below = finite[finite < floor]
+    # The step down into the dust is part of the search: a spectrum of k features
+    # followed by dust has its real gap at the very end, not between the features.
+    # With no dust at all the floor itself stands in, so that the final step stays a
+    # finite ratio and is judged by the same threshold as every other one — a zero
+    # sentinel would make it infinite and sweep the whole spectrum in as features.
+    sentinel = float(below[0]) if below.size else floor
+    extended = np.concatenate([above, [sentinel]])
+    positive = extended[1:] > 0
+    ratios = np.where(positive, extended[:-1] / np.where(positive, extended[1:], 1.0), np.inf)
+
+    best = int(np.argmax(ratios))
+    if ratios[best] < gap_min_ratio:
+        return n_infinite
+    return n_infinite + best + 1
 
 
 def _check_distances(distances: np.ndarray) -> None:

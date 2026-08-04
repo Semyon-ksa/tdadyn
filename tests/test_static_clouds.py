@@ -18,70 +18,87 @@ from tdadyn.synthetic import (
 )
 from tdadyn.synthetic.schema import validate_ground_truth_dict
 
-from conftest import PLANAR_GENERATORS, build_planar_cloud
+from conftest import STATIC_GENERATORS, build_planar_cloud, build_static_cloud
 
 # Transcribed from the table in docs/method.md §1.2, independently of what the
 # generators declare — comparing the two is the point of one of the tests below.
+# The Klein bottle row is the one for Z/2, which is the working field of the project.
 EXPECTED_BETTI = {
     "circle": {0: 1, 1: 1, 2: 0},
     "two_circles": {0: 2, 1: 2, 2: 0},
     "figure_eight": {0: 1, 1: 2, 2: 0},
+    "torus": {0: 1, 1: 2, 2: 1},
+    "sphere": {0: 1, 1: 0, 2: 1},
+    "klein_bottle": {0: 1, 1: 2, 2: 1},
+    "hopf_link": {0: 2, 1: 2, 2: 0},
+}
+
+AMBIENT_DIMENSION = {
+    "circle": 2,
+    "two_circles": 2,
+    "figure_eight": 2,
+    "torus": 3,
+    "sphere": 3,
+    "klein_bottle": 4,
+    "hopf_link": 3,
 }
 
 
-@pytest.fixture(params=PLANAR_GENERATORS)
-def planar_name(request):
+@pytest.fixture(params=STATIC_GENERATORS)
+def static_name(request):
     return request.param
 
 
-def test_same_seed_gives_bitwise_identical_points(planar_name, config):
-    first = build_planar_cloud(planar_name, config)
-    second = build_planar_cloud(planar_name, config)
+def test_same_seed_gives_bitwise_identical_points(static_name, config):
+    first = build_static_cloud(static_name, config)
+    second = build_static_cloud(static_name, config)
     assert dataset_equal(first, second)
 
 
-def test_global_numpy_seed_does_not_change_the_cloud(planar_name, config):
-    expected = build_planar_cloud(planar_name, config)
+def test_global_numpy_seed_does_not_change_the_cloud(static_name, config):
+    expected = build_static_cloud(static_name, config)
     np.random.seed(4242)
     np.random.normal(size=1000)
-    assert dataset_equal(build_planar_cloud(planar_name, config), expected)
+    assert dataset_equal(build_static_cloud(static_name, config), expected)
 
 
-def test_shape_and_dtype_follow_the_axis_table(planar_name, config):
-    dataset = build_planar_cloud(planar_name, config)
-    assert dataset.points.shape == (config.static_clouds.n_points, 2)
+def test_shape_and_dtype_follow_the_axis_table(static_name, config):
+    clouds = config.static_clouds
+    dataset = build_static_cloud(static_name, config)
+    expected_count = clouds.n_points_by_generator.get(static_name, clouds.n_points)
+    assert dataset.points.shape == (expected_count, AMBIENT_DIMENSION[static_name])
     assert dataset.points.dtype == np.float64
 
 
-def test_declared_expectations_match_the_table_in_the_docs(planar_name, config):
+def test_declared_expectations_match_the_table_in_the_docs(static_name, config):
     """The generator's ``expected_betti`` must equal the table it was transcribed from.
 
     Catches the two halves of the truth drifting apart: what a dataset claims about
     itself and what the topological test checks against.
     """
-    dataset = build_planar_cloud(planar_name, config)
-    assert dataset.ground_truth.expected_betti == EXPECTED_BETTI[planar_name]
+    dataset = build_static_cloud(static_name, config)
+    assert dataset.ground_truth.expected_betti == EXPECTED_BETTI[static_name]
     assert dataset.ground_truth.coeff_field == config.topology_check.coeff_field
     assert dataset.ground_truth.family == "static_cloud"
 
 
-def test_seed_is_taken_from_the_stream(planar_name, config):
-    dataset = build_planar_cloud(planar_name, config)
+def test_seed_is_taken_from_the_stream(static_name, config):
+    dataset = build_static_cloud(static_name, config)
     assert dataset.ground_truth.seed == config.seed
 
 
-def test_ground_truth_passes_schema_validation(planar_name, config, tmp_path):
+def test_ground_truth_passes_schema_validation(static_name, config):
     from tdadyn.synthetic.schema import ground_truth_to_json_dict
 
-    dataset = build_planar_cloud(planar_name, config)
+    dataset = build_static_cloud(static_name, config)
     dataset_id = make_dataset_id(
         dataset.ground_truth, float_precision=config.naming.float_precision
     )
     validate_ground_truth_dict(ground_truth_to_json_dict(dataset.ground_truth, dataset_id))
 
 
-def test_round_trip_through_disk(planar_name, config, tmp_path):
-    dataset = build_planar_cloud(planar_name, config)
+def test_round_trip_through_disk(static_name, config, tmp_path):
+    dataset = build_static_cloud(static_name, config)
     path = save_dataset(
         dataset, tmp_path / "static_cloud", float_precision=config.naming.float_precision
     )
@@ -89,13 +106,32 @@ def test_round_trip_through_disk(planar_name, config, tmp_path):
     assert dataset_equal(restored, dataset)
 
 
-def test_every_parameter_reaches_the_directory_name(planar_name, config):
-    dataset = build_planar_cloud(planar_name, config)
+def test_every_parameter_reaches_the_directory_name(static_name, config):
+    dataset = build_static_cloud(static_name, config)
     dataset_id = make_dataset_id(
         dataset.ground_truth, float_precision=config.naming.float_precision
     )
-    assert dataset_id.startswith(planar_name)
+    assert dataset_id.startswith(static_name)
     assert dataset_id.endswith(f"seed{config.seed}")
+
+
+def test_klein_bottle_expectations_depend_on_the_field(config):
+    """The one object whose truth changes with the field (docs/method.md §1.2)."""
+    from tdadyn.synthetic import klein_bottle_betti
+
+    assert klein_bottle_betti(2) == {0: 1, 1: 2, 2: 1}
+    assert klein_bottle_betti(3) == {0: 1, 1: 1, 2: 0}
+    # Different answers, so the two must not be able to share a directory: the field is
+    # part of the parameters and therefore of the name.
+    dataset = build_static_cloud("klein_bottle", config)
+    assert "coeff_field" in dataset.ground_truth.params
+
+
+def test_hopf_link_expects_two_components(config):
+    """docs/method.md §1.2: expecting beta_0 = 1 for a link is an error."""
+    dataset = build_static_cloud("hopf_link", config)
+    assert dataset.ground_truth.expected_betti[0] == 2
+    assert "сцеп" in dataset.ground_truth.notes
 
 
 def test_noise_level_changes_the_cloud_but_not_the_underlying_sample(config):

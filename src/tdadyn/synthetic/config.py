@@ -46,7 +46,11 @@ class TopologyCheck:
     max_homology_dim: int
     coeff_field: int
     coeff_field_test_values: tuple[int, ...]
+    criterion: str
     significance_ratio: float
+    gap_noise_floor_ratio: float
+    gap_min_ratio: float
+    calibration_seeds: tuple[int, ...]
     reference_max_nodes: int
     cross_check_n_points: int
     cross_check_n_scales: int
@@ -84,7 +88,9 @@ class Sphere:
 @dataclass(frozen=True)
 class KleinBottle:
     embedding: str
-    R: float
+    a: float
+    b: float
+    sampling: str
 
 
 @dataclass(frozen=True)
@@ -98,6 +104,7 @@ class StaticClouds:
     """Family 1: point clouds with analytically known Betti numbers."""
 
     n_points: int
+    n_points_by_generator: dict[str, int]
     noise_sigma: float
     ambient_noise: str
     circle: Circle
@@ -366,11 +373,20 @@ def _topology_check(reader: _Reader) -> TopologyCheck:
         coeff_field_test_values=reader.integer_list(
             "coeff_field_test_values", minimum=2, min_length=1
         ),
+        # The significance criterion is under revision (docs/validation.md §2); the old
+        # diam_ratio rule is kept only so that the two can be compared.
+        criterion=reader.string("criterion", choices=("gap", "diam_ratio")),
         # Strictly inside (0, 1): at 0 every noise bar counts as significant, at 1 only
         # a bar as long as the diameter would.
         significance_ratio=reader.number(
             "significance_ratio", minimum=0.0, maximum=1.0, exclusive=True
         ),
+        gap_noise_floor_ratio=reader.number(
+            "gap_noise_floor_ratio", minimum=0.0, maximum=1.0, exclusive=True
+        ),
+        # A gap of 1.0 would mean "no gap at all", so the minimum useful ratio is above 1.
+        gap_min_ratio=reader.number("gap_min_ratio", minimum=1.0, exclusive=True),
+        calibration_seeds=reader.integer_list("calibration_seeds", minimum=0, min_length=1),
         reference_max_nodes=reader.integer("reference_max_nodes", minimum=1),
         # Cross-check of paths A and B on family 1 (docs/validation.md §1.1): both
         # implementations measure the same complex, and agreement rather than the
@@ -402,6 +418,11 @@ def _topology_check(reader: _Reader) -> TopologyCheck:
 
 def _static_clouds(reader: _Reader) -> StaticClouds:
     n_points = reader.integer("n_points", minimum=1)
+    # Surfaces need more points than curves: at 400 the gap in H1 of the torus lands on
+    # the wrong position (docs/validation.md §3).
+    n_points_by_generator = reader.integer_mapping(
+        "n_points_by_generator", minimum=1, allowed_keys=_STATIC_CLOUD_GENERATORS
+    )
     noise_sigma = reader.number("noise_sigma", minimum=0.0)
     ambient_noise = reader.string("ambient_noise", choices=("gaussian",))
 
@@ -439,10 +460,18 @@ def _static_clouds(reader: _Reader) -> StaticClouds:
     klein_bottle = KleinBottle(
         # R^3 admits only an immersion with a self-intersection, which destroys the
         # ground truth (docs/method.md §1.1), so the option is rejected outright.
-        embedding=klein_reader.string("embedding", choices=("r4",)),
-        R=klein_reader.number("R", minimum=0.0, exclusive=True),
+        embedding=klein_reader.string("embedding", choices=("r4_tube",)),
+        a=klein_reader.number("a", minimum=0.0, exclusive=True),
+        b=klein_reader.number("b", minimum=0.0, exclusive=True),
+        sampling=klein_reader.string("sampling", choices=("rejection", "naive")),
     )
     klein_reader.done()
+    if klein_bottle.a <= klein_bottle.b:
+        raise ConfigError(
+            f"{reader.origin}: static_clouds.klein_bottle requires a > b, got "
+            f"a={klein_bottle.a}, b={klein_bottle.b}; otherwise the factor (a + b cos v) "
+            "reaches zero and the surface degenerates (docs/method.md §1.1)"
+        )
 
     hopf_reader = reader.section("hopf_link")
     hopf_link = HopfLink(
@@ -454,6 +483,7 @@ def _static_clouds(reader: _Reader) -> StaticClouds:
     reader.done()
     return StaticClouds(
         n_points=n_points,
+        n_points_by_generator=n_points_by_generator,
         noise_sigma=noise_sigma,
         ambient_noise=ambient_noise,
         circle=circle,
@@ -709,10 +739,13 @@ def _check_cross_section(config: Config, *, origin: str) -> None:
             f"exceeds reference_max_nodes ({topology.reference_max_nodes}); the reference "
             "implementation would refuse the subsample"
         )
-    if topology.cross_check_n_points > config.static_clouds.n_points:
+    smallest_cloud = min(
+        [config.static_clouds.n_points, *config.static_clouds.n_points_by_generator.values()]
+    )
+    if topology.cross_check_n_points > smallest_cloud:
         raise ConfigError(
             f"{origin}: topology_check.cross_check_n_points ({topology.cross_check_n_points}) "
-            f"exceeds static_clouds.n_points ({config.static_clouds.n_points}); there is "
+            f"exceeds the smallest configured cloud ({smallest_cloud}); there is "
             "nothing to subsample from"
         )
 
@@ -867,6 +900,32 @@ class _Reader:
                 )
             result.append(item)
         return tuple(result)
+
+    def integer_mapping(
+        self, key: str, *, minimum: int | None = None, allowed_keys: Sequence[str]
+    ) -> dict[str, int]:
+        """Read a mapping of names to ints, rejecting names outside ``allowed_keys``."""
+        value = self._take(key)
+        if not isinstance(value, Mapping):
+            raise ConfigError(f"{self._where(key)}: expected a mapping, got {_type_name(value)}")
+        unknown = set(value) - set(allowed_keys)
+        if unknown:
+            raise ConfigError(
+                f"{self._where(key)}: unknown names {sorted(unknown)}; "
+                f"expected any of {list(allowed_keys)}"
+            )
+        result = {}
+        for name, item in value.items():
+            if not isinstance(item, int) or isinstance(item, bool):
+                raise ConfigError(
+                    f"{self._where(key)}.{name}: expected an int, got {_type_name(item)}"
+                )
+            if minimum is not None and item < minimum:
+                raise ConfigError(
+                    f"{self._where(key)}.{name}: expected >= {minimum}, got {item}"
+                )
+            result[name] = item
+        return result
 
     def string_list(self, key: str, *, min_length: int = 0) -> tuple[str, ...]:
         values = self._take_sequence(key, min_length)

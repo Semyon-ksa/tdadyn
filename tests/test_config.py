@@ -223,6 +223,46 @@ def test_repository_config_exercises_both_fields_of_the_klein_bottle(raw):
     assert config.topology_check.coeff_field_test_values == (2, 3)
 
 
+def test_klein_bottle_requires_the_major_radius_to_dominate(raw):
+    # Otherwise the factor (a + b cos v) reaches zero and the surface degenerates.
+    with pytest.raises(ConfigError, match="requires a > b"):
+        parse_config(
+            mutate(raw, "static_clouds.klein_bottle.b", raw["static_clouds"]["klein_bottle"]["a"]),
+            config_path=CONFIG_PATH,
+        )
+
+
+def test_per_generator_point_counts_must_name_known_generators(raw):
+    with pytest.raises(ConfigError, match="moebius"):
+        parse_config(
+            mutate(raw, "static_clouds.n_points_by_generator", {"moebius": 600}),
+            config_path=CONFIG_PATH,
+        )
+
+
+def test_criterion_must_be_one_of_the_known_rules(raw):
+    with pytest.raises(ConfigError, match="expected one of"):
+        parse_config(mutate(raw, "topology_check.criterion", "elbow"), config_path=CONFIG_PATH)
+
+
+def test_gap_min_ratio_must_exceed_one(raw):
+    # A ratio of 1.0 means "no gap at all" and would accept any spectrum.
+    with pytest.raises(ConfigError, match="gap_min_ratio"):
+        parse_config(mutate(raw, "topology_check.gap_min_ratio", 1.0), config_path=CONFIG_PATH)
+
+
+def test_calibration_seeds_must_not_be_empty(raw):
+    with pytest.raises(ConfigError, match="calibration_seeds"):
+        parse_config(mutate(raw, "topology_check.calibration_seeds", []), config_path=CONFIG_PATH)
+
+
+def test_cross_check_subsample_must_fit_the_smallest_cloud(raw):
+    polluted = copy.deepcopy(raw)
+    polluted["static_clouds"]["n_points_by_generator"] = {"torus": 10}
+    with pytest.raises(ConfigError, match="smallest configured cloud"):
+        parse_config(polluted, config_path=CONFIG_PATH)
+
+
 def test_cross_check_subsample_must_fit_the_reference_implementation(raw):
     limit = raw["topology_check"]["reference_max_nodes"]
     with pytest.raises(ConfigError, match="reference_max_nodes"):
