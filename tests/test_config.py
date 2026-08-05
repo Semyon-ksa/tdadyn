@@ -223,6 +223,50 @@ def test_repository_config_exercises_both_fields_of_the_klein_bottle(raw):
     assert config.topology_check.coeff_field_test_values == (2, 3)
 
 
+def test_kernel_width_is_a_fraction_not_an_absolute_number(raw):
+    """docs/method.md §1.3: an absolute width collapses objects of a different scale."""
+    config = parse_config(raw, config_path=CONFIG_PATH)
+    assert config.network_from_cloud.kernel_sigma_median_fraction > 0
+    assert not hasattr(config.network_from_cloud, "kernel_sigma")
+
+
+@pytest.mark.parametrize(
+    ("dotted", "value"),
+    [
+        ("network_from_cloud.kernel_sigma_median_fraction", 0.0),
+        ("network_from_cloud.max_collapsed_weight_fraction", 1.0),
+        ("network_from_cloud.knn_k", 0),
+        # A ratio of 1.0 would declare a fully degenerate geodesic metric acceptable.
+        ("network_from_cloud.min_geodesic_diameter_ratio", 1.0),
+    ],
+)
+def test_network_parameters_out_of_range_are_rejected(raw, dotted, value):
+    with pytest.raises(ConfigError):
+        parse_config(mutate(raw, dotted, value), config_path=CONFIG_PATH)
+
+
+def test_per_generator_network_overrides_must_name_known_generators(raw):
+    with pytest.raises(ConfigError, match="moebius"):
+        parse_config(
+            mutate(raw, "network_from_cloud.knn_k_by_generator", {"moebius": 20}),
+            config_path=CONFIG_PATH,
+        )
+    with pytest.raises(ConfigError, match="moebius"):
+        parse_config(
+            mutate(raw, "network_from_cloud.kernel_sigma_by_generator", {"moebius": 1.0}),
+            config_path=CONFIG_PATH,
+        )
+
+
+def test_both_distance_transforms_stay_available(raw):
+    """one_minus is not banned: it is what task 3 will use as d = 1 - |r|."""
+    for transform in ("sqrt_neg_log", "one_minus"):
+        parse_config(
+            mutate(raw, "network_from_cloud.distance_from_similarity", transform),
+            config_path=CONFIG_PATH,
+        )
+
+
 def test_klein_bottle_requires_the_major_radius_to_dominate(raw):
     # Otherwise the factor (a + b cos v) reaches zero and the surface degenerates.
     with pytest.raises(ConfigError, match="requires a > b"):

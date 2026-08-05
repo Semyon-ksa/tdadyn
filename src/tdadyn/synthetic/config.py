@@ -118,10 +118,24 @@ class StaticClouds:
 
 @dataclass(frozen=True)
 class NetworkFromCloud:
+    """Family 1 clouds turned into weighted networks — the bridge to task 3.
+
+    The kernel width is stated as a fraction of the median pairwise distance rather than
+    as an absolute number: the objects of family 1 differ in scale, and an absolute width
+    that suits one collapses another.  See ``docs/method.md`` §1.3.
+    """
+
     method: str
-    kernel_sigma: float
+    kernel_sigma_median_fraction: float
+    kernel_sigma_by_generator: dict[str, float]
+    max_collapsed_weight_fraction: float
     knn_k: int
+    knn_k_by_generator: dict[str, int]
+    knn_symmetrize: str
+    knn_require_connected: bool
+    min_geodesic_diameter_ratio: float
     distance_from_similarity: str
+    test_both_transforms: bool
 
 
 @dataclass(frozen=True)
@@ -499,11 +513,31 @@ def _static_clouds(reader: _Reader) -> StaticClouds:
 def _network_from_cloud(reader: _Reader) -> NetworkFromCloud:
     section = NetworkFromCloud(
         method=reader.string("method", choices=("gaussian_kernel", "knn")),
-        kernel_sigma=reader.number("kernel_sigma", minimum=0.0, exclusive=True),
+        kernel_sigma_median_fraction=reader.number(
+            "kernel_sigma_median_fraction", minimum=0.0, exclusive=True
+        ),
+        kernel_sigma_by_generator=reader.number_mapping(
+            "kernel_sigma_by_generator", minimum=0.0, exclusive=True,
+            allowed_keys=_STATIC_CLOUD_GENERATORS,
+        ),
+        max_collapsed_weight_fraction=reader.number(
+            "max_collapsed_weight_fraction", minimum=0.0, maximum=1.0, exclusive=True
+        ),
         knn_k=reader.integer("knn_k", minimum=1),
+        knn_k_by_generator=reader.integer_mapping(
+            "knn_k_by_generator", minimum=1, allowed_keys=_STATIC_CLOUD_GENERATORS
+        ),
+        knn_symmetrize=reader.string("knn_symmetrize", choices=("union", "mutual")),
+        knn_require_connected=reader.boolean("knn_require_connected"),
+        # Strictly above 1: a ratio of 1.0 would declare a fully degenerate geodesic
+        # metric acceptable, and that is exactly what the guard exists to catch.
+        min_geodesic_diameter_ratio=reader.number(
+            "min_geodesic_diameter_ratio", minimum=1.0, exclusive=True
+        ),
         distance_from_similarity=reader.string(
             "distance_from_similarity", choices=("sqrt_neg_log", "one_minus")
         ),
+        test_both_transforms=reader.boolean("test_both_transforms"),
     )
     reader.done()
     return section
@@ -924,6 +958,37 @@ class _Reader:
                 raise ConfigError(
                     f"{self._where(key)}.{name}: expected >= {minimum}, got {item}"
                 )
+            result[name] = item
+        return result
+
+    def number_mapping(
+        self,
+        key: str,
+        *,
+        minimum: float | None = None,
+        exclusive: bool = False,
+        allowed_keys: Sequence[str],
+    ) -> dict[str, float]:
+        """Read a mapping of names to numbers, rejecting names outside ``allowed_keys``."""
+        value = self._take(key)
+        if not isinstance(value, Mapping):
+            raise ConfigError(f"{self._where(key)}: expected a mapping, got {_type_name(value)}")
+        unknown = set(value) - set(allowed_keys)
+        if unknown:
+            raise ConfigError(
+                f"{self._where(key)}: unknown names {sorted(unknown)}; "
+                f"expected any of {list(allowed_keys)}"
+            )
+        result = {}
+        for name, item in value.items():
+            if isinstance(item, bool) or not isinstance(item, (int, float)):
+                raise ConfigError(
+                    f"{self._where(key)}.{name}: expected a number, got {_type_name(item)}"
+                )
+            item = float(item)
+            if minimum is not None and (item <= minimum if exclusive else item < minimum):
+                bound = "> " if exclusive else ">= "
+                raise ConfigError(f"{self._where(key)}.{name}: expected {bound}{minimum}, got {item}")
             result[name] = item
         return result
 

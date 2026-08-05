@@ -30,6 +30,7 @@ import numpy as np
 
 from .config import Config, load_config
 from .io import read_json, write_json
+from .network import knn_geodesic_distances
 from .persistence import pairwise_distances, persistence_diagrams
 from .rng import rng_for
 from .static_clouds import (
@@ -227,7 +228,30 @@ def _uniform_cube(n_points: int, noise_sigma: float, rng: np.random.Generator) -
     return points + rng.normal(0.0, noise_sigma, points.shape)
 
 
-def spectra_of(points: np.ndarray, *, max_homology_dim: int, coeff_field: int) -> dict[int, Spectrum]:
+GEODESIC_OUT_OF_DOMAIN = ("hopf_link",)
+"""The one case the geodesic construction cannot describe.
+
+Measured: no parameter setting gives zero misses while the Hopf link is in the table.
+Its :math:`H_1` spectrum grows a third bar (0.44-0.54 against 1.3-1.8 for the first two),
+and the cause is the same one that collapses its k window — a k large enough to connect
+the two components necessarily lays chords across the linkage, and those chords close the
+extra loop.  Excluding it states the boundary of the construction; on the Euclidean metric
+the object passes (``docs/method.md`` §1.3).
+
+Objects that merely need a *larger* k, such as two disjoint circles, are not excluded:
+they take a per-generator k through ``knn_k_by_generator``.
+"""
+
+
+def spectra_of(
+    points: np.ndarray,
+    *,
+    max_homology_dim: int,
+    coeff_field: int,
+    metric: str = "euclidean",
+    config: Config | None = None,
+    case_name: str = "",
+) -> dict[int, Spectrum]:
     """Persistence spectra of a point cloud, one per dimension.
 
     Parameters
@@ -238,6 +262,12 @@ def spectra_of(points: np.ndarray, *, max_homology_dim: int, coeff_field: int) -
         Highest homology dimension.
     coeff_field : int
         Prime field of coefficients.
+    metric : {'euclidean', 'geodesic'}
+        Which metric to measure in.
+    config : Config, optional
+        Required for ``geodesic``: supplies ``knn_k`` and the symmetrisation rule.
+    case_name : str, optional
+        Used to pick a per-generator ``k`` override.
 
     Returns
     -------
@@ -245,6 +275,20 @@ def spectra_of(points: np.ndarray, *, max_homology_dim: int, coeff_field: int) -
         Sorted persistences per dimension, with the infinite bars counted separately.
     """
     distances = pairwise_distances(points)
+    if metric == "geodesic":
+        if config is None:
+            raise ValueError("the geodesic metric needs the config for knn_k")
+        network = config.network_from_cloud
+        generator = case_name.split()[0] if case_name else ""
+        k = network.knn_k_by_generator.get(generator, network.knn_k)
+        distances = knn_geodesic_distances(
+            distances,
+            k=k,
+            symmetrize=network.knn_symmetrize,
+            require_connected=network.knn_require_connected,
+        )
+    elif metric != "euclidean":
+        raise ValueError(f"unknown metric {metric!r}; expected 'euclidean' or 'geodesic'")
     diagrams = persistence_diagrams(
         distances, max_homology_dim=max_homology_dim, coeff_field=coeff_field
     )
@@ -407,12 +451,32 @@ class SpectrumRecord:
     spectra: dict[int, Spectrum]
 
 
-def collect_spectra(config: Config, cases: list[CalibrationCase]) -> list[SpectrumRecord]:
+def collect_spectra(
+    config: Config, cases: list[CalibrationCase], *, metric: str = "euclidean"
+) -> list[SpectrumRecord]:
     """Measure every combination of case, seed and noise level.
 
-    This is the expensive half — persistent homology of every cloud in the table, about
-    eight minutes for the full set.  It is deliberately separate from rule evaluation so
-    that a parameter sweep costs nothing once the spectra are on disk.
+    Parameters
+    ----------
+    config : Config
+        Loaded configuration.
+    cases : list of CalibrationCase
+        Rows of the table.
+    metric : {'euclidean', 'geodesic'}
+        ``geodesic`` replaces the ambient distances with shortest paths along the k-NN
+        graph.  ``docs/method.md`` §1.3 forbids inheriting the Euclidean parameters onto
+        it: it is a different metric, not a reparametrisation of the same one.
+
+    Returns
+    -------
+    list of SpectrumRecord
+        One record per combination.
+
+    Notes
+    -----
+    This is the expensive half — persistent homology of every cloud in the table.  It is
+    deliberately separate from rule evaluation so that a parameter sweep costs nothing
+    once the spectra are on disk.
     """
     topology = config.topology_check
     records = []
@@ -424,6 +488,9 @@ def collect_spectra(config: Config, cases: list[CalibrationCase]) -> list[Spectr
                     points,
                     max_homology_dim=topology.max_homology_dim,
                     coeff_field=case.coeff_field,
+                    metric=metric,
+                    config=config,
+                    case_name=case.name,
                 )
                 label = f"{case.name} seed={seed} sigma={sigma}"
                 print(f"измерено: {label}", flush=True)
@@ -559,17 +626,24 @@ def main(argv: list[str] | None = None) -> None:
         "--tail-min-ratio", type=float, default=1.6, help="parameter of the tail_gap candidate"
     )
     parser.add_argument("--case", action="append", help="restrict to named cases")
+    parser.add_argument(
+        "--metric", choices=("euclidean", "geodesic"), default="euclidean",
+        help="geodesic replaces ambient distances with k-NN shortest paths",
+    )
     arguments = parser.parse_args(argv)
 
     config = load_config(arguments.config)
-    cache = arguments.cache or config.output_root / "calibration_spectra.json"
+    suffix = "" if arguments.metric == "euclidean" else f"_{arguments.metric}"
+    cache = arguments.cache or config.output_root / f"calibration_spectra{suffix}.json"
 
     if arguments.collect or not cache.exists():
         cases = build_cases(config)
+        if arguments.metric == "geodesic":
+            cases = [c for c in cases if c.name.split()[0] not in GEODESIC_OUT_OF_DOMAIN]
         if arguments.case:
             wanted = set(arguments.case)
             cases = [case for case in cases if case.name in wanted]
-        records = collect_spectra(config, cases)
+        records = collect_spectra(config, cases, metric=arguments.metric)
         save_spectra(records, cache)
         print(f"спектры записаны в {cache}")
     else:
