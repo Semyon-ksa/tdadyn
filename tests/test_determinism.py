@@ -108,6 +108,95 @@ def test_value_formatting_is_stable(params, expected):
     )
 
 
+SCHEDULE_PARAMS = {
+    "n_nodes": 24,
+    "n_snapshots": 60,
+    "edge_weight": 1.0,
+    "threshold": 0.5,
+    "path_closes_at": 12,
+    "chord_added_at": 27,
+    "edge_removed_at": 41,
+    "component_splits_at": 48,
+    "component_merges_at": 55,
+}
+SCHEDULE_ORDER = [
+    "n_nodes",
+    "n_snapshots",
+    "edge_weight",
+    "threshold",
+    (
+        "sched",
+        [
+            "path_closes_at",
+            "chord_added_at",
+            "edge_removed_at",
+            "component_splits_at",
+            "component_merges_at",
+        ],
+    ),
+]
+
+
+def test_a_group_of_keys_collapses_into_one_token():
+    # docs/data.md 1.1: listing five schedule keys separately makes the name unreadable,
+    # dropping them makes two scenarios collide. The group is the way out of both.
+    assert (
+        format_dataset_id(
+            "cycle_lifecycle",
+            SCHEDULE_PARAMS,
+            20260201,
+            order=SCHEDULE_ORDER,
+            float_precision=FLOAT_PRECISION,
+        )
+        == "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201"
+    )
+
+
+def test_a_key_outside_every_group_is_still_refused():
+    # Grouping must not become a hole in the coverage check.
+    with pytest.raises(ValueError, match="Every parameter must appear"):
+        format_dataset_id(
+            "g", {"a": 1, "b": 2, "c": 3}, 1, order=[("grp", ["a", "b"])], float_precision=6
+        )
+
+
+def test_a_group_key_absent_from_params_is_refused():
+    with pytest.raises(ValueError, match="absent from params"):
+        format_dataset_id("g", {"a": 1}, 1, order=[("grp", ["a", "b"])], float_precision=6)
+
+
+def test_a_key_listed_in_two_groups_is_refused():
+    with pytest.raises(ValueError, match="duplicate keys"):
+        format_dataset_id(
+            "g", {"a": 1}, 1, order=[("x", ["a"]), ("y", ["a"])], float_precision=6
+        )
+
+
+def test_a_group_prefix_colliding_with_a_label_is_refused():
+    # Two tokens under one label read as one parameter and hide the other.
+    with pytest.raises(ValueError, match="duplicate labels"):
+        format_dataset_id(
+            "g", {"a": 1, "b": 2}, 1, order=["a", ("a", ["b"])], float_precision=6
+        )
+
+
+def test_a_malformed_group_is_refused():
+    with pytest.raises(ValueError, match="empty"):
+        format_dataset_id("g", {"a": 1}, 1, order=[("grp", [])], float_precision=6)
+    with pytest.raises(TypeError, match="must list its keys"):
+        format_dataset_id("g", {"a": 1}, 1, order=[("grp", "a")], float_precision=6)
+
+
+def test_registering_a_group_order_is_idempotent(monkeypatch):
+    from tdadyn.synthetic import naming
+
+    monkeypatch.setattr(naming, "_NAME_ORDER", dict(naming._NAME_ORDER))
+    register_name_order("grouped", ["a", ("s", ["b", "c"])])
+    register_name_order("grouped", ["a", ("s", ["b", "c"])])
+    with pytest.raises(ValueError, match="already registered"):
+        register_name_order("grouped", ["a", ("s", ["c", "b"])])
+
+
 def test_unusable_values_are_rejected():
     with pytest.raises(ValueError, match="not usable in a path"):
         format_dataset_id("g", {"label": "a/b"}, 1, order=("label",), float_precision=6)

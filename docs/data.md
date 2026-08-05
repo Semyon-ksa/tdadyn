@@ -10,7 +10,7 @@ data/synthetic/                 # в .gitignore, генерируется цел
 │       ├── weights.npy         # (n_points, n_points) float64, опционально
 │       └── ground_truth.json
 ├── dynamic_graph/
-│   └── cycle_lifecycle_N24_T60_threshold0.5_seed20260201/
+│   └── cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201/
 │       ├── snapshots.npy       # (T, n_nodes, n_nodes) float64, симметричные
 │       └── ground_truth.json
 ├── series/
@@ -42,6 +42,27 @@ data/synthetic/                 # в .gitignore, генерируется цел
 - Числа форматируются как `format(v, f".{naming.float_precision}g")`; строковые значения
   отделяются дефисом (`sampling-rejection`), числовые пишутся слитно (`N400`).
 - Seed всегда последний.
+
+**Группировка ключей.** У генераторов с расписанием (семейство 2) прямое перечисление
+всех параметров даёт нечитаемое имя, а выбросить их нельзя — два сценария с разным
+расписанием обязаны различаться именами. Поэтому `register_name_order` принимает не только
+отдельные ключи, но и **группу ключей, сворачиваемую в один токен**: значения группы
+форматируются по общему правилу и соединяются дефисами под одним префиксом.
+
+```python
+register_name_order(
+    "cycle_lifecycle",
+    ["n_nodes", "n_snapshots", "edge_weight", "threshold",
+     ("sched", ["path_closes_at", "chord_added_at", "edge_removed_at",
+                "component_splits_at", "component_merges_at"])],
+)
+# cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201
+```
+
+Требование точного покрытия `params` при этом не ослабляется: ключ, попавший в группу,
+считается покрытым, ключ, не попавший никуда, по-прежнему приводит к отказу построить имя.
+Хеш параметров вместо группировки не используется намеренно: он тоже обеспечил бы
+различимость, но потерял бы второе свойство имени — по каталогу видно, что в нём лежит.
 
 ## 2. Порядок осей (фиксирован, менять нельзя)
 
@@ -152,10 +173,12 @@ numpy не используется; функции чистые (одинако
 ```json
 {
   "format_version": 1,
-  "dataset_id": "cycle_lifecycle_N24_T60_threshold0.5_seed20260201",
+  "dataset_id": "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
   "family": "dynamic_graph",
   "generator": "cycle_lifecycle",
-  "params": {"n_nodes": 24, "n_snapshots": 60, "threshold": 0.5},
+  "params": {"n_nodes": 24, "n_snapshots": 60, "edge_weight": 1.0, "threshold": 0.5,
+             "path_closes_at": 12, "chord_added_at": 27, "edge_removed_at": 41,
+             "component_splits_at": 48, "component_merges_at": 55},
   "seed": 20260201,
   "coeff_field": 2,
   "complex": "flag",
@@ -165,11 +188,25 @@ numpy не используется; функции чистые (одинако
      "narrative": "путь замыкается в цикл"},
     {"snapshot": 27, "dim": 1, "type": "birth", "feature_id": "h1_b",
      "narrative": "хорда делит цикл на два"},
-    {"snapshot": 41, "dim": 1, "type": "death", "feature_id": "h1_b",
-     "narrative": "удалено ребро"}
+    {"snapshot": 41, "dim": 1, "type": "death", "feature_id": "h1_a",
+     "narrative": "удалено ребро дуги, отрезанной хордой"},
+    {"snapshot": 48, "dim": 0, "type": "birth", "feature_id": "h0_b",
+     "narrative": "от висячего пути отделяется компонента"},
+    {"snapshot": 55, "dim": 0, "type": "death", "feature_id": "h0_b",
+     "narrative": "компоненты сливаются обратно"}
   ]
 }
 ```
+
+Два места в этом примере выглядят как произвол, но им есть причина, и обе разобраны
+в `method.md`:
+
+- **Гибель в 41 спарена с рождением в 12, а не в 27** (`h1_a`, не `h1_b`). Это не
+  конвенция: разложение зигзаг-модуля на интервалы однозначно, и умирает именно класс,
+  рождённый при замыкании пути. Вывод — `method.md`, 2.2a. Интуитивное «хорда породила
+  два цикла, ломаем один — умирает он, молодой» здесь неверно.
+- **`snapshot: k` означает, что $G_k$ уже содержит изменение**, а $G_{k-1}$ — нет.
+  Скачок `betti_curve` приходится на переход $k-1 \to k$. Конвенция — `method.md`, 2.1.
 
 **Ключевое требование к согласованности:** `events` и `betti_curve` — два независимых
 источника. `events` отражает намерение планировщика, `betti_curve` считается независимой

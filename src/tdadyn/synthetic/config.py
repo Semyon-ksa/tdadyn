@@ -155,23 +155,21 @@ class Scenarios:
 
 
 @dataclass(frozen=True)
-class GeometricLoop:
-    n_points: int
-    radius_schedule: tuple[float, ...]
-    gap_open_at: int
-    gap_close_at: int
-
-
-@dataclass(frozen=True)
 class DynamicEvents:
-    """Family 2: graph snapshots with a scheduled event log."""
+    """Family 2: graph snapshots with a scheduled event log.
+
+    ``geometric_loop`` is deliberately absent: its specification is incomplete and it
+    moved to S7 (``docs/method.md`` §2.1).  Keeping it in the schema would pretend the
+    dataset can be built; leaving it out means an uncommented block in ``config.yaml``
+    is rejected as an unknown key, which is the honest answer until the missing
+    connection radius is decided.
+    """
 
     n_nodes: int
     n_snapshots: int
     edge_weight: float
     threshold: float
     scenarios: Scenarios
-    geometric_loop: GeometricLoop
 
 
 @dataclass(frozen=True)
@@ -561,17 +559,6 @@ def _dynamic_events(reader: _Reader) -> DynamicEvents:
     lifecycle_reader.done()
     scenarios_reader.done()
 
-    loop_reader = reader.section("geometric_loop")
-    geometric_loop = GeometricLoop(
-        n_points=loop_reader.integer("n_points", minimum=3),
-        radius_schedule=loop_reader.number_list(
-            "radius_schedule", minimum=0.0, exclusive=True, min_length=1
-        ),
-        gap_open_at=loop_reader.integer("gap_open_at", minimum=0),
-        gap_close_at=loop_reader.integer("gap_close_at", minimum=0),
-    )
-    loop_reader.done()
-
     reader.done()
     if threshold >= edge_weight:
         raise ConfigError(
@@ -584,7 +571,6 @@ def _dynamic_events(reader: _Reader) -> DynamicEvents:
         edge_weight=edge_weight,
         threshold=threshold,
         scenarios=Scenarios(cycle_lifecycle=cycle_lifecycle),
-        geometric_loop=geometric_loop,
     )
 
 
@@ -798,6 +784,15 @@ def _check_cross_section(config: Config, *, origin: str) -> None:
         ("component_splits_at", lifecycle.component_splits_at),
         ("component_merges_at", lifecycle.component_merges_at),
     ]
+    if schedule[0][1] < 1:
+        # docs/method.md 2.1: "snapshot: k" means G_k already carries the change and
+        # G_{k-1} does not, so the jump lands on the k-1 -> k transition. Snapshot 0
+        # has no predecessor and can never be a jump of the Betti curve.
+        raise ConfigError(
+            f"{origin}: dynamic_events.scenarios.cycle_lifecycle.{schedule[0][0]} "
+            f"({schedule[0][1]}) must be at least 1; an event on snapshot 0 has no "
+            "preceding snapshot and cannot show up as a jump of the Betti curve"
+        )
     for (earlier_key, earlier), (later_key, later) in zip(schedule, schedule[1:]):
         if later <= earlier:
             raise ConfigError(
@@ -809,14 +804,6 @@ def _check_cross_section(config: Config, *, origin: str) -> None:
         raise ConfigError(
             f"{origin}: dynamic_events.scenarios.cycle_lifecycle.{schedule[-1][0]} "
             f"({schedule[-1][1]}) is outside n_snapshots ({config.dynamic_events.n_snapshots})"
-        )
-
-    loop = config.dynamic_events.geometric_loop
-    if not loop.gap_open_at < loop.gap_close_at < config.dynamic_events.n_snapshots:
-        raise ConfigError(
-            f"{origin}: dynamic_events.geometric_loop requires "
-            f"gap_open_at < gap_close_at < n_snapshots, got {loop.gap_open_at}, "
-            f"{loop.gap_close_at}, {config.dynamic_events.n_snapshots}"
         )
 
     if sum(config.dynamic_sbm.block_sizes) != config.dynamic_sbm.n_nodes:

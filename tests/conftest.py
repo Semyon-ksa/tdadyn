@@ -21,6 +21,7 @@ from tdadyn.synthetic import (
     SeriesDataset,
     load_config,
     make_circle,
+    make_cycle_lifecycle,
     make_figure_eight,
     make_hopf_link,
     make_klein_bottle,
@@ -39,6 +40,7 @@ CONFIG_PATH = REPO_ROOT / "config.yaml"
 PLANAR_GENERATORS = ("circle", "two_circles", "figure_eight")
 SURFACE_GENERATORS = ("torus", "sphere", "klein_bottle", "hopf_link")
 STATIC_GENERATORS = PLANAR_GENERATORS + SURFACE_GENERATORS
+DYNAMIC_GENERATORS = ("cycle_lifecycle",)
 
 FAKE_NAME_ORDERS = {
     "fake_cloud": ("n_points", "dim", "noise_sigma", "sampling"),
@@ -95,7 +97,9 @@ def make_fake_dynamic_graph(seed: int = SEED) -> DynamicGraphDataset:
             Event(2, 0, "birth", "h0_b", "граф распадается на две компоненты"),
             Event(3, 0, "death", "h0_b", "компоненты сливаются"),
         ],
-        notes="Фиктивная кривая Бетти; согласованность событий проверяется в S6.",
+        notes="Фиктивная кривая Бетти при случайных снимках: набор проверяет каркас "
+        "(схему, round-trip, детерминизм), а не топологию. Согласованность событий "
+        "с кривой проверяется на cycle_lifecycle, см. tests/test_dynamic_events.py.",
     )
     return DynamicGraphDataset(snapshots=snapshots, ground_truth=ground_truth)
 
@@ -210,6 +214,49 @@ def build_static_cloud(
             count, clouds.hopf_link.radius, clouds.hopf_link.offset, sigma, field, rng
         )
     raise ValueError(f"unknown static-cloud generator {name!r}")
+
+
+def build_dynamic_graph(name, config, *, seed=None, coeff_field=None, n_nodes=None):
+    """Build one family-2 dynamic graph from the repository configuration.
+
+    Parameters
+    ----------
+    name : str
+        One of :data:`DYNAMIC_GENERATORS`.
+    config : Config
+        Loaded configuration; the schedule and the geometry come from it.
+    seed, coeff_field, n_nodes : optional
+        Override the configured values, for another stream or for the negative tests
+        that a field other than Z/2 and a graph too small for the scenario are refused.
+
+    Returns
+    -------
+    DynamicGraphDataset
+        The dataset, from the stream named after the generator.
+    """
+    events = config.dynamic_events
+    topology = config.topology_check
+    field = topology.coeff_field if coeff_field is None else coeff_field
+    rng = rng_for(config.seed if seed is None else seed, name)
+
+    if name == "cycle_lifecycle":
+        lifecycle = events.scenarios.cycle_lifecycle
+        return make_cycle_lifecycle(
+            events.n_nodes if n_nodes is None else n_nodes,
+            events.n_snapshots,
+            events.edge_weight,
+            events.threshold,
+            lifecycle.path_closes_at,
+            lifecycle.chord_added_at,
+            lifecycle.edge_removed_at,
+            lifecycle.component_splits_at,
+            lifecycle.component_merges_at,
+            field,
+            topology.max_homology_dim,
+            topology.reference_max_nodes,
+            rng,
+        )
+    raise ValueError(f"unknown dynamic-graph generator {name!r}")
 
 
 def build_planar_cloud(name, config, *, noise_sigma=None, n_points=None):

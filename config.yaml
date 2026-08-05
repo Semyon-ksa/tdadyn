@@ -130,11 +130,19 @@ dynamic_events:
       edge_removed_at: 41        # гибель H1
       component_splits_at: 48    # рождение H0
       component_merges_at: 55    # гибель H0
-  geometric_loop:
-    n_points: 60
-    radius_schedule: [1.0, 1.4, 1.0]
-    gap_open_at: 20
-    gap_close_at: 45
+    # geometric_loop перенесён в S7 (method.md, 2.1). Блок закомментирован намеренно:
+    # спецификация неполна, и держать её в схеме валидации значило бы делать вид, что
+    # набор можно построить. Что нужно дописать до включения:
+    #   - rips_epsilon: радиуса связи нет вообще, а он задаёт качественный режим;
+    #   - n_points <= reference_max_nodes (было 60 при пределе 30);
+    #   - правило интерполяции radius_schedule между узлами расписания;
+    #   - два порога режима: связность (eps > 2*pi*R/n) и переход VR(S^1) в S^3
+    #     (eps < R*sqrt(3)); расписание радиусов обязано удерживаться между ними.
+    # geometric_loop:
+    #   n_points: 60
+    #   radius_schedule: [1.0, 1.4, 1.0]
+    #   gap_open_at: 20
+    #   gap_close_at: 45
 
 # --- Семейство 3: SBM и осцилляторы ---
 dynamic_sbm:

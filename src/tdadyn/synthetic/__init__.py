@@ -19,6 +19,7 @@ from .contracts import (
     dataset_equal,
     ground_truth_equal,
 )
+from .dynamic_events import CYCLE_LIFECYCLE_NOTES, make_cycle_lifecycle
 from .io import load_dataset, load_ground_truth, save_dataset
 from .manifest import ManifestEntry, entry_payload, make_entry, read_manifest, update_manifest
 from .naming import format_dataset_id, make_dataset_id, register_name_order
@@ -43,6 +44,7 @@ from .static_clouds import (
 )
 
 __all__ = [
+    "CYCLE_LIFECYCLE_NOTES",
     "EVENT_TYPES",
     "FAMILIES",
     "FORMAT_VERSION",
@@ -68,6 +70,7 @@ __all__ = [
     "load_dataset",
     "load_ground_truth",
     "make_circle",
+    "make_cycle_lifecycle",
     "make_dataset_id",
     "make_entry",
     "make_figure_eight",

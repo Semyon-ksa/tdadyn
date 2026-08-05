@@ -353,12 +353,28 @@ def test_scheduled_events_must_fit_in_the_snapshots(raw):
         )
 
 
-def test_geometric_loop_gap_must_open_before_it_closes(raw):
-    with pytest.raises(ConfigError, match="gap_open_at < gap_close_at"):
+def test_the_first_scheduled_event_cannot_sit_on_snapshot_zero(raw):
+    # docs/method.md 2.1: the jump lands on the k-1 -> k transition, and snapshot 0
+    # has no predecessor.
+    with pytest.raises(ConfigError, match="must be at least 1"):
         parse_config(
-            mutate(raw, "dynamic_events.geometric_loop.gap_open_at", 50),
+            mutate(raw, "dynamic_events.scenarios.cycle_lifecycle.path_closes_at", 0),
             config_path=CONFIG_PATH,
         )
+
+
+def test_the_geometric_loop_block_is_not_silently_accepted(raw):
+    # It moved to S7 with an incomplete specification (docs/method.md 2.1). Un-commenting
+    # the block in config.yaml must fail loudly rather than parse and do nothing.
+    revived = copy.deepcopy(raw)
+    revived["dynamic_events"]["geometric_loop"] = {
+        "n_points": 60,
+        "radius_schedule": [1.0, 1.4, 1.0],
+        "gap_open_at": 20,
+        "gap_close_at": 45,
+    }
+    with pytest.raises(ConfigError, match="unknown keys"):
+        parse_config(revived, config_path=CONFIG_PATH)
 
 
 def test_sbm_block_sizes_must_sum_to_the_node_count(raw):

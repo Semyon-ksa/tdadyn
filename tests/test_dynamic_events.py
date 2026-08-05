@@ -1,0 +1,330 @@
+"""Family 2: the ``cycle_lifecycle`` scenario and its event log.
+
+The expectations below are transcribed from ``docs/method.md`` §2.1 and §2.2a and from
+``docs/data.md`` §4.  They are an **input**: if a test does not converge, the fault is in
+the generator, never in this table (``docs/data.md`` §4).  Nothing here is imported from
+:mod:`tdadyn.synthetic.dynamic_events` — a test that took its expectation from the module
+under test would confirm itself.
+"""
+
+from __future__ import annotations
+
+import numpy as np
+import pytest
+
+from tdadyn.synthetic import (
+    dataset_equal,
+    load_dataset,
+    make_cycle_lifecycle,
+    make_dataset_id,
+    reference,
+    rng_for,
+    save_dataset,
+)
+
+from conftest import build_dynamic_graph
+
+EXPECTED_PHASES = (
+    (0, 12, (1, 0, 0)),
+    (12, 27, (1, 1, 0)),
+    (27, 41, (1, 2, 0)),
+    (41, 48, (1, 1, 0)),
+    (48, 55, (2, 1, 0)),
+    (55, 60, (1, 1, 0)),
+)
+"""``(first snapshot, one past the last, (beta_0, beta_1, beta_2))`` per phase."""
+
+EXPECTED_EVENTS = (
+    (12, 1, "birth", "h1_a"),
+    (27, 1, "birth", "h1_b"),
+    (41, 1, "death", "h1_a"),
+    (48, 0, "birth", "h0_b"),
+    (55, 0, "death", "h0_b"),
+)
+"""The log from ``docs/data.md`` §4.  The death at 41 is paired with the birth at 12,
+not with the one at 27; that is forced, not chosen (``docs/method.md`` §2.2a)."""
+
+EXPECTED_DATASET_ID = (
+    "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201"
+)
+
+REMOVED_EDGE = (6, 7)
+"""The edge cut at snapshot 41, on the arc the chord separated."""
+
+
+@pytest.fixture
+def dynamic_graph(config):
+    return build_dynamic_graph("cycle_lifecycle", config)
+
+
+def reference_args(config):
+    """Arguments the reference implementation takes for a snapshot of this family."""
+    return {
+        "threshold": config.dynamic_events.threshold,
+        "max_homology_dim": config.topology_check.max_homology_dim,
+        "max_nodes": config.topology_check.reference_max_nodes,
+    }
+
+
+def betti_tuple(betti):
+    return tuple(betti[dim] for dim in sorted(betti))
+
+
+def jumps_of(betti_curve):
+    """Every change of the curve as ``(snapshot, dim, "birth" | "death")``.
+
+    ``docs/method.md`` §2.1 fixes the convention: ``snapshot: k`` means that :math:`G_k`
+    already carries the change, so a jump belongs to the transition ``k-1 -> k``.  A step
+    of two counts as two events, even though this scenario has none.
+    """
+    jumps = []
+    for dim, values in betti_curve.items():
+        for index in range(1, len(values)):
+            delta = values[index] - values[index - 1]
+            kind = "birth" if delta > 0 else "death"
+            jumps.extend([(index, dim, kind)] * abs(delta))
+    return sorted(jumps)
+
+
+# --- shape of the data ------------------------------------------------------------
+
+
+def test_snapshots_have_the_declared_shape_and_dtype(dynamic_graph, config):
+    events = config.dynamic_events
+    assert dynamic_graph.snapshots.shape == (
+        events.n_snapshots,
+        events.n_nodes,
+        events.n_nodes,
+    )
+    assert dynamic_graph.snapshots.dtype == np.float64
+
+
+def test_snapshots_are_symmetric_with_zero_diagonal(dynamic_graph):
+    snapshots = dynamic_graph.snapshots
+    assert np.array_equal(snapshots, np.swapaxes(snapshots, -1, -2))
+    diagonals = np.diagonal(snapshots, axis1=1, axis2=2)
+    assert np.array_equal(diagonals, np.zeros_like(diagonals))
+
+
+def test_weights_take_only_two_values(dynamic_graph, config):
+    events = config.dynamic_events
+    assert set(np.unique(dynamic_graph.snapshots).tolist()) == {0.0, events.edge_weight}
+    # The threshold has to fall strictly between them, or the graph is empty or complete.
+    assert 0.0 <= events.threshold < events.edge_weight
+
+
+def test_no_snapshot_contains_a_triangle(dynamic_graph, config):
+    # docs/method.md 2.1 requires this: a triangle would let the flag complex fill a
+    # cycle, and the logged event would not be the event that happened. Making it a test
+    # turns the agreement of beta_1 with the cyclomatic number here into a consequence of
+    # the construction rather than a coincidence.
+    adjacency = (dynamic_graph.snapshots > config.dynamic_events.threshold).astype(np.int64)
+    for index, edges in enumerate(adjacency):
+        closed_walks = np.trace(edges @ edges @ edges)  # six per triangle
+        assert closed_walks == 0, f"snapshot {index} contains a triangle"
+
+
+def test_the_repeated_state_is_present_in_the_data(dynamic_graph, config):
+    # docs/method.md 2.1: restoring (3, 4) returns the graph to the state it held between
+    # the edge removal and the split, so five distinct graphs span sixty snapshots. The
+    # repeat is deliberate and must survive into the data.
+    snapshots = dynamic_graph.snapshots
+    assert np.array_equal(snapshots[41], snapshots[55])
+    assert len({snapshot.tobytes() for snapshot in snapshots}) == 5
+    lengths = {len(values) for values in dynamic_graph.ground_truth.betti_curve.values()}
+    assert lengths == {config.dynamic_events.n_snapshots}
+
+
+# --- reproducibility --------------------------------------------------------------
+
+
+def test_the_generator_is_deterministic(config):
+    first = build_dynamic_graph("cycle_lifecycle", config)
+    second = build_dynamic_graph("cycle_lifecycle", config)
+    assert dataset_equal(first, second)
+
+
+def test_the_global_seed_does_not_leak(config, dynamic_graph):
+    np.random.seed(999)
+    np.random.normal(size=1000)
+    assert dataset_equal(build_dynamic_graph("cycle_lifecycle", config), dynamic_graph)
+
+
+def test_the_dataset_survives_a_round_trip(dynamic_graph, config, tmp_path):
+    path = save_dataset(
+        dynamic_graph, tmp_path, float_precision=config.naming.float_precision
+    )
+    assert dataset_equal(load_dataset(path), dynamic_graph)
+
+
+def test_the_dataset_id_matches_the_documented_name(dynamic_graph, config):
+    # docs/data.md 1.1: the five schedule keys collapse into one token, and every one of
+    # them still has to reach the name — two schedules must not share a directory.
+    name = make_dataset_id(
+        dynamic_graph.ground_truth, float_precision=config.naming.float_precision
+    )
+    assert name == EXPECTED_DATASET_ID
+
+
+@pytest.mark.parametrize("n_nodes", [13, 14])
+def test_a_node_count_that_degrades_the_scenario_is_refused(config, n_nodes):
+    # The chord ends are fixed node indices, so a short enough graph quietly stops being
+    # the scenario the truth describes: at 13 nodes the chord coincides with the closing
+    # edge and adding it is a no-op, at 14 it closes a triangle. Both leave beta_1 at 1
+    # while the log still claims a birth, which is exactly the plausible-looking dataset
+    # with a wrong truth that docs/validation.md opens with.
+    with pytest.raises(ValueError, match="cycle_lifecycle"):
+        build_dynamic_graph("cycle_lifecycle", config, n_nodes=n_nodes)
+
+
+def test_a_field_other_than_z2_is_refused(config):
+    # The reference is Z/2 only (docs/method.md 1.2); coeff_field must not arrive as 3
+    # and be quietly computed over Z/2 anyway.
+    with pytest.raises(ValueError, match="Z/2"):
+        build_dynamic_graph("cycle_lifecycle", config, coeff_field=3)
+
+
+# --- the truth --------------------------------------------------------------------
+
+
+def test_the_event_log_matches_the_documented_schedule(dynamic_graph):
+    events = dynamic_graph.ground_truth.events
+    actual = tuple(
+        (event.snapshot, event.dim, event.type, event.feature_id) for event in events
+    )
+    assert actual == EXPECTED_EVENTS
+
+
+def test_every_death_pairs_with_an_earlier_birth(dynamic_graph):
+    born_at = {}
+    for event in dynamic_graph.ground_truth.events:
+        key = (event.dim, event.feature_id)
+        if event.type == "birth":
+            assert key not in born_at, f"{key} is born twice"
+            born_at[key] = event.snapshot
+        else:
+            assert key in born_at, f"{key} dies without a birth"
+            assert born_at[key] < event.snapshot
+
+
+def test_the_curve_jumps_exactly_where_the_events_say(dynamic_graph):
+    # The core of the session. events and betti_curve are two independent sources: the
+    # first is the scheduler's intent, the second is computed by the reference. Comparing
+    # multisets of (position, dimension, direction) catches an unscheduled jump, an event
+    # without a jump, and a position off by one — the last being invisible inside family 2
+    # and fatal in Task 2 (docs/method.md 2.1).
+    ground_truth = dynamic_graph.ground_truth
+    from_events = sorted(
+        (event.snapshot, event.dim, event.type) for event in ground_truth.events
+    )
+    assert jumps_of(ground_truth.betti_curve) == from_events
+
+
+def test_the_declared_curve_matches_the_expected_phases(dynamic_graph):
+    curve = dynamic_graph.ground_truth.betti_curve
+    for start, stop, expected in EXPECTED_PHASES:
+        for index in range(start, stop):
+            actual = tuple(curve[dim][index] for dim in sorted(curve))
+            assert actual == expected, f"snapshot {index}"
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    ("start", "stop", "expected"), EXPECTED_PHASES, ids=lambda value: str(value)
+)
+def test_each_phase_has_the_expected_betti_numbers(
+    dynamic_graph, config, start, stop, expected
+):
+    snapshots = dynamic_graph.snapshots
+    for index in range(start, stop):
+        assert np.array_equal(snapshots[index], snapshots[start]), f"snapshot {index}"
+    betti = reference.betti_numbers_of_graph(snapshots[start], **reference_args(config))
+    assert betti_tuple(betti) == expected
+
+
+@pytest.mark.slow
+def test_the_curve_matches_the_snapshots_on_disk(dynamic_graph, config, tmp_path):
+    # The generator memoises the reference by snapshot; recomputing without the memo, from
+    # the arrays that actually reached the disk, is the guard on both that shortcut and on
+    # a curve taken from the scheduler's state instead of from the data.
+    path = save_dataset(
+        dynamic_graph, tmp_path, float_precision=config.naming.float_precision
+    )
+    loaded = load_dataset(path)
+    recomputed = {dim: [] for dim in sorted(loaded.ground_truth.betti_curve)}
+    for snapshot in loaded.snapshots:
+        betti = reference.betti_numbers_of_graph(snapshot, **reference_args(config))
+        for dim in recomputed:
+            recomputed[dim].append(betti[dim])
+    assert recomputed == loaded.ground_truth.betti_curve
+
+
+@pytest.mark.slow
+def test_the_dying_class_is_the_one_born_at_the_closure(dynamic_graph, config):
+    """The pairing of ``docs/method.md`` §2.2a, in its canonical part.
+
+    Over Z/2 let ``c`` be the 24-cycle and ``c2`` the cycle carried by the arc
+    ``12..23..0`` together with the chord.  After the removal of ``(6, 7)`` the surviving
+    cycle space is one-dimensional and contains ``c2`` but not ``c``, so the class born at
+    the closure is the one that dies.  The identity of a class is *not* asserted: a basis
+    of :math:`H_1` of the theta graph is not canonical.
+    """
+    threshold = config.dynamic_events.threshold
+    theta = dynamic_graph.snapshots[40]
+    broken = dynamic_graph.snapshots[41]
+    assert theta[REMOVED_EDGE] > threshold
+    assert broken[REMOVED_EDGE] <= threshold
+
+    complex_theta = reference.flag_complex(theta, **reference_args(config))
+    edges = complex_theta.simplices(1)
+    position = {edge: index for index, edge in enumerate(edges)}
+    boundary = reference.boundary_matrix(complex_theta, 1).astype(np.int64)
+
+    def chain(pairs):
+        vector = np.zeros(len(edges), dtype=np.int64)
+        for pair in pairs:
+            vector[position[tuple(sorted(pair))]] = 1
+        return vector
+
+    cycle_24 = chain([(node, node + 1) for node in range(23)] + [(23, 0)])
+    c2 = chain(
+        [(node, node + 1) for node in range(12, 23)] + [(23, 0), (0, 12)]
+    )
+    assert not (boundary @ cycle_24 % 2).any(), "c is not a cycle of the theta graph"
+    assert not (boundary @ c2 % 2).any(), "c2 is not a cycle of the theta graph"
+
+    # Z_1(G_41) sits inside C_1(G_40) as the chains supported off the removed edge.
+    assert cycle_24[position[REMOVED_EDGE]] == 1
+    assert c2[position[REMOVED_EDGE]] == 0
+    # ... and c2 spans all of it, so nothing else could have survived instead.
+    assert reference.betti_numbers_of_graph(broken, **reference_args(config))[1] == 1
+
+
+@pytest.mark.slow
+def test_relabelling_the_nodes_changes_nothing(dynamic_graph, config):
+    # docs/method.md 2.1: the labels are not randomised in the data, so that snapshots stay
+    # readable while debugging. The invariance is checked here instead.
+    permutation = rng_for(config.seed, "relabel_check").permutation(
+        config.dynamic_events.n_nodes
+    )
+    permuted = dynamic_graph.snapshots[:, permutation][:, :, permutation]
+    curve = {dim: [] for dim in sorted(dynamic_graph.ground_truth.betti_curve)}
+    for snapshot in permuted:
+        betti = reference.betti_numbers_of_graph(snapshot, **reference_args(config))
+        for dim in curve:
+            curve[dim].append(betti[dim])
+    assert curve == dynamic_graph.ground_truth.betti_curve
+
+
+def test_flag_beta_1_is_not_the_cyclomatic_number(config):
+    # docs/method.md 2.3: the triangle is filled, so beta_1 is 0 while the cyclomatic
+    # number m - n + c is 1. Counting cycles instead of computing homology is the classic
+    # silent error this family has to be safe from.
+    weight = config.dynamic_events.edge_weight
+    triangle = np.array(
+        [[0.0, weight, weight], [weight, 0.0, weight], [weight, weight, 0.0]]
+    )
+    betti = reference.betti_numbers_of_graph(triangle, **reference_args(config))
+    assert betti[1] == 0
+    n_nodes, n_edges, n_components = 3, 3, 1
+    assert n_edges - n_nodes + n_components == 1
