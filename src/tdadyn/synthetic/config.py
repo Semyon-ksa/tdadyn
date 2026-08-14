@@ -951,6 +951,24 @@ def _check_cross_section(config: Config, *, origin: str) -> None:
     _check_geometric_loop(config, origin=origin)
     _check_coupling_schedule(config, origin=origin)
 
+    # No reference_max_nodes rule for the SBM, deliberately. That limit exists so the
+    # reference implementation can verify a Betti curve; the SBM's truth is a partition
+    # and has no curve (docs/method.md, 3.1), so applying the limit here would halve a
+    # dataset for a check it never undergoes. The requirement follows the kind of truth,
+    # exactly as the schema does.
+    sbm = config.dynamic_sbm
+    if not 1 <= sbm.merge_at < sbm.split_at < sbm.n_snapshots:
+        raise ConfigError(
+            f"{origin}: dynamic_sbm requires 1 <= merge_at < split_at < n_snapshots, got "
+            f"{sbm.merge_at}, {sbm.split_at}, {sbm.n_snapshots}; a change on snapshot 0 "
+            "has no preceding snapshot"
+        )
+    if len(sbm.block_sizes) < 2:
+        raise ConfigError(
+            f"{origin}: dynamic_sbm.block_sizes has {len(sbm.block_sizes)} block(s); at "
+            "least two are needed for a merge to be possible"
+        )
+
     if sum(config.dynamic_sbm.block_sizes) != config.dynamic_sbm.n_nodes:
         raise ConfigError(
             f"{origin}: dynamic_sbm.block_sizes sum to "

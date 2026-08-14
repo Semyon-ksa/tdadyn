@@ -430,6 +430,26 @@ def test_the_series_length_must_match_the_schedule(raw):
         parse_config(mutate(raw, "oscillators.n_timepoints", 4000), config_path=CONFIG_PATH)
 
 
+def test_the_sbm_schedule_must_merge_before_it_splits(raw):
+    with pytest.raises(ConfigError, match="merge_at < split_at"):
+        parse_config(mutate(raw, "dynamic_sbm.merge_at", 50), config_path=CONFIG_PATH)
+
+
+def test_the_sbm_needs_two_communities_to_merge(raw):
+    smaller = copy.deepcopy(raw)
+    smaller["dynamic_sbm"]["block_sizes"] = [60]
+    with pytest.raises(ConfigError, match="at least two"):
+        parse_config(smaller, config_path=CONFIG_PATH)
+
+
+def test_the_sbm_is_not_capped_by_the_reference_limit(raw):
+    # docs/method.md 3.1: the SBM's truth is a partition, so it never goes through the
+    # reference implementation and the node limit that protects it does not apply.
+    limit = raw["topology_check"]["reference_max_nodes"]
+    assert raw["dynamic_sbm"]["n_nodes"] > limit
+    parse_config(raw, config_path=CONFIG_PATH)
+
+
 def test_sbm_block_sizes_must_sum_to_the_node_count(raw):
     with pytest.raises(ConfigError, match="block_sizes"):
         parse_config(mutate(raw, "dynamic_sbm.block_sizes", [15, 15, 15]), config_path=CONFIG_PATH)

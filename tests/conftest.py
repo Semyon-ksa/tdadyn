@@ -22,6 +22,7 @@ from tdadyn.synthetic import (
     load_config,
     make_circle,
     make_cycle_lifecycle,
+    make_dynamic_sbm,
     make_figure_eight,
     make_geometric_loop,
     make_hopf_link,
@@ -281,6 +282,21 @@ def build_dynamic_graph(name, config, *, seed=None, coeff_field=None, n_nodes=No
             rng,
         )
     raise ValueError(f"unknown dynamic-graph generator {name!r}")
+
+
+def build_dynamic_sbm(config, *, seed=None):
+    """Build the family-3 SBM from the repository configuration."""
+    settings = config.dynamic_sbm
+    return make_dynamic_sbm(
+        settings.n_nodes,
+        settings.n_snapshots,
+        settings.block_sizes,
+        settings.p_in,
+        settings.p_out,
+        settings.merge_at,
+        settings.split_at,
+        rng_for(config.seed if seed is None else seed, "dynamic_sbm"),
+    )
 
 
 def build_series(name, config, *, seed=None, coupling_strength=None):
