@@ -7,15 +7,19 @@ See ``docs/`` for the task, the method, the data contracts and the validation ru
 
 from .config import Config, ConfigError, load_config, parse_config
 from .contracts import (
+    EDGE_RULES,
     EVENT_TYPES,
     FAMILIES,
     FORMAT_VERSION,
+    REQUIRED_BY_TRUTH_KIND,
+    TRUTH_KINDS,
     Dataset,
     DynamicGraphDataset,
     Event,
     GroundTruth,
     PointCloudDataset,
     SeriesDataset,
+    adjacency_from_snapshot,
     dataset_equal,
     ground_truth_equal,
 )
@@ -45,9 +49,12 @@ from .static_clouds import (
 
 __all__ = [
     "CYCLE_LIFECYCLE_NOTES",
+    "EDGE_RULES",
     "EVENT_TYPES",
     "FAMILIES",
     "FORMAT_VERSION",
+    "REQUIRED_BY_TRUTH_KIND",
+    "TRUTH_KINDS",
     "Config",
     "ConfigError",
     "Dataset",
@@ -58,6 +65,7 @@ __all__ = [
     "PointCloudDataset",
     "SchemaError",
     "SeriesDataset",
+    "adjacency_from_snapshot",
     "base_seed_of",
     "betti_at_scale",
     "cross_check_scales",

@@ -639,6 +639,7 @@ def _ground_truth(
     return GroundTruth(
         format_version=FORMAT_VERSION,
         family="static_cloud",
+        truth_kind="expected_betti",
         generator=generator,
         params=params,
         seed=base_seed_of(rng),

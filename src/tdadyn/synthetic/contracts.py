@@ -18,15 +18,104 @@ from typing import Any
 
 import numpy as np
 
-FORMAT_VERSION = 1
-"""Version of the on-disk ground-truth schema. Bumped whenever the schema changes."""
+FORMAT_VERSION = 2
+"""Version of the on-disk ground-truth schema. Bumped whenever the schema changes.
+
+Version 2 added the required :attr:`GroundTruth.truth_kind` and the optional
+``edge_rule`` / ``edge_threshold``.  A *required* field changes files that were already
+written, which the byte-stability promise of ``docs/data.md`` §6 covers only for optional
+ones — hence the bump rather than a silent addition.
+"""
 
 FAMILIES = ("static_cloud", "dynamic_graph", "series", "noisy", "null")
-"""Dataset families from ``docs/task.md``; also the top-level directories on disk."""
+"""Dataset families from ``docs/task.md``.
+
+This is the **layout on disk** and nothing more.  Which fields the truth must carry is
+decided by :data:`TRUTH_KINDS`: the dynamic SBM lays out like a dynamic graph yet has no
+barcode at all, so tying the requirements to the family would encode the false claim
+"a dynamic graph has a topological truth" (``docs/method.md`` §3.1).
+"""
+
+TRUTH_KINDS = ("expected_betti", "betti_curve", "partition", "noise_level", "none")
+"""Kinds of truth a dataset can carry; see ``docs/data.md`` §4.1."""
+
+REQUIRED_BY_TRUTH_KIND: dict[str, tuple[str, ...]] = {
+    "expected_betti": ("coeff_field", "expected_betti"),
+    "betti_curve": (
+        "coeff_field",
+        "complex",
+        "edge_rule",
+        "edge_threshold",
+        "betti_curve",
+        "events",
+    ),
+    "partition": ("community_labels",),
+    "noise_level": ("noise_level",),
+    "none": (),
+}
+"""Fields each kind of truth must state.  Consulted both by :class:`GroundTruth` and by
+the JSON schema, so the two cannot drift apart."""
+
+EDGE_RULES = ("weight_above", "distance_within")
+"""How a snapshot becomes a graph.  ``weight_above`` is the similarity convention of
+``docs/method.md`` §2.3 — an edge where :math:`w_{ij} > t`, strictly.
+``distance_within`` is the metric one — an edge where :math:`d_{ij} \\le \\varepsilon`,
+non-strictly, because :math:`\\varepsilon` is a radius of inclusion and not a threshold to
+exceed.  The two point in opposite directions and the rule is never inferred from the
+family: ``cycle_lifecycle`` and ``geometric_loop`` share a family and disagree here."""
 
 EVENT_TYPES = ("birth", "death")
 """The only admissible homological events.  A barcode has no "split" or "merge":
 those are graph-level narratives and belong in :attr:`Event.narrative`."""
+
+
+def adjacency_from_snapshot(
+    snapshot: np.ndarray, *, edge_rule: str, edge_threshold: float
+) -> np.ndarray:
+    """Turn one snapshot into a 0/1 adjacency matrix according to its edge rule.
+
+    Parameters
+    ----------
+    snapshot : numpy.ndarray
+        Square symmetric matrix of similarities or of distances.
+    edge_rule : {'weight_above', 'distance_within'}
+        Which of the two conventions applies; see :data:`EDGE_RULES`.
+    edge_threshold : float
+        The threshold :math:`t` or the radius :math:`\\varepsilon`.
+
+    Returns
+    -------
+    numpy.ndarray
+        Adjacency of the same shape, float64, 1.0 on edges and 0.0 elsewhere, with a
+        zero diagonal.
+
+    Notes
+    -----
+    This is the **only** place the rule is applied.  Comparing against the threshold at
+    each use site is what lets a metric dataset be read with the similarity convention,
+    which yields the *complement* of the intended graph — and yields it quietly, since
+    the complement of a sparse graph is also connected and also produces plausible Betti
+    numbers.  Inside this package the mistake would not surface at all, because the
+    generator computes its own curve; it would surface in task 2, in someone else's code.
+    """
+    if edge_rule not in EDGE_RULES:
+        raise ValueError(f"edge_rule must be one of {EDGE_RULES}, got {edge_rule!r}")
+    if not isinstance(snapshot, np.ndarray):
+        raise TypeError(f"snapshot must be a numpy array, got {type(snapshot).__name__}")
+    if snapshot.ndim != 2 or snapshot.shape[0] != snapshot.shape[1]:
+        raise ValueError(f"snapshot must be a square matrix, got shape {snapshot.shape}")
+    if not np.isfinite(snapshot).all():
+        raise ValueError("snapshot holds non-finite values")
+    if not np.isfinite(edge_threshold):
+        raise ValueError(f"edge_threshold must be finite, got {edge_threshold!r}")
+
+    if edge_rule == "weight_above":
+        edges = snapshot > edge_threshold
+    else:
+        edges = snapshot <= edge_threshold
+    adjacency = edges.astype(np.float64)
+    np.fill_diagonal(adjacency, 0.0)
+    return adjacency
 
 
 @dataclass(frozen=True)
@@ -79,7 +168,12 @@ class GroundTruth:
     format_version : int
         Must equal :data:`FORMAT_VERSION`.
     family : str
-        One of :data:`FAMILIES`.
+        One of :data:`FAMILIES` — the layout on disk, nothing more.
+    truth_kind : str
+        One of :data:`TRUTH_KINDS` — which fields below the truth must state, per
+        :data:`REQUIRED_BY_TRUTH_KIND`.  Required and never defaulted from ``family``:
+        an implicit default is exactly the silent-convention failure that ``edge_rule``
+        exists to remove.
     generator : str
         Name of the generating function, e.g. ``"torus"``.
     params : dict
@@ -93,6 +187,13 @@ class GroundTruth:
         wherever the answer depends on it (see the Klein bottle in ``docs/method.md``).
     complex : str, optional
         Complex the truth is stated for, e.g. ``"flag"`` for thresholded graphs.
+    edge_rule : str, optional
+        One of :data:`EDGE_RULES`; how a snapshot becomes a graph.
+    edge_threshold : float, optional
+        The threshold or radius the rule is applied at.  Deliberately duplicates a value
+        that also appears in ``params``: ``params`` records the generator *call*, the
+        truth fields define the *truth*, and relating them by knowing which key holds the
+        threshold for which generator is the implicit convention being removed.
     expected_betti : dict of int to int, optional
         Family 1.  Keys must be the contiguous range ``0..max_dim``; a dimension with
         answer zero is stated explicitly, since a missing key is indistinguishable
@@ -113,11 +214,14 @@ class GroundTruth:
 
     format_version: int
     family: str
+    truth_kind: str
     generator: str
     params: dict
     seed: int
     coeff_field: int | None = None
     complex: str | None = None
+    edge_rule: str | None = None
+    edge_threshold: float | None = None
     expected_betti: dict[int, int] | None = None
     betti_curve: dict[int, list[int]] | None = None
     events: list[Event] | None = None
@@ -133,6 +237,36 @@ class GroundTruth:
             )
         if self.family not in FAMILIES:
             raise ValueError(f"GroundTruth.family must be one of {FAMILIES}, got {self.family!r}")
+        if self.truth_kind not in TRUTH_KINDS:
+            raise ValueError(
+                f"GroundTruth.truth_kind must be one of {TRUTH_KINDS}, got {self.truth_kind!r}"
+            )
+        missing = [
+            field
+            for field in REQUIRED_BY_TRUTH_KIND[self.truth_kind]
+            if getattr(self, field) is None
+        ]
+        if missing:
+            raise ValueError(
+                f"GroundTruth.truth_kind {self.truth_kind!r} requires {missing}; "
+                "the kind of truth decides which fields must be stated, not the family"
+            )
+        if self.edge_rule is not None and self.edge_rule not in EDGE_RULES:
+            raise ValueError(
+                f"GroundTruth.edge_rule must be one of {EDGE_RULES}, got {self.edge_rule!r}"
+            )
+        if self.edge_threshold is not None:
+            if not isinstance(self.edge_threshold, (float, int)) or isinstance(
+                self.edge_threshold, bool
+            ):
+                raise TypeError(
+                    f"GroundTruth.edge_threshold must be a number, "
+                    f"got {type(self.edge_threshold).__name__}"
+                )
+            if not np.isfinite(self.edge_threshold):
+                raise ValueError(
+                    f"GroundTruth.edge_threshold must be finite, got {self.edge_threshold!r}"
+                )
         if not self.generator:
             raise ValueError("GroundTruth.generator must be a non-empty string")
         if not isinstance(self.params, dict):

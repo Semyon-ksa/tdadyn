@@ -88,17 +88,23 @@ register_name_order(
 class GroundTruth:
     """Machine-readable truth for a generated dataset."""
     format_version: int
-    family: str                  # static_cloud | dynamic_graph | series | noisy | null
+    family: str                  # РАСКЛАДКА НА ДИСКЕ, не род истины:
+                                 # static_cloud | dynamic_graph | series | noisy | null
+    truth_kind: str              # РОД ИСТИНЫ, определяет обязательные поля:
+                                 # expected_betti | betti_curve | partition |
+                                 # noise_level | none
     generator: str               # torus, kuramoto, cycle_lifecycle, ...
     params: dict                 # фактические аргументы вызова генератора
     seed: int
     coeff_field: int | None = None
     complex: str | None = None                        # "flag" для порогованных графов
-    expected_betti: dict[int, int] | None = None      # семейство 1
-    betti_curve: dict[int, list[int]] | None = None   # семейство 2, по снимкам
-    events: list["Event"] | None = None               # семейство 2
-    community_labels: np.ndarray | None = None        # семейство 3, int64
-    noise_level: dict | None = None                   # семейство 4
+    edge_rule: str | None = None                      # weight_above | distance_within
+    edge_threshold: float | None = None               # значение t или eps
+    expected_betti: dict[int, int] | None = None      # truth_kind: expected_betti
+    betti_curve: dict[int, list[int]] | None = None   # truth_kind: betti_curve
+    events: list["Event"] | None = None               # truth_kind: betti_curve
+    community_labels: np.ndarray | None = None        # truth_kind: partition, int64
+    noise_level: dict | None = None                   # truth_kind: noise_level
     notes: str = ""
 
 @dataclass(frozen=True)
@@ -147,9 +153,10 @@ numpy не используется; функции чистые (одинако
 
 ```json
 {
-  "format_version": 1,
+  "format_version": 2,
   "dataset_id": "torus_N400_R2_r0.8_sig0.03_sampling-rejection_seed20260201",
   "family": "static_cloud",
+  "truth_kind": "expected_betti",
   "generator": "torus",
   "params": {"n_points": 400, "R": 2.0, "r": 0.8, "noise_sigma": 0.03,
              "sampling": "rejection"},
@@ -159,6 +166,44 @@ numpy не используется; функции чистые (одинако
   "notes": "Rejection sampling по элементу площади (R + r cos φ)."
 }
 ```
+
+### 4.1. `family` — это раскладка, `truth_kind` — род истины
+
+До семейства 3 эти две вещи совпадали, и одно поле обслуживало обе. Динамическая SBM —
+первый объект, где они расходятся: на диске у неё `snapshots.npy`, то есть раскладка
+динамического графа, а истина — разбиение на сообщества и расписание, и баркода среди
+неё нет вовсе (`docs/method.md`, §3.1). Требовать от неё `betti_curve` только потому,
+что на диске лежат снимки, значит кодировать ложное «динамический граф ⇒ у него есть
+топологическая истина».
+
+Поэтому обязательность полей определяется **`truth_kind`**, а `family` отвечает только
+за то, в каком подкаталоге лежит набор и какой файл массива в нём ожидается.
+
+| `truth_kind` | Обязательные поля | Кто |
+|---|---|---|
+| `expected_betti` | `coeff_field`, `expected_betti` | семейство 1 |
+| `betti_curve` | `coeff_field`, `complex`, `edge_rule`, `edge_threshold`, `betti_curve`, `events` | `cycle_lifecycle`, `geometric_loop` |
+| `partition` | `community_labels` | динамическая SBM |
+| `noise_level` | `noise_level` | семейство 4 |
+| `none` | — | ряды осцилляторов |
+
+Поле обязательное и **не выводится из `family` по умолчанию**: неявный дефолт — ровно тот
+механизм молчаливых ошибок, ради устранения которого заводится `edge_rule` ниже.
+
+### 4.2. `edge_rule` и `edge_threshold` — направление порога
+
+`docs/method.md` §2.3 разбирает, почему правил ребра два и почему они противоположны:
+у набора сходств ребро появляется сверху ($w_{ij} > t$, строго), у метрического — снизу
+($d_{ij} \le \varepsilon$, нестрого). Из семейства это не выводится: `cycle_lifecycle`
+и `geometric_loop` оба лежат в `dynamic_graph/`.
+
+`edge_threshold` намеренно дублирует значение, которое уже есть в `params`. Это не
+избыточность, а разделение назначений: `params` протоколирует **вызов генератора**, поля
+истины определяют **саму истину**. Связывать их знанием о том, какой ключ `params` держит
+порог у какого генератора, — та же неявная конвенция, от которой уходим.
+
+`format_version` поднят с 1 до 2: `truth_kind` обязателен, а обещание побайтовой
+стабильности из §6 распространяется только на необязательные поля.
 
 `dataset_id` в файле есть, но полем датакласса не является: он выводится из
 `(generator, params, seed)`. Хранить его ещё и в объекте значило бы позволить имени и
@@ -172,9 +217,10 @@ numpy не используется; функции чистые (одинако
 
 ```json
 {
-  "format_version": 1,
+  "format_version": 2,
   "dataset_id": "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
   "family": "dynamic_graph",
+  "truth_kind": "betti_curve",
   "generator": "cycle_lifecycle",
   "params": {"n_nodes": 24, "n_snapshots": 60, "edge_weight": 1.0, "threshold": 0.5,
              "path_closes_at": 12, "chord_added_at": 27, "edge_removed_at": 41,
@@ -182,6 +228,8 @@ numpy не используется; функции чистые (одинако
   "seed": 20260201,
   "coeff_field": 2,
   "complex": "flag",
+  "edge_rule": "weight_above",
+  "edge_threshold": 0.5,
   "betti_curve": {"0": [1, 1, "..."], "1": [0, 0, "..."], "2": ["..."]},
   "events": [
     {"snapshot": 12, "dim": 1, "type": "birth", "feature_id": "h1_a",
@@ -198,8 +246,12 @@ numpy не используется; функции чистые (одинако
 }
 ```
 
-Два места в этом примере выглядят как произвол, но им есть причина, и обе разобраны
+Три места в этом примере выглядят как произвол, но им есть причина, и все разобраны
 в `method.md`:
+
+- **`edge_rule: weight_above` записан явно**, хотя для этого набора он «очевиден».
+  Очевиден он ровно до появления `geometric_loop`, который лежит в том же семействе
+  и требует `distance_within`. Вывод — `method.md`, 2.3.
 
 - **Гибель в 41 спарена с рождением в 12, а не в 27** (`h1_a`, не `h1_b`). Это не
   конвенция: разложение зигзаг-модуля на интервалы однозначно, и умирает именно класс,

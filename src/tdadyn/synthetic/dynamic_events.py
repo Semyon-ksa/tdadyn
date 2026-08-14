@@ -20,7 +20,13 @@ from __future__ import annotations
 
 import numpy as np
 
-from .contracts import FORMAT_VERSION, DynamicGraphDataset, Event, GroundTruth
+from .contracts import (
+    FORMAT_VERSION,
+    DynamicGraphDataset,
+    Event,
+    GroundTruth,
+    adjacency_from_snapshot,
+)
 from .naming import register_name_order
 from .reference import REFERENCE_COEFF_FIELD, betti_numbers_of_graph
 from .rng import base_seed_of
@@ -153,7 +159,8 @@ def make_cycle_lifecycle(
     snapshots = _build_snapshots(n_nodes, n_snapshots, edge_weight, schedule)
     betti_curve = _betti_curve(
         snapshots,
-        threshold=threshold,
+        edge_rule="weight_above",
+        edge_threshold=threshold,
         max_homology_dim=max_homology_dim,
         reference_max_nodes=reference_max_nodes,
         coeff_field=coeff_field,
@@ -172,11 +179,16 @@ def make_cycle_lifecycle(
     ground_truth = GroundTruth(
         format_version=FORMAT_VERSION,
         family="dynamic_graph",
+        truth_kind="betti_curve",
         generator="cycle_lifecycle",
         params=params,
         seed=base_seed_of(rng),
         coeff_field=int(coeff_field),
         complex="flag",
+        # Similarities, so an edge is a weight strictly above the threshold. Stated
+        # rather than assumed: geometric_loop shares this family and reads the other way.
+        edge_rule="weight_above",
+        edge_threshold=float(threshold),
         betti_curve=betti_curve,
         events=_events(schedule),
         notes=CYCLE_LIFECYCLE_NOTES,
@@ -234,18 +246,25 @@ def _remove(edges: set[tuple[int, int]], edge: tuple[int, int]) -> None:
 def _betti_curve(
     snapshots: np.ndarray,
     *,
-    threshold: float,
+    edge_rule: str,
+    edge_threshold: float,
     max_homology_dim: int,
     reference_max_nodes: int,
     coeff_field: int,
 ) -> dict[int, list[int]]:
     """Betti numbers of every snapshot, from the reference implementation.
 
-    Identical snapshots are computed once.  The scenario holds five distinct graphs over
-    sixty snapshots, and the reference is deliberately slow, so the memo is what keeps
-    this generator usable outside the slow tests.  It cannot change the answer — the same
-    graph has the same Betti numbers — and the curve still carries one entry per snapshot;
-    the repeat lives in the data, not in the computation.
+    The snapshot is turned into a graph by :func:`adjacency_from_snapshot` and never by
+    comparing against the threshold here: the two edge rules point in opposite directions
+    and applying the wrong one yields the complement of the intended graph
+    (``docs/method.md`` §2.3).  The reference then works on a 0/1 matrix, where the
+    similarity convention is the correct one whichever rule produced it.
+
+    Identical snapshots are computed once.  The scenarios hold a handful of distinct
+    graphs over sixty snapshots, and the reference is deliberately slow, so the memo is
+    what keeps these generators usable outside the slow tests.  It cannot change the
+    answer — the same graph has the same Betti numbers — and the curve still carries one
+    entry per snapshot; a repeated state lives in the data, not in the computation.
     """
     curve: dict[int, list[int]] = {dim: [] for dim in range(max_homology_dim + 1)}
     seen: dict[bytes, dict[int, int]] = {}
@@ -253,9 +272,12 @@ def _betti_curve(
         key = snapshot.tobytes()
         betti = seen.get(key)
         if betti is None:
+            adjacency = adjacency_from_snapshot(
+                snapshot, edge_rule=edge_rule, edge_threshold=edge_threshold
+            )
             betti = betti_numbers_of_graph(
-                snapshot,
-                threshold=threshold,
+                adjacency,
+                threshold=0.5,
                 max_homology_dim=max_homology_dim,
                 max_nodes=reference_max_nodes,
                 coeff_field=coeff_field,

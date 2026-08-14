@@ -11,13 +11,32 @@ from typing import Any
 
 import numpy as np
 
-from .contracts import EVENT_TYPES, FAMILIES, FORMAT_VERSION, Event, GroundTruth
+from .contracts import (
+    EDGE_RULES,
+    EVENT_TYPES,
+    FAMILIES,
+    FORMAT_VERSION,
+    REQUIRED_BY_TRUTH_KIND,
+    TRUTH_KINDS,
+    Event,
+    GroundTruth,
+)
 
-_REQUIRED_KEYS = ("format_version", "dataset_id", "family", "generator", "params", "seed")
+_REQUIRED_KEYS = (
+    "format_version",
+    "dataset_id",
+    "family",
+    "truth_kind",
+    "generator",
+    "params",
+    "seed",
+)
 
 _OPTIONAL_KEYS = (
     "coeff_field",
     "complex",
+    "edge_rule",
+    "edge_threshold",
     "expected_betti",
     "betti_curve",
     "events",
@@ -27,16 +46,6 @@ _OPTIONAL_KEYS = (
 )
 
 _EVENT_KEYS = ("snapshot", "dim", "type", "feature_id", "narrative")
-
-_REQUIRED_BY_FAMILY = {
-    # A static cloud whose Betti numbers are unknown has no reason to exist, and a
-    # dynamic graph without a curve and an event log cannot validate anything.
-    "static_cloud": ("coeff_field", "expected_betti"),
-    "dynamic_graph": ("coeff_field", "complex", "betti_curve", "events"),
-    "series": (),
-    "noisy": ("noise_level",),
-    "null": (),
-}
 
 
 class SchemaError(ValueError):
@@ -64,6 +73,7 @@ def ground_truth_to_json_dict(ground_truth: GroundTruth, dataset_id: str) -> dic
         "format_version": ground_truth.format_version,
         "dataset_id": dataset_id,
         "family": ground_truth.family,
+        "truth_kind": ground_truth.truth_kind,
         "generator": ground_truth.generator,
         "params": jsonify("params", ground_truth.params),
         "seed": int(ground_truth.seed),
@@ -73,6 +83,10 @@ def ground_truth_to_json_dict(ground_truth: GroundTruth, dataset_id: str) -> dic
         payload["coeff_field"] = int(ground_truth.coeff_field)
     if ground_truth.complex is not None:
         payload["complex"] = ground_truth.complex
+    if ground_truth.edge_rule is not None:
+        payload["edge_rule"] = ground_truth.edge_rule
+    if ground_truth.edge_threshold is not None:
+        payload["edge_threshold"] = float(ground_truth.edge_threshold)
     if ground_truth.expected_betti is not None:
         payload["expected_betti"] = _dims_to_json(ground_truth.expected_betti)
     if ground_truth.betti_curve is not None:
@@ -124,11 +138,14 @@ def ground_truth_from_json_dict(payload: dict[str, Any]) -> GroundTruth:
     return GroundTruth(
         format_version=payload["format_version"],
         family=payload["family"],
+        truth_kind=payload["truth_kind"],
         generator=payload["generator"],
         params=payload["params"],
         seed=payload["seed"],
         coeff_field=payload.get("coeff_field"),
         complex=payload.get("complex"),
+        edge_rule=payload.get("edge_rule"),
+        edge_threshold=payload.get("edge_threshold"),
         expected_betti=None if expected_betti is None else _dims_from_json(expected_betti),
         betti_curve=None if betti_curve is None else _dims_from_json(betti_curve),
         events=None if events is None else [Event(**event) for event in events],
@@ -169,6 +186,10 @@ def validate_ground_truth_dict(payload: Any) -> None:
         )
     if payload["family"] not in FAMILIES:
         raise SchemaError(f"family must be one of {list(FAMILIES)}, got {payload['family']!r}")
+    if payload["truth_kind"] not in TRUTH_KINDS:
+        raise SchemaError(
+            f"truth_kind must be one of {list(TRUTH_KINDS)}, got {payload['truth_kind']!r}"
+        )
     for key in ("dataset_id", "generator"):
         if not isinstance(payload[key], str) or not payload[key]:
             raise SchemaError(f"{key} must be a non-empty string")
@@ -177,9 +198,21 @@ def validate_ground_truth_dict(payload: Any) -> None:
     if not isinstance(payload["seed"], int) or isinstance(payload["seed"], bool):
         raise SchemaError(f"seed must be an int, got {payload['seed']!r}")
 
-    for key in _REQUIRED_BY_FAMILY[payload["family"]]:
+    # The kind of truth decides the required fields, not the family: the dynamic SBM lays
+    # out like a dynamic graph and has no barcode at all (docs/method.md, 3.1).
+    for key in REQUIRED_BY_TRUTH_KIND[payload["truth_kind"]]:
         if key not in payload:
-            raise SchemaError(f"family {payload['family']!r} requires the field {key!r}")
+            raise SchemaError(f"truth_kind {payload['truth_kind']!r} requires the field {key!r}")
+
+    if "edge_rule" in payload and payload["edge_rule"] not in EDGE_RULES:
+        raise SchemaError(
+            f"edge_rule must be one of {list(EDGE_RULES)}, got {payload['edge_rule']!r}"
+        )
+    if "edge_threshold" in payload and (
+        not isinstance(payload["edge_threshold"], (int, float))
+        or isinstance(payload["edge_threshold"], bool)
+    ):
+        raise SchemaError(f"edge_threshold must be a number, got {payload['edge_threshold']!r}")
 
     if "expected_betti" in payload:
         _validate_dim_mapping("expected_betti", payload["expected_betti"], of_lists=False)

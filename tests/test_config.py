@@ -149,7 +149,7 @@ def test_unknown_top_level_key_is_an_error(raw):
 
 def test_format_version_must_match_the_package(raw):
     with pytest.raises(ConfigError, match="format_version"):
-        parse_config(mutate(raw, "format_version", 2), config_path=CONFIG_PATH)
+        parse_config(mutate(raw, "format_version", 99), config_path=CONFIG_PATH)
 
 
 # --- cross-section constraints, each restating a rule from docs/ ------------------

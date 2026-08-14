@@ -81,20 +81,35 @@ def test_stale_format_version_is_rejected(fake_dynamic_graph):
 
 
 @pytest.mark.parametrize(
-    ("family", "field"),
+    ("truth_kind", "field"),
     [
-        ("static_cloud", "expected_betti"),
-        ("dynamic_graph", "betti_curve"),
-        ("dynamic_graph", "events"),
-        ("noisy", "noise_level"),
+        ("expected_betti", "expected_betti"),
+        ("betti_curve", "betti_curve"),
+        ("betti_curve", "events"),
+        ("betti_curve", "edge_rule"),
+        ("betti_curve", "edge_threshold"),
+        ("partition", "community_labels"),
+        ("noise_level", "noise_level"),
     ],
 )
-def test_family_requires_its_truth_fields(fake_dynamic_graph, family, field):
+def test_the_truth_kind_requires_its_fields(fake_dynamic_graph, truth_kind, field):
+    # docs/data.md 4.1: the required fields hang off truth_kind, not off family — the
+    # dynamic SBM lays out like a dynamic graph and carries no barcode at all.
     payload = as_json(fake_dynamic_graph)
-    payload["family"] = family
+    payload["truth_kind"] = truth_kind
     payload.pop(field, None)
     with pytest.raises(SchemaError, match=field):
         validate_ground_truth_dict(payload)
+
+
+def test_a_dynamic_graph_may_carry_a_partition_instead_of_a_barcode(fake_dynamic_graph):
+    # The case the split exists for: the SBM. Same layout on disk, different truth.
+    payload = as_json(fake_dynamic_graph)
+    payload["truth_kind"] = "partition"
+    for field in ("betti_curve", "events", "complex", "edge_rule", "edge_threshold"):
+        payload.pop(field, None)
+    payload["community_labels"] = [[0, 0, 1], [0, 1, 1]]
+    validate_ground_truth_dict(payload)
 
 
 def test_dimensions_must_be_stated_from_zero_upwards(fake_dynamic_graph):
@@ -112,6 +127,7 @@ def test_a_skipped_dimension_is_rejected():
         GroundTruth(
             format_version=FORMAT_VERSION,
             family="static_cloud",
+            truth_kind="expected_betti",
             generator="fake_cloud",
             params={},
             seed=1,
@@ -125,11 +141,14 @@ def test_betti_curve_lengths_must_agree_across_dimensions():
         GroundTruth(
             format_version=FORMAT_VERSION,
             family="dynamic_graph",
+            truth_kind="betti_curve",
             generator="fake_dynamic",
             params={},
             seed=1,
             coeff_field=2,
             complex="flag",
+            edge_rule="weight_above",
+            edge_threshold=0.5,
             betti_curve={0: [1, 1, 1], 1: [0, 1]},
             events=[],
         )
@@ -140,11 +159,14 @@ def test_event_outside_the_betti_curve_is_rejected():
         GroundTruth(
             format_version=FORMAT_VERSION,
             family="dynamic_graph",
+            truth_kind="betti_curve",
             generator="fake_dynamic",
             params={},
             seed=1,
             coeff_field=2,
             complex="flag",
+            edge_rule="weight_above",
+            edge_threshold=0.5,
             betti_curve={0: [1, 1], 1: [0, 0]},
             events=[Event(5, 1, "birth", "h1_a", "цикл замкнулся")],
         )

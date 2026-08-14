@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 from tdadyn.synthetic import (
+    adjacency_from_snapshot,
     dataset_equal,
     load_dataset,
     make_cycle_lifecycle,
@@ -314,6 +315,68 @@ def test_relabelling_the_nodes_changes_nothing(dynamic_graph, config):
         for dim in curve:
             curve[dim].append(betti[dim])
     assert curve == dynamic_graph.ground_truth.betti_curve
+
+
+# --- the edge rule -----------------------------------------------------------------
+
+
+def test_weight_above_is_strict_and_distance_within_is_not():
+    # docs/method.md 2.3: a weight equal to the threshold does not exceed it, while a
+    # distance equal to epsilon is inside the radius of inclusion.
+    matrix = np.array([[0.0, 0.5], [0.5, 0.0]])
+    above = adjacency_from_snapshot(matrix, edge_rule="weight_above", edge_threshold=0.5)
+    within = adjacency_from_snapshot(matrix, edge_rule="distance_within", edge_threshold=0.5)
+    assert above[0, 1] == 0.0
+    assert within[0, 1] == 1.0
+
+
+def test_the_two_rules_give_complementary_graphs():
+    # Why the rule must be recorded rather than inferred: read a metric dataset with the
+    # similarity convention and you get the complement — connected, plausible, wrong.
+    rng = rng_for(1, "edge_rule_check")
+    matrix = rng.random((6, 6))
+    matrix = (matrix + matrix.T) / 2
+    np.fill_diagonal(matrix, 0.0)
+    above = adjacency_from_snapshot(matrix, edge_rule="weight_above", edge_threshold=0.5)
+    within = adjacency_from_snapshot(matrix, edge_rule="distance_within", edge_threshold=0.5)
+    off_diagonal = ~np.eye(6, dtype=bool)
+    assert np.array_equal(above[off_diagonal] + within[off_diagonal], np.ones(30))
+    assert np.array_equal(np.diagonal(above), np.zeros(6))
+    assert np.array_equal(np.diagonal(within), np.zeros(6))
+
+
+def test_an_unknown_edge_rule_is_refused():
+    with pytest.raises(ValueError, match="edge_rule must be one of"):
+        adjacency_from_snapshot(np.zeros((2, 2)), edge_rule="nearest", edge_threshold=0.5)
+
+
+@pytest.mark.slow
+def test_the_recorded_edge_rule_is_the_one_that_reproduces_the_curve(dynamic_graph, config):
+    # The field is load-bearing, not decorative: applying the other rule to the same
+    # snapshots yields a different curve. Without this the rule could be recorded wrongly
+    # and nothing inside the package would notice.
+    ground_truth = dynamic_graph.ground_truth
+    topology = config.topology_check
+
+    def curve_under(rule):
+        result = {dim: [] for dim in sorted(ground_truth.betti_curve)}
+        for snapshot in dynamic_graph.snapshots:
+            adjacency = adjacency_from_snapshot(
+                snapshot, edge_rule=rule, edge_threshold=ground_truth.edge_threshold
+            )
+            betti = reference.betti_numbers_of_graph(
+                adjacency,
+                threshold=0.5,
+                max_homology_dim=topology.max_homology_dim,
+                max_nodes=topology.reference_max_nodes,
+            )
+            for dim in result:
+                result[dim].append(betti[dim])
+        return result
+
+    assert curve_under(ground_truth.edge_rule) == ground_truth.betti_curve
+    other = "distance_within" if ground_truth.edge_rule == "weight_above" else "weight_above"
+    assert curve_under(other) != ground_truth.betti_curve
 
 
 def test_flag_beta_1_is_not_the_cyclomatic_number(config):
