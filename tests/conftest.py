@@ -26,6 +26,8 @@ from tdadyn.synthetic import (
     make_geometric_loop,
     make_hopf_link,
     make_klein_bottle,
+    make_kuramoto,
+    make_roessler,
     make_sphere,
     make_torus,
     make_two_circles,
@@ -42,6 +44,7 @@ PLANAR_GENERATORS = ("circle", "two_circles", "figure_eight")
 SURFACE_GENERATORS = ("torus", "sphere", "klein_bottle", "hopf_link")
 STATIC_GENERATORS = PLANAR_GENERATORS + SURFACE_GENERATORS
 DYNAMIC_GENERATORS = ("cycle_lifecycle", "geometric_loop")
+SERIES_GENERATORS = ("kuramoto", "roessler")
 
 FAKE_NAME_ORDERS = {
     "fake_cloud": ("n_points", "dim", "noise_sigma", "sampling"),
@@ -278,6 +281,67 @@ def build_dynamic_graph(name, config, *, seed=None, coeff_field=None, n_nodes=No
             rng,
         )
     raise ValueError(f"unknown dynamic-graph generator {name!r}")
+
+
+def build_series(name, config, *, seed=None, coupling_strength=None):
+    """Build one family-3 series from the repository configuration.
+
+    Parameters
+    ----------
+    name : str
+        One of :data:`SERIES_GENERATORS`.
+    config : Config
+        Loaded configuration; every physical parameter comes from it.
+    seed, coupling_strength : optional
+        Override the configured values, for another stream or for the negative control
+        that switches the coupling off entirely.
+
+    Returns
+    -------
+    SeriesDataset
+        The dataset, from the stream named after the generator.
+    """
+    oscillators = config.oscillators
+    schedule = oscillators.coupling_schedule
+    integrator = oscillators.integrator
+    rng = rng_for(config.seed if seed is None else seed, name)
+    shared = (
+        schedule.regimes,
+        schedule.regime_length,
+        schedule.transient_length,
+        integrator.method,
+        integrator.rtol,
+        integrator.atol,
+    )
+    if name == "kuramoto":
+        strength = (
+            oscillators.kuramoto.K if coupling_strength is None else coupling_strength
+        )
+        return make_kuramoto(
+            oscillators.n_channels,
+            oscillators.n_timepoints,
+            oscillators.dt,
+            strength,
+            oscillators.kuramoto.omega_scale,
+            *shared,
+            rng,
+        )
+    if name == "roessler":
+        strength = (
+            oscillators.roessler.epsilon if coupling_strength is None else coupling_strength
+        )
+        return make_roessler(
+            oscillators.n_channels,
+            oscillators.n_timepoints,
+            oscillators.dt,
+            oscillators.roessler.a,
+            oscillators.roessler.b,
+            oscillators.roessler.c,
+            strength,
+            *shared,
+            rng,
+        )
+    raise ValueError(f"unknown series generator {name!r}")
 
 
 def build_planar_cloud(name, config, *, noise_sigma=None, n_points=None):

@@ -86,7 +86,8 @@ def test_missing_required_key_names_the_key(raw, dotted):
         ("static_clouds.torus.R", "two", "expected a number"),
         ("sliding_window.fisher_z", "yes", "expected a bool"),
         ("dynamic_sbm.block_sizes", 60, "expected a list"),
-        ("oscillators.coupling_schedule.regimes", [1, 2], "expected a non-empty string"),
+        # A regime is a partition, not a name: docs/method.md 3.1a.
+        ("oscillators.coupling_schedule.regimes", [1, 2], "expected a list of block sizes"),
         ("topology_check", [1, 2], "expected a mapping"),
     ],
 )
@@ -398,6 +399,35 @@ def test_a_gap_too_narrow_to_break_the_loop_is_refused(raw):
 def test_the_metric_gap_must_open_before_it_closes(raw):
     with pytest.raises(ConfigError, match="gap_open_at < gap_close_at"):
         parse_config(mutate(raw, f"{GEOMETRIC_LOOP}.gap_open_at", 50), config_path=CONFIG_PATH)
+
+
+def test_a_regime_must_partition_all_the_channels(raw):
+    with pytest.raises(ConfigError, match="must partition all the channels"):
+        parse_config(
+            mutate(raw, "oscillators.coupling_schedule.regimes", [[10, 10], [20, 10]]),
+            config_path=CONFIG_PATH,
+        )
+
+
+def test_regimes_not_related_by_refinement_are_refused(raw):
+    # docs/method.md 3.1a: [15,15] -> [10,10,10] is neither a merge nor a split; the
+    # blocks are simply re-cut, and the schedule the roadmap asks for is not realised.
+    with pytest.raises(ConfigError, match="not related by refinement"):
+        parse_config(
+            mutate(
+                raw,
+                "oscillators.coupling_schedule.regimes",
+                [[15, 15], [10, 10, 10], [15, 15]],
+            ),
+            config_path=CONFIG_PATH,
+        )
+
+
+def test_the_series_length_must_match_the_schedule(raw):
+    # Otherwise a window is matched against the wrong regime and the failure looks like
+    # poor recovery rather than a misalignment.
+    with pytest.raises(ConfigError, match="regime_length"):
+        parse_config(mutate(raw, "oscillators.n_timepoints", 4000), config_path=CONFIG_PATH)
 
 
 def test_sbm_block_sizes_must_sum_to_the_node_count(raw):

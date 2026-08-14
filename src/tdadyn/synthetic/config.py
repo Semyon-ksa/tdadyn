@@ -172,11 +172,10 @@ class Scenarios:
 class DynamicEvents:
     """Family 2: graph snapshots with a scheduled event log.
 
-    ``geometric_loop`` is deliberately absent: its specification is incomplete and it
-    moved to S7 (``docs/method.md`` §2.1).  Keeping it in the schema would pretend the
-    dataset can be built; leaving it out means an uncommented block in ``config.yaml``
-    is rejected as an unknown key, which is the honest answer until the missing
-    connection radius is decided.
+    Two scenarios, and they disagree about what a snapshot holds: ``cycle_lifecycle``
+    stores similarities and ``geometric_loop`` stores distances.  Which rule applies is
+    recorded per dataset in ``GroundTruth.edge_rule``, never inferred from the family
+    (``docs/method.md`` §2.3).
     """
 
     n_nodes: int
@@ -221,8 +220,16 @@ class Integrator:
 
 @dataclass(frozen=True)
 class CouplingSchedule:
+    """Piecewise-constant coupling; see ``docs/method.md`` §3.1a.
+
+    Each regime is a partition of the channels into blocks, and consecutive partitions
+    must be related by refinement — otherwise the transition is neither a merge nor a
+    split, just a re-cut.
+    """
+
     regime_length: int
-    regimes: tuple[str, ...]
+    transient_length: int
+    regimes: tuple[tuple[int, ...], ...]
 
 
 @dataclass(frozen=True)
@@ -245,6 +252,7 @@ class SlidingWindow:
     step: int
     fisher_z: bool
     max_length_fraction_of_regime: float
+    min_coupling_agreement: float
 
 
 @dataclass(frozen=True)
@@ -660,7 +668,8 @@ def _oscillators(reader: _Reader) -> Oscillators:
     schedule_reader = reader.section("coupling_schedule")
     coupling_schedule = CouplingSchedule(
         regime_length=schedule_reader.integer("regime_length", minimum=1),
-        regimes=schedule_reader.string_list("regimes", min_length=1),
+        transient_length=schedule_reader.integer("transient_length", minimum=0),
+        regimes=schedule_reader.partition_list("regimes", min_length=1),
     )
     schedule_reader.done()
 
@@ -685,6 +694,9 @@ def _sliding_window(reader: _Reader) -> SlidingWindow:
         fisher_z=reader.boolean("fisher_z"),
         max_length_fraction_of_regime=reader.number(
             "max_length_fraction_of_regime", minimum=0.0, maximum=1.0, exclusive=True
+        ),
+        min_coupling_agreement=reader.number(
+            "min_coupling_agreement", minimum=0.0, maximum=1.0
         ),
     )
     reader.done()
@@ -752,6 +764,53 @@ def _naming(reader: _Reader) -> Naming:
     section = Naming(float_precision=reader.integer("float_precision", minimum=1, maximum=17))
     reader.done()
     return section
+
+
+def _block_boundaries(partition: Sequence[int]) -> set[int]:
+    """Interior cut positions of a partition given as contiguous block sizes."""
+    boundaries, position = set(), 0
+    for size in partition[:-1]:
+        position += size
+        boundaries.add(position)
+    return boundaries
+
+
+def _check_coupling_schedule(config: Config, *, origin: str) -> None:
+    """The regimes must partition the channels and be related by refinement.
+
+    ``docs/method.md`` §3.1a: a transition between partitions that do not refine one
+    another is neither a merge nor a split, just a re-cut, and the "merge/split schedule"
+    the roadmap asks for is not realised at all.
+    """
+    oscillators = config.oscillators
+    schedule = oscillators.coupling_schedule
+    key = "oscillators.coupling_schedule"
+
+    for index, partition in enumerate(schedule.regimes):
+        if sum(partition) != oscillators.n_channels:
+            raise ConfigError(
+                f"{origin}: {key}.regimes[{index}] sums to {sum(partition)} but "
+                f"oscillators.n_channels is {oscillators.n_channels}; a regime must "
+                "partition all the channels"
+            )
+
+    for index, (earlier, later) in enumerate(zip(schedule.regimes, schedule.regimes[1:])):
+        first, second = _block_boundaries(earlier), _block_boundaries(later)
+        if not (first <= second or second <= first):
+            raise ConfigError(
+                f"{origin}: {key}.regimes[{index}] {list(earlier)} and "
+                f"[{index + 1}] {list(later)} are not related by refinement; the "
+                "transition is neither a merge nor a split, just a re-cut "
+                "(docs/method.md, 3.1a)"
+            )
+
+    expected = schedule.regime_length * len(schedule.regimes)
+    if oscillators.n_timepoints != expected:
+        raise ConfigError(
+            f"{origin}: oscillators.n_timepoints ({oscillators.n_timepoints}) must equal "
+            f"{key}.regime_length * len(regimes) ({expected}); otherwise the series and "
+            "coupling.npy drift apart and a window is matched against the wrong regime"
+        )
 
 
 def _check_geometric_loop(config: Config, *, origin: str) -> None:
@@ -890,6 +949,7 @@ def _check_cross_section(config: Config, *, origin: str) -> None:
         )
 
     _check_geometric_loop(config, origin=origin)
+    _check_coupling_schedule(config, origin=origin)
 
     if sum(config.dynamic_sbm.block_sizes) != config.dynamic_sbm.n_nodes:
         raise ConfigError(
@@ -981,6 +1041,34 @@ class _Reader:
             if minimum is not None and item < minimum:
                 raise ConfigError(f"{self._where(key)}[{index}]: expected >= {minimum}, got {item}")
             result.append(item)
+        return tuple(result)
+
+    def partition_list(self, key: str, *, min_length: int = 1) -> tuple[tuple[int, ...], ...]:
+        """Read a list of block-size lists, e.g. ``[[10, 10, 10], [20, 10]]``.
+
+        One entry per coupling regime; each is the partition of the channels into blocks
+        (``docs/method.md`` §3.1a).
+        """
+        values = self._take_sequence(key, min_length)
+        result = []
+        for index, item in enumerate(values):
+            if isinstance(item, str) or not isinstance(item, Sequence):
+                raise ConfigError(
+                    f"{self._where(key)}[{index}]: expected a list of block sizes, got "
+                    f"{_type_name(item)}. A regime is a partition of the channels, not a "
+                    "name (docs/method.md, 3.1a)"
+                )
+            if not item:
+                raise ConfigError(f"{self._where(key)}[{index}]: a regime needs at least one block")
+            blocks = []
+            for position, size in enumerate(item):
+                if not isinstance(size, int) or isinstance(size, bool) or size < 1:
+                    raise ConfigError(
+                        f"{self._where(key)}[{index}][{position}]: block size must be a "
+                        f"positive int, got {size!r}"
+                    )
+                blocks.append(size)
+            result.append(tuple(blocks))
         return tuple(result)
 
     def number_list(
