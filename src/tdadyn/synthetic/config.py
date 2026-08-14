@@ -10,6 +10,7 @@ present in ``config.yaml``; nothing here is a preference.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -150,8 +151,21 @@ class CycleLifecycle:
 
 
 @dataclass(frozen=True)
+class GeometricLoop:
+    """The metric scenario of family 2; see ``docs/method.md`` §2.1a."""
+
+    n_points: int
+    rips_epsilon: float
+    radius_schedule: tuple[float, ...]
+    gap_angle: float
+    gap_open_at: int
+    gap_close_at: int
+
+
+@dataclass(frozen=True)
 class Scenarios:
     cycle_lifecycle: CycleLifecycle
+    geometric_loop: GeometricLoop
 
 
 @dataclass(frozen=True)
@@ -557,6 +571,19 @@ def _dynamic_events(reader: _Reader) -> DynamicEvents:
         component_merges_at=lifecycle_reader.integer("component_merges_at", minimum=0),
     )
     lifecycle_reader.done()
+
+    loop_reader = scenarios_reader.section("geometric_loop")
+    geometric_loop = GeometricLoop(
+        n_points=loop_reader.integer("n_points", minimum=3),
+        rips_epsilon=loop_reader.number("rips_epsilon", minimum=0.0, exclusive=True),
+        radius_schedule=loop_reader.number_list(
+            "radius_schedule", minimum=0.0, exclusive=True, min_length=2
+        ),
+        gap_angle=loop_reader.number("gap_angle", minimum=0.0, exclusive=True),
+        gap_open_at=loop_reader.integer("gap_open_at", minimum=1),
+        gap_close_at=loop_reader.integer("gap_close_at", minimum=1),
+    )
+    loop_reader.done()
     scenarios_reader.done()
 
     reader.done()
@@ -570,7 +597,7 @@ def _dynamic_events(reader: _Reader) -> DynamicEvents:
         n_snapshots=n_snapshots,
         edge_weight=edge_weight,
         threshold=threshold,
-        scenarios=Scenarios(cycle_lifecycle=cycle_lifecycle),
+        scenarios=Scenarios(cycle_lifecycle=cycle_lifecycle, geometric_loop=geometric_loop),
     )
 
 
@@ -727,6 +754,62 @@ def _naming(reader: _Reader) -> Naming:
     return section
 
 
+def _check_geometric_loop(config: Config, *, origin: str) -> None:
+    """Keep the metric scenario inside the regime its truth is stated for.
+
+    Every bound here names a *regime*, not a taste: outside them the dataset still
+    generates and still looks plausible, but it is a different scenario than the one the
+    event log describes (``docs/method.md`` §2.1a).
+    """
+    loop = config.dynamic_events.scenarios.geometric_loop
+    key = "dynamic_events.scenarios.geometric_loop"
+    smallest, largest = min(loop.radius_schedule), max(loop.radius_schedule)
+
+    if loop.n_points > config.topology_check.reference_max_nodes:
+        raise ConfigError(
+            f"{origin}: {key}.n_points ({loop.n_points}) exceeds "
+            f"topology_check.reference_max_nodes ({config.topology_check.reference_max_nodes}); "
+            "the reference implementation could not verify the Betti curve"
+        )
+
+    # Below the largest inter-point step the graph does not lose an arc, it shatters into
+    # n components, and the growing radius reads as an event that was never scheduled.
+    connectivity = 2 * math.pi * largest / loop.n_points
+    if loop.rips_epsilon <= connectivity:
+        raise ConfigError(
+            f"{origin}: {key}.rips_epsilon ({loop.rips_epsilon}) is at or below the "
+            f"inter-point step at the largest radius ({connectivity:.4f}); the graph would "
+            f"shatter into {loop.n_points} components instead of opening an arc"
+        )
+
+    # Above R*sqrt(3) the Vietoris-Rips complex of a circle leaves the S^1 regime for S^3
+    # (Adamaszek-Adams). With max_homology_dim 2 the new class is invisible and the death
+    # of beta_1 looks like the loop vanishing for no reason.
+    regime = smallest * math.sqrt(3.0)
+    if loop.rips_epsilon >= regime:
+        raise ConfigError(
+            f"{origin}: {key}.rips_epsilon ({loop.rips_epsilon}) is at or above "
+            f"R_min*sqrt(3) ({regime:.4f}); the Rips complex of the circle leaves the S^1 "
+            "regime for S^3, where beta_1 dies without a scheduled event"
+        )
+
+    # The chord across the gap must clear epsilon at the *smallest* radius: that is where
+    # the gap is narrowest in absolute terms and the loop is least likely to break.
+    chord = 2 * smallest * math.sin(loop.gap_angle / 2)
+    if chord <= loop.rips_epsilon:
+        raise ConfigError(
+            f"{origin}: {key}.gap_angle ({loop.gap_angle}) spans a chord of {chord:.4f} at "
+            f"the smallest radius, which does not clear rips_epsilon ({loop.rips_epsilon}); "
+            "the loop would stay closed and the scheduled death of H1 would not happen"
+        )
+
+    if not loop.gap_open_at < loop.gap_close_at < config.dynamic_events.n_snapshots:
+        raise ConfigError(
+            f"{origin}: {key} requires gap_open_at < gap_close_at < n_snapshots, got "
+            f"{loop.gap_open_at}, {loop.gap_close_at}, {config.dynamic_events.n_snapshots}"
+        )
+
+
 def _check_cross_section(config: Config, *, origin: str) -> None:
     """Checks that span sections; each one restates a constraint from ``docs/``."""
     clouds = config.static_clouds
@@ -805,6 +888,8 @@ def _check_cross_section(config: Config, *, origin: str) -> None:
             f"{origin}: dynamic_events.scenarios.cycle_lifecycle.{schedule[-1][0]} "
             f"({schedule[-1][1]}) is outside n_snapshots ({config.dynamic_events.n_snapshots})"
         )
+
+    _check_geometric_loop(config, origin=origin)
 
     if sum(config.dynamic_sbm.block_sizes) != config.dynamic_sbm.n_nodes:
         raise ConfigError(

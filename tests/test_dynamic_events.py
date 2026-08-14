@@ -317,6 +317,166 @@ def test_relabelling_the_nodes_changes_nothing(dynamic_graph, config):
     assert curve == dynamic_graph.ground_truth.betti_curve
 
 
+# --- geometric_loop: the metric scenario (docs/method.md 2.1a) ----------------------
+
+LOOP_PHASES = ((0, 20, (1, 1, 0)), (20, 45, (1, 0, 0)), (45, 60, (1, 1, 0)))
+"""Radius breathing carries no events; only the arc gap does."""
+
+LOOP_EVENTS = ((20, 1, "death", "h1_loop"), (45, 1, "birth", "h1_loop"))
+
+LOOP_BREATHING_SNAPSHOTS = (4, 43, 56)
+"""Snapshots where the radius alone changes the graph, with no event attached.
+
+Measured: 72 -> 48 edges at 4, 45 -> 66 at 43, 48 -> 72 at 56.  These are the negative
+control of the dataset, and the test names them rather than sweeping the range: a range
+sweep would also pass on a dataset whose complex never changed at all.
+"""
+
+
+@pytest.fixture
+def geometric_loop(config):
+    return build_dynamic_graph("geometric_loop", config)
+
+
+def test_the_closed_arc_is_the_uniform_circle(geometric_loop, config):
+    # docs/method.md 2.1a: delta = 0 would put points 0 and n-1 on top of each other, and
+    # beta would not notice — (1,1,0) either way. The vertex doubling is visible only in
+    # the geometry, so that is what is checked.
+    loop = config.dynamic_events.scenarios.geometric_loop
+    closed = geometric_loop.snapshots[0]
+    off_diagonal = closed[~np.eye(loop.n_points, dtype=bool)]
+    expected_step = 2 * np.sin(np.pi / loop.n_points) * loop.radius_schedule[0]
+    assert off_diagonal.min() == pytest.approx(expected_step, rel=1e-9)
+    assert off_diagonal.min() > 0.1
+
+
+def test_the_loop_dataset_id_stays_readable(geometric_loop, config):
+    # docs/data.md 1.1: the name exists so the directory says what is in it. Six raw
+    # parameter names would defeat that, hence the abbreviations and the sched group.
+    name = make_dataset_id(
+        geometric_loop.ground_truth, float_precision=config.naming.float_precision
+    )
+    assert name == "geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201"
+
+
+def test_the_snapshots_hold_distances_not_similarities(geometric_loop):
+    ground_truth = geometric_loop.ground_truth
+    assert ground_truth.edge_rule == "distance_within"
+    snapshots = geometric_loop.snapshots
+    assert np.array_equal(np.diagonal(snapshots, axis1=1, axis2=2), np.zeros((len(snapshots), snapshots.shape[1])))
+    assert (snapshots >= 0.0).all()
+
+
+def test_the_loop_curve_matches_the_expected_phases(geometric_loop):
+    curve = geometric_loop.ground_truth.betti_curve
+    for start, stop, expected in LOOP_PHASES:
+        for index in range(start, stop):
+            assert tuple(curve[dim][index] for dim in sorted(curve)) == expected, index
+
+
+def test_the_loop_event_log_matches_the_schedule(geometric_loop):
+    events = geometric_loop.ground_truth.events
+    assert tuple((e.snapshot, e.dim, e.type, e.feature_id) for e in events) == LOOP_EVENTS
+
+
+def test_the_loop_curve_jumps_exactly_where_the_events_say(geometric_loop):
+    ground_truth = geometric_loop.ground_truth
+    from_events = sorted((e.snapshot, e.dim, e.type) for e in ground_truth.events)
+    assert jumps_of(ground_truth.betti_curve) == from_events
+
+
+def test_the_breathing_radius_changes_the_graph_without_an_event(geometric_loop, config):
+    # The strongest negative control in the dataset: the complex genuinely changes and no
+    # event follows. Named snapshots, not a range — see LOOP_BREATHING_SNAPSHOTS.
+    ground_truth = geometric_loop.ground_truth
+    scheduled = {event.snapshot for event in ground_truth.events}
+    curve = ground_truth.betti_curve
+
+    def graph_at(index):
+        return adjacency_from_snapshot(
+            geometric_loop.snapshots[index],
+            edge_rule=ground_truth.edge_rule,
+            edge_threshold=ground_truth.edge_threshold,
+        )
+
+    for index in LOOP_BREATHING_SNAPSHOTS:
+        assert index not in scheduled
+        assert not np.array_equal(graph_at(index), graph_at(index - 1)), f"snapshot {index}"
+        before = tuple(curve[dim][index - 1] for dim in sorted(curve))
+        after = tuple(curve[dim][index] for dim in sorted(curve))
+        assert before == after, f"snapshot {index} moved beta without an event"
+
+
+def test_the_loop_has_four_distinct_graphs(geometric_loop):
+    ground_truth = geometric_loop.ground_truth
+    graphs = {
+        adjacency_from_snapshot(
+            snapshot,
+            edge_rule=ground_truth.edge_rule,
+            edge_threshold=ground_truth.edge_threshold,
+        ).tobytes()
+        for snapshot in geometric_loop.snapshots
+    }
+    assert len(graphs) == 4
+
+
+def test_every_snapshot_stays_inside_both_regime_bounds(geometric_loop, config):
+    # Connectivity below, the S^1 -> S^3 transition above. Checked on the data, not only
+    # in the config, because the radius is interpolated and the config sees only knots.
+    loop = config.dynamic_events.scenarios.geometric_loop
+    epsilon = loop.rips_epsilon
+    n_snapshots = len(geometric_loop.snapshots)
+    radii = np.interp(
+        np.arange(n_snapshots),
+        np.linspace(0, n_snapshots - 1, len(loop.radius_schedule)),
+        loop.radius_schedule,
+    )
+    # The radius is interpolated, so the config sees only the knots; the binding values
+    # are the extremes actually reached.
+    assert epsilon > 2 * np.pi * radii.max() / loop.n_points
+    assert epsilon < radii.min() * np.sqrt(3.0)
+
+
+@pytest.mark.slow
+def test_the_loop_beta_1_is_far_from_the_cyclomatic_number(geometric_loop, config):
+    # Unlike cycle_lifecycle, this complex is full of triangles, so the distinction of
+    # docs/method.md 2.3 shows up on real data rather than on a 3-node fixture.
+    ground_truth = geometric_loop.ground_truth
+    adjacency = adjacency_from_snapshot(
+        geometric_loop.snapshots[0],
+        edge_rule=ground_truth.edge_rule,
+        edge_threshold=ground_truth.edge_threshold,
+    )
+    n_nodes = adjacency.shape[0]
+    n_edges = int(adjacency.sum() // 2)
+    cyclomatic = n_edges - n_nodes + 1
+    assert ground_truth.betti_curve[1][0] == 1
+    assert cyclomatic > 40
+
+
+@pytest.mark.slow
+def test_the_loop_curve_matches_the_snapshots_on_disk(geometric_loop, config, tmp_path):
+    path = save_dataset(geometric_loop, tmp_path, float_precision=config.naming.float_precision)
+    loaded = load_dataset(path)
+    ground_truth = loaded.ground_truth
+    recomputed = {dim: [] for dim in sorted(ground_truth.betti_curve)}
+    for snapshot in loaded.snapshots:
+        adjacency = adjacency_from_snapshot(
+            snapshot,
+            edge_rule=ground_truth.edge_rule,
+            edge_threshold=ground_truth.edge_threshold,
+        )
+        betti = reference.betti_numbers_of_graph(
+            adjacency,
+            threshold=0.5,
+            max_homology_dim=config.topology_check.max_homology_dim,
+            max_nodes=config.topology_check.reference_max_nodes,
+        )
+        for dim in recomputed:
+            recomputed[dim].append(betti[dim])
+    assert recomputed == ground_truth.betti_curve
+
+
 # --- the edge rule -----------------------------------------------------------------
 
 

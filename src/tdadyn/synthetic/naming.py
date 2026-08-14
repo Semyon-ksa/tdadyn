@@ -34,6 +34,9 @@ ABBREVIATIONS = {
     "noise_sigma": "sig",
     "edge_weight": "w",
     "threshold": "thr",
+    "rips_epsilon": "eps",
+    "gap_angle": "gap",
+    "radius_schedule": "R",
 }
 """Short forms for the most frequent parameters, so that names stay readable.
 Every other parameter appears under its own key."""

@@ -139,13 +139,14 @@ def make_cycle_lifecycle(
     change and its predecessor does not (``docs/method.md`` §2.1), so a jump of the curve
     belongs to the transition into it.
     """
-    _check_arguments(
+    _check_common(
         n_nodes=n_nodes,
         n_snapshots=n_snapshots,
-        edge_weight=edge_weight,
-        threshold=threshold,
         coeff_field=coeff_field,
         max_homology_dim=max_homology_dim,
+    )
+    _check_cycle_lifecycle_arguments(
+        n_nodes=n_nodes, edge_weight=edge_weight, threshold=threshold
     )
     schedule = (
         path_closes_at,
@@ -194,6 +195,163 @@ def make_cycle_lifecycle(
         notes=CYCLE_LIFECYCLE_NOTES,
     )
     return DynamicGraphDataset(snapshots=snapshots, ground_truth=ground_truth)
+
+
+register_name_order(
+    "geometric_loop",
+    [
+        "n_points",
+        "n_snapshots",
+        "rips_epsilon",
+        "gap_angle",
+        "radius_schedule",
+        ("sched", ["gap_opens_at", "gap_closes_at"]),
+    ],
+)
+
+GEOMETRIC_LOOP_NOTES = (
+    "Метрический сценарий: в snapshots.npy лежат РАССТОЯНИЯ, ребро при d <= eps "
+    "(edge_rule=distance_within, docs/method.md 2.3). Закрытое состояние дуги — "
+    "delta = 2*pi/n, а не ноль: при нуле точки 0 и n-1 совпадают, а beta этого не "
+    "замечает (docs/method.md 2.1a). Дыхание радиуса меняет граф, но не beta; "
+    "события даёт только разрыв дуги."
+)
+
+
+def make_geometric_loop(
+    n_points: int,
+    n_snapshots: int,
+    rips_epsilon: float,
+    gap_angle: float,
+    radius_schedule: tuple[float, ...],
+    gap_opens_at: int,
+    gap_closes_at: int,
+    coeff_field: int,
+    max_homology_dim: int,
+    reference_max_nodes: int,
+    rng: np.random.Generator,
+) -> DynamicGraphDataset:
+    """Build a breathing circle whose arc opens and closes on schedule.
+
+    Parameters
+    ----------
+    n_points : int
+        Number of points on the circle.
+    n_snapshots : int
+        Length of the sequence.
+    rips_epsilon : float
+        Connection radius: an edge wherever the distance is at most this.  It must stay
+        inside the regime window of ``docs/method.md`` §2.1a, which the config checks.
+    gap_angle : float
+        Angular width of the open gap, in radians.
+    radius_schedule : sequence of float
+        Radii to interpolate through, piecewise-linearly, with knots spread evenly over
+        the sequence.  The breathing carries no events.
+    gap_opens_at : int
+        Snapshot at which the arc opens — a death in :math:`H_1`.
+    gap_closes_at : int
+        Snapshot at which it closes again — a birth in :math:`H_1`.
+    coeff_field : int
+        Field of coefficients; only 2 is available.
+    max_homology_dim : int
+        Highest homology dimension of the curve.
+    reference_max_nodes : int
+        Node limit of the reference implementation.
+    rng : numpy.random.Generator
+        Required by the generator contract and not used: the scenario is deterministic.
+
+    Returns
+    -------
+    DynamicGraphDataset
+        Snapshots of shape ``(n_snapshots, n_points, n_points)`` holding **distances**,
+        with a ground truth whose ``edge_rule`` is ``"distance_within"``.
+
+    Notes
+    -----
+    The closed arc is :math:`\\delta = 2\\pi/n`, not zero.  With
+    :math:`\\theta_j = j(2\\pi-\\delta)/(n-1)`, zero puts :math:`\\theta_{n-1}` on top of
+    :math:`\\theta_0`; substituting :math:`2\\pi/n` makes the step exactly :math:`2\\pi/n`,
+    that is the uniform circle.  Betti numbers do not distinguish the two, so the
+    degenerate variant would sit in the data unnoticed — the geometry is what catches it.
+    """
+    _check_common(
+        n_nodes=n_points,
+        n_snapshots=n_snapshots,
+        coeff_field=coeff_field,
+        max_homology_dim=max_homology_dim,
+    )
+    if rips_epsilon <= 0.0 or not np.isfinite(rips_epsilon):
+        raise ValueError(f"rips_epsilon must be positive and finite, got {rips_epsilon!r}")
+    if gap_angle <= 0.0 or gap_angle >= 2 * np.pi:
+        raise ValueError(f"gap_angle must lie in (0, 2*pi), got {gap_angle!r}")
+    if len(radius_schedule) < 2:
+        raise ValueError("radius_schedule needs at least two knots to interpolate between")
+    _check_schedule((gap_opens_at, gap_closes_at), n_snapshots)
+
+    closed_gap = 2 * np.pi / n_points
+    if gap_angle <= closed_gap:
+        raise ValueError(
+            f"gap_angle ({gap_angle}) does not exceed the closed state 2*pi/n "
+            f"({closed_gap}); the arc would never open"
+        )
+
+    radii = np.interp(
+        np.arange(n_snapshots),
+        np.linspace(0.0, n_snapshots - 1, len(radius_schedule)),
+        np.asarray(radius_schedule, dtype=np.float64),
+    )
+    snapshots = np.zeros((n_snapshots, n_points, n_points), dtype=np.float64)
+    for index in range(n_snapshots):
+        gap = gap_angle if gap_opens_at <= index < gap_closes_at else closed_gap
+        snapshots[index] = _circle_distances(n_points, radii[index], gap)
+
+    betti_curve = _betti_curve(
+        snapshots,
+        edge_rule="distance_within",
+        edge_threshold=rips_epsilon,
+        max_homology_dim=max_homology_dim,
+        reference_max_nodes=reference_max_nodes,
+        coeff_field=coeff_field,
+    )
+    params = {
+        "n_points": int(n_points),
+        "n_snapshots": int(n_snapshots),
+        "rips_epsilon": float(rips_epsilon),
+        "gap_angle": float(gap_angle),
+        "radius_schedule": [float(value) for value in radius_schedule],
+        "gap_opens_at": int(gap_opens_at),
+        "gap_closes_at": int(gap_closes_at),
+    }
+    ground_truth = GroundTruth(
+        format_version=FORMAT_VERSION,
+        family="dynamic_graph",
+        truth_kind="betti_curve",
+        generator="geometric_loop",
+        params=params,
+        seed=base_seed_of(rng),
+        coeff_field=int(coeff_field),
+        complex="flag",
+        edge_rule="distance_within",
+        edge_threshold=float(rips_epsilon),
+        betti_curve=betti_curve,
+        events=[
+            Event(gap_opens_at, 1, "death", "h1_loop", "дуга разрывается, петля исчезает"),
+            Event(gap_closes_at, 1, "birth", "h1_loop", "дуга смыкается, петля возвращается"),
+        ],
+        notes=GEOMETRIC_LOOP_NOTES,
+    )
+    return DynamicGraphDataset(snapshots=snapshots, ground_truth=ground_truth)
+
+
+def _circle_distances(n_points: int, radius: float, gap: float) -> np.ndarray:
+    """Pairwise distances between points spread evenly over an arc of ``2*pi - gap``."""
+    angles = np.arange(n_points) * (2 * np.pi - gap) / (n_points - 1)
+    points = np.column_stack((radius * np.cos(angles), radius * np.sin(angles)))
+    distances = np.linalg.norm(points[:, None, :] - points[None, :, :], axis=-1)
+    # Exact symmetry and an exact zero diagonal: DynamicGraphDataset compares bitwise.
+    distances = (distances + distances.T) / 2
+    np.fill_diagonal(distances, 0.0)
+    return distances
 
 
 def _build_snapshots(
@@ -306,16 +464,8 @@ def _events(schedule: tuple[int, ...]) -> list[Event]:
     ]
 
 
-def _check_arguments(
-    *,
-    n_nodes: int,
-    n_snapshots: int,
-    edge_weight: float,
-    threshold: float,
-    coeff_field: int,
-    max_homology_dim: int,
-) -> None:
-    """Validate everything the scenario cannot repair on its own."""
+def _check_common(*, n_nodes: int, n_snapshots: int, coeff_field: int, max_homology_dim: int) -> None:
+    """Validate what every family-2 scenario needs, whatever its edge rule."""
     if coeff_field != REFERENCE_COEFF_FIELD:
         raise ValueError(
             f"coeff_field is {coeff_field!r}, but the Betti curve of family 2 is computed "
@@ -323,6 +473,18 @@ def _check_arguments(
             "(docs/method.md, 1.2). Computing over Z/2 while the truth claims another "
             "field would be a silent error."
         )
+    if n_nodes < 3:
+        raise ValueError(f"n_nodes must be >= 3, got {n_nodes}")
+    if n_snapshots < 1:
+        raise ValueError(f"n_snapshots must be >= 1, got {n_snapshots}")
+    if max_homology_dim < 0:
+        raise ValueError(f"max_homology_dim must be >= 0, got {max_homology_dim}")
+
+
+def _check_cycle_lifecycle_arguments(
+    *, n_nodes: int, edge_weight: float, threshold: float
+) -> None:
+    """Validate what is specific to the combinatorial scenario."""
     # The chord and the two cut edges are fixed node indices, so a graph that is too
     # short quietly stops being the scenario the truth describes. The binding constraint
     # is not that the indices exist but that the chord divides the cycle into two arcs of
@@ -343,8 +505,6 @@ def _check_arguments(
             f"n_nodes={n_nodes} is too small for the cycle_lifecycle cuts "
             f"{REMOVED_EDGE} and {SPLIT_EDGE}"
         )
-    if n_snapshots < 1:
-        raise ValueError(f"n_snapshots must be >= 1, got {n_snapshots}")
     if not np.isfinite(edge_weight) or edge_weight <= 0.0:
         raise ValueError(f"edge_weight must be a positive finite number, got {edge_weight!r}")
     if not np.isfinite(threshold) or threshold < 0.0:
@@ -354,8 +514,6 @@ def _check_arguments(
             f"threshold ({threshold}) must be below edge_weight ({edge_weight}), "
             "otherwise no edge ever enters the complex"
         )
-    if max_homology_dim < 0:
-        raise ValueError(f"max_homology_dim must be >= 0, got {max_homology_dim}")
 
 
 def _check_schedule(schedule: tuple[int, ...], n_snapshots: int) -> None:

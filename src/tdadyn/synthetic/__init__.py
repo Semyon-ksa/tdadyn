@@ -23,7 +23,12 @@ from .contracts import (
     dataset_equal,
     ground_truth_equal,
 )
-from .dynamic_events import CYCLE_LIFECYCLE_NOTES, make_cycle_lifecycle
+from .dynamic_events import (
+    CYCLE_LIFECYCLE_NOTES,
+    GEOMETRIC_LOOP_NOTES,
+    make_cycle_lifecycle,
+    make_geometric_loop,
+)
 from .io import load_dataset, load_ground_truth, save_dataset
 from .manifest import ManifestEntry, entry_payload, make_entry, read_manifest, update_manifest
 from .naming import format_dataset_id, make_dataset_id, register_name_order
@@ -53,6 +58,7 @@ __all__ = [
     "EVENT_TYPES",
     "FAMILIES",
     "FORMAT_VERSION",
+    "GEOMETRIC_LOOP_NOTES",
     "REQUIRED_BY_TRUTH_KIND",
     "TRUTH_KINDS",
     "Config",
@@ -82,6 +88,7 @@ __all__ = [
     "make_dataset_id",
     "make_entry",
     "make_figure_eight",
+    "make_geometric_loop",
     "make_hopf_link",
     "make_klein_bottle",
     "make_sphere",

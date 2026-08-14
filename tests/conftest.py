@@ -23,6 +23,7 @@ from tdadyn.synthetic import (
     make_circle,
     make_cycle_lifecycle,
     make_figure_eight,
+    make_geometric_loop,
     make_hopf_link,
     make_klein_bottle,
     make_sphere,
@@ -40,7 +41,7 @@ CONFIG_PATH = REPO_ROOT / "config.yaml"
 PLANAR_GENERATORS = ("circle", "two_circles", "figure_eight")
 SURFACE_GENERATORS = ("torus", "sphere", "klein_bottle", "hopf_link")
 STATIC_GENERATORS = PLANAR_GENERATORS + SURFACE_GENERATORS
-DYNAMIC_GENERATORS = ("cycle_lifecycle",)
+DYNAMIC_GENERATORS = ("cycle_lifecycle", "geometric_loop")
 
 FAKE_NAME_ORDERS = {
     "fake_cloud": ("n_points", "dim", "noise_sigma", "sampling"),
@@ -256,6 +257,21 @@ def build_dynamic_graph(name, config, *, seed=None, coeff_field=None, n_nodes=No
             lifecycle.edge_removed_at,
             lifecycle.component_splits_at,
             lifecycle.component_merges_at,
+            field,
+            topology.max_homology_dim,
+            topology.reference_max_nodes,
+            rng,
+        )
+    if name == "geometric_loop":
+        loop = events.scenarios.geometric_loop
+        return make_geometric_loop(
+            loop.n_points if n_nodes is None else n_nodes,
+            events.n_snapshots,
+            loop.rips_epsilon,
+            loop.gap_angle,
+            loop.radius_schedule,
+            loop.gap_open_at,
+            loop.gap_close_at,
             field,
             topology.max_homology_dim,
             topology.reference_max_nodes,

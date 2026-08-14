@@ -363,18 +363,41 @@ def test_the_first_scheduled_event_cannot_sit_on_snapshot_zero(raw):
         )
 
 
-def test_the_geometric_loop_block_is_not_silently_accepted(raw):
-    # It moved to S7 with an incomplete specification (docs/method.md 2.1). Un-commenting
-    # the block in config.yaml must fail loudly rather than parse and do nothing.
-    revived = copy.deepcopy(raw)
-    revived["dynamic_events"]["geometric_loop"] = {
-        "n_points": 60,
-        "radius_schedule": [1.0, 1.4, 1.0],
-        "gap_open_at": 20,
-        "gap_close_at": 45,
-    }
-    with pytest.raises(ConfigError, match="unknown keys"):
-        parse_config(revived, config_path=CONFIG_PATH)
+# --- geometric_loop: every bound names a regime, not a taste (method.md 2.1a) -----
+
+GEOMETRIC_LOOP = "dynamic_events.scenarios.geometric_loop"
+
+
+def test_the_metric_scenario_must_fit_the_reference_implementation(raw):
+    limit = raw["topology_check"]["reference_max_nodes"]
+    with pytest.raises(ConfigError, match="reference_max_nodes"):
+        parse_config(mutate(raw, f"{GEOMETRIC_LOOP}.n_points", limit + 1), config_path=CONFIG_PATH)
+
+
+def test_an_epsilon_below_the_inter_point_step_shatters_the_graph(raw):
+    # The failure method.md 2.1a warns about: the growing radius does not open an arc,
+    # it breaks the loop into n components, and that reads as an unscheduled event.
+    with pytest.raises(ConfigError, match="shatter"):
+        parse_config(mutate(raw, f"{GEOMETRIC_LOOP}.rips_epsilon", 0.2), config_path=CONFIG_PATH)
+
+
+def test_an_epsilon_above_the_regime_boundary_is_refused(raw):
+    # Above R_min*sqrt(3) the Rips complex of a circle is S^3, not S^1; with
+    # max_homology_dim 2 the loop appears to vanish for no reason.
+    with pytest.raises(ConfigError, match=r"S\^3"):
+        parse_config(mutate(raw, f"{GEOMETRIC_LOOP}.rips_epsilon", 1.9), config_path=CONFIG_PATH)
+
+
+def test_a_gap_too_narrow_to_break_the_loop_is_refused(raw):
+    # Measured: at 0.8 the chord is 0.779 against epsilon 0.8, so the loop stays closed
+    # at the smallest radius and the scheduled death of H1 never happens.
+    with pytest.raises(ConfigError, match="stay closed"):
+        parse_config(mutate(raw, f"{GEOMETRIC_LOOP}.gap_angle", 0.8), config_path=CONFIG_PATH)
+
+
+def test_the_metric_gap_must_open_before_it_closes(raw):
+    with pytest.raises(ConfigError, match="gap_open_at < gap_close_at"):
+        parse_config(mutate(raw, f"{GEOMETRIC_LOOP}.gap_open_at", 50), config_path=CONFIG_PATH)
 
 
 def test_sbm_block_sizes_must_sum_to_the_node_count(raw):
