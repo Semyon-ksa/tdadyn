@@ -183,9 +183,14 @@ numpy не используется; функции чистые (одинако
 |---|---|---|
 | `expected_betti` | `coeff_field`, `expected_betti` | семейство 1 |
 | `betti_curve` | `coeff_field`, `complex`, `edge_rule`, `edge_threshold`, `betti_curve`, `events` | `cycle_lifecycle`, `geometric_loop` |
-| `partition` | `community_labels` | динамическая SBM |
-| `noise_level` | `noise_level` | семейство 4 |
-| `none` | — | ряды осцилляторов |
+| `partition` | `community_labels` | динамическая SBM, ряды осцилляторов |
+| `noise_level` | `noise_level` | зашумлённые наборы семейства 4 |
+| `none` | — | нулевые модели семейства 4 |
+
+Ряды осцилляторов стоят под `partition`, а не под `none`: истина ряда — какие каналы
+связаны с какими, то есть разбиение и расписание, и `community_labels` у него есть
+(`src/tdadyn/synthetic/series.py`). Под `none` попадают только нулевые модели, у которых
+истина — отсутствие расписания, а не какое-то его значение (`docs/method.md`, §4.2).
 
 Поле обязательное и **не выводится из `family` по умолчанию**: неявный дефолт — ровно тот
 механизм молчаливых ошибок, ради устранения которого заводится `edge_rule` ниже.

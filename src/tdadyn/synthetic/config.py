@@ -267,21 +267,27 @@ class Noise:
 
 
 @dataclass(frozen=True)
-class ErdosRenyi:
-    match_density_to: str
+class UniformCloud:
+    """Null model of family 1: a uniform cloud, fed through the Rips pipeline."""
+
+    n_points: int
+    dim: int
 
 
 @dataclass(frozen=True)
-class RandomGeometric:
+class ErdosRenyi:
+    """Null model of family 2: snapshots at the density of ``cycle_lifecycle``."""
+
     n_nodes: int
-    match_density_to: str
+    n_snapshots: int
 
 
 @dataclass(frozen=True)
 class NullModels:
+    uniform_cloud: UniformCloud
     erdos_renyi: ErdosRenyi
-    random_geometric: RandomGeometric
     n_realizations: int
+    max_false_positive_rate: float
 
 
 @dataclass(frozen=True)
@@ -738,25 +744,32 @@ def _noise(reader: _Reader) -> Noise:
 
 
 def _null_models(reader: _Reader) -> NullModels:
+    cloud_reader = reader.section("uniform_cloud")
+    uniform_cloud = UniformCloud(
+        n_points=cloud_reader.integer("n_points", minimum=2),
+        dim=cloud_reader.integer("dim", minimum=1),
+    )
+    cloud_reader.done()
+
     er_reader = reader.section("erdos_renyi")
     erdos_renyi = ErdosRenyi(
-        match_density_to=er_reader.string("match_density_to", choices=_STATIC_CLOUD_GENERATORS)
+        n_nodes=er_reader.integer("n_nodes", minimum=3),
+        n_snapshots=er_reader.integer("n_snapshots", minimum=1),
     )
     er_reader.done()
 
-    rg_reader = reader.section("random_geometric")
-    random_geometric = RandomGeometric(
-        n_nodes=rg_reader.integer("n_nodes", minimum=1),
-        match_density_to=rg_reader.string("match_density_to", choices=_STATIC_CLOUD_GENERATORS),
-    )
-    rg_reader.done()
-
     n_realizations = reader.integer("n_realizations", minimum=1)
+    # Not a claim that the criterion never fires on noise — measured, it does, at about
+    # 2% (docs/method.md, 1.2a). The bound catches regression without pretending at zero.
+    max_false_positive_rate = reader.number(
+        "max_false_positive_rate", minimum=0.0, maximum=1.0
+    )
     reader.done()
     return NullModels(
+        uniform_cloud=uniform_cloud,
         erdos_renyi=erdos_renyi,
-        random_geometric=random_geometric,
         n_realizations=n_realizations,
+        max_false_positive_rate=max_false_positive_rate,
     )
 
 
@@ -956,6 +969,16 @@ def _check_cross_section(config: Config, *, origin: str) -> None:
     # and has no curve (docs/method.md, 3.1), so applying the limit here would halve a
     # dataset for a check it never undergoes. The requirement follows the kind of truth,
     # exactly as the schema does.
+    # The ER null goes through the reference implementation, so it is bound by that
+    # limit — unlike the SBM above, whose truth is a partition and needs no curve.
+    null_er = config.null_models.erdos_renyi
+    if null_er.n_nodes > config.topology_check.reference_max_nodes:
+        raise ConfigError(
+            f"{origin}: null_models.erdos_renyi.n_nodes ({null_er.n_nodes}) exceeds "
+            f"topology_check.reference_max_nodes ({config.topology_check.reference_max_nodes}); "
+            "the reference implementation could not characterise the null distribution"
+        )
+
     sbm = config.dynamic_sbm
     if not 1 <= sbm.merge_at < sbm.split_at < sbm.n_snapshots:
         raise ConfigError(

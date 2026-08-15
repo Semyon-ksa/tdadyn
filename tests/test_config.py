@@ -127,7 +127,7 @@ def test_out_of_range_value_is_rejected(raw, dotted, value):
         ("network_from_cloud.distance_from_similarity", "exp"),
         ("oscillators.model", "lorenz"),
         ("oscillators.integrator.method", "Euler"),
-        ("null_models.erdos_renyi.match_density_to", "moebius"),
+        ("oscillators.integrator.method", "midpoint"),
     ],
 )
 def test_value_outside_the_allowed_set_is_rejected(raw, dotted, value):
@@ -440,6 +440,16 @@ def test_the_sbm_needs_two_communities_to_merge(raw):
     smaller["dynamic_sbm"]["block_sizes"] = [60]
     with pytest.raises(ConfigError, match="at least two"):
         parse_config(smaller, config_path=CONFIG_PATH)
+
+
+def test_the_er_null_must_fit_the_reference_implementation(raw):
+    # Unlike the SBM, the ER null does go through the reference: its Betti curve is the
+    # null distribution the false-positive rate is measured against.
+    limit = raw["topology_check"]["reference_max_nodes"]
+    with pytest.raises(ConfigError, match="reference_max_nodes"):
+        parse_config(
+            mutate(raw, "null_models.erdos_renyi.n_nodes", limit + 1), config_path=CONFIG_PATH
+        )
 
 
 def test_the_sbm_is_not_capped_by_the_reference_limit(raw):

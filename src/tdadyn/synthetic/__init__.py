@@ -44,6 +44,13 @@ from .noise import (
     make_noisy_cloud,
     make_noisy_snapshots,
 )
+from .null_models import (
+    ERDOS_RENYI_NOTES,
+    UNIFORM_CLOUD_NOTES,
+    cycle_lifecycle_density,
+    make_erdos_renyi,
+    make_uniform_cloud,
+)
 from .persistence import (
     betti_at_scale,
     cross_check_scales,
@@ -81,6 +88,7 @@ __all__ = [
     "Dataset",
     "DynamicGraphDataset",
     "EDGE_RULES",
+    "ERDOS_RENYI_NOTES",
     "EVENT_TYPES",
     "Event",
     "FAMILIES",
@@ -97,6 +105,7 @@ __all__ = [
     "SchemaError",
     "SeriesDataset",
     "TRUTH_KINDS",
+    "UNIFORM_CLOUD_NOTES",
     "add_spurious_edges",
     "adjacency_from_snapshot",
     "base_seed_of",
@@ -105,6 +114,7 @@ __all__ = [
     "coupling_matrix",
     "coupling_schedule",
     "cross_check_scales",
+    "cycle_lifecycle_density",
     "dataset_equal",
     "drop_edges",
     "edge_count",
@@ -122,6 +132,7 @@ __all__ = [
     "make_dataset_id",
     "make_dynamic_sbm",
     "make_entry",
+    "make_erdos_renyi",
     "make_figure_eight",
     "make_geometric_loop",
     "make_hopf_link",
@@ -133,6 +144,7 @@ __all__ = [
     "make_sphere",
     "make_torus",
     "make_two_circles",
+    "make_uniform_cloud",
     "pairwise_distances",
     "parse_config",
     "persistence_diagrams",

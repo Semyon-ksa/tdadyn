@@ -26,12 +26,14 @@ from tdadyn.synthetic import (
     make_figure_eight,
     make_geometric_loop,
     make_hopf_link,
+    make_erdos_renyi,
     make_klein_bottle,
     make_kuramoto,
     make_roessler,
     make_sphere,
     make_torus,
     make_two_circles,
+    make_uniform_cloud,
     rng_for,
 )
 from tdadyn.synthetic import naming
@@ -296,6 +298,40 @@ def build_dynamic_sbm(config, *, seed=None):
         settings.merge_at,
         settings.split_at,
         rng_for(config.seed if seed is None else seed, "dynamic_sbm"),
+    )
+
+
+def build_null_cloud(config, *, repeat=0, n_points=None, dim=None):
+    """Build the family-1 null model from the repository configuration."""
+    settings = config.null_models.uniform_cloud
+    return make_uniform_cloud(
+        settings.n_points if n_points is None else n_points,
+        settings.dim if dim is None else dim,
+        repeat,
+        rng_for(config.seed, "uniform_cloud", repeat),
+    )
+
+
+def build_null_graph(config, *, repeat=0):
+    """Build the family-2 null model at the density of ``cycle_lifecycle``."""
+    from tdadyn.synthetic import cycle_lifecycle_density, edge_count
+
+    events = config.dynamic_events
+    base = build_dynamic_graph("cycle_lifecycle", config)
+    n_edges = edge_count(
+        base.snapshots[0],
+        edge_rule=base.ground_truth.edge_rule,
+        edge_threshold=base.ground_truth.edge_threshold,
+    )
+    probability = cycle_lifecycle_density(events.n_nodes, n_edges)
+    settings = config.null_models.erdos_renyi
+    return probability, make_erdos_renyi(
+        settings.n_nodes,
+        settings.n_snapshots,
+        probability,
+        events.edge_weight,
+        repeat,
+        rng_for(config.seed, "erdos_renyi", repeat),
     )
 
 
