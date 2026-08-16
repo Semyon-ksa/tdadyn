@@ -196,47 +196,82 @@ cells += [md("""---
 `method.md` §1.2 — они вход, а не результат."""),
     code("""clouds = {name: build_static_cloud(name, CONFIG) for name in STATIC_GENERATORS}
 
-fig = plt.figure(figsize=(13, 6.2))
+# Ракурс подбирается по объекту: у тора дырка видна только сверху, а у зацепления
+# Хопфа — сбоку, иначе две окружности накладываются друг на друга.
+VIEW = {"torus": (62, -60), "sphere": (22, -60), "klein_bottle": (26, -55),
+        "hopf_link": (16, -72)}
+
+fig = plt.figure(figsize=(13.5, 6.6))
 for i, (name, dataset) in enumerate(clouds.items(), 1):
     pts = dataset.points
+    betti = dataset.ground_truth.expected_betti
     if pts.shape[1] == 2:
         ax = fig.add_subplot(2, 4, i)
-        ax.scatter(pts[:, 0], pts[:, 1], s=3, alpha=0.7)
+        ax.scatter(pts[:, 0], pts[:, 1], s=3, alpha=0.75)
         ax.set_aspect("equal")
     else:
         ax = fig.add_subplot(2, 4, i, projection="3d")
-        ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], s=2, alpha=0.5)
+        ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], s=2.5, alpha=0.55, depthshade=True)
+        # Пропорции коробки — по фактическим габаритам: иначе matplotlib растягивает
+        # каждую ось независимо, и тор (5.6 x 5.6 x 1.6) перестаёт быть бубликом.
+        ax.set_box_aspect(np.ptp(pts[:, :3], axis=0))
+        elev, azim = VIEW[name]
+        ax.view_init(elev=elev, azim=azim)
         ax.set_xticklabels([]); ax.set_yticklabels([]); ax.set_zticklabels([])
-    betti = dataset.ground_truth.expected_betti
+        ax.grid(False)
     ax.set_title(f"{name}\\nbeta = {tuple(betti[k] for k in range(3))}, N={len(pts)}",
                  fontsize=8)
 fig.suptitle("Семейство 1: объекты и ожидаемые числа Бетти (Z/2)", fontsize=11)
 fig.tight_layout(); plt.show()"""),
+    md("""Тор показан сверху — под другим углом дырка в середине не читается, а
+пропорции коробки заданы по габаритам облака: по умолчанию matplotlib масштабирует
+каждую ось независимо, и тор $5.6 \\times 5.6 \\times 1.6$ выглядит сплющенным блином.
+Зацепление Хопфа, наоборот, показано сбоку — сверху две окружности накладываются."""),
     md("""### Что видит персистентность: фильтрация Вьеториса–Рипса
 
 Облако само по себе алгоритму не даётся — из него строится **вложенное семейство
-комплексов** по растущему масштабу $\\varepsilon$. Ниже 14 точек с окружности: сперва
-изолированные вершины, затем появляется петля, затем она заполняется треугольниками
-и умирает. Время её жизни и есть персистентность."""),
-    code("""demo = build_static_cloud("circle", CONFIG, n_points=14, noise_sigma=0.0).points
-demo_d = pairwise_distances(demo)
+комплексов** по растущему масштабу $\\varepsilon$.
 
-fig, axes = plt.subplots(1, 5, figsize=(13.5, 2.9))
-for ax, eps in zip(axes, [0.20, 0.45, 0.70, 1.10, 1.60]):
+Точки ниже расставлены **равномерно**, как в закрытом состоянии `geometric_loop`
+($\\delta = 2\\pi/n$ даёт шаг ровно $2\\pi/n$). Это дидактический выбор: генераторы
+семейства 1 сэмплируют $\\theta$ случайно, и на полутора десятках точек зазоры между
+соседями различаются в сотни раз — картинка получилась бы клочковатой и про механизм
+фильтрации не сказала бы ничего. Именно из-за случайности выборки восстановление чисел
+Бетти на настоящих наборах требует сотен точек, а не полутора десятков."""),
+    code("""n_demo = 16
+a_demo = np.arange(n_demo) * 2 * np.pi / n_demo
+demo = np.c_[np.cos(a_demo), np.sin(a_demo)]
+demo_d = pairwise_distances(demo)
+print(f"шаг по дуге {2*np.pi/n_demo:.3f}, хорда соседей {2*np.sin(np.pi/n_demo):.3f}")
+
+fig, axes = plt.subplots(1, 5, figsize=(13.5, 3.0))
+for ax, eps in zip(axes, [0.30, 0.45, 0.80, 1.50, 1.95]):
     adj = (demo_d <= eps).astype(float); np.fill_diagonal(adj, 0.0)
     for tri in triangles_of(adj):
-        ax.add_patch(Polygon(demo[list(tri)], closed=True, alpha=0.20,
+        ax.add_patch(Polygon(demo[list(tri)], closed=True, alpha=0.16,
                              facecolor="tab:blue", edgecolor="none"))
-    for i in range(len(demo)):
-        for j in range(i + 1, len(demo)):
-            if adj[i, j]:
-                ax.plot(*demo[[i, j]].T, color="tab:blue", lw=0.9, zorder=2)
-    ax.scatter(*demo.T, s=22, color="tab:blue", zorder=3, edgecolor="white", lw=0.5)
+    iu = np.triu_indices(n_demo, 1)
+    for i, j in zip(iu[0][adj[iu] > 0], iu[1][adj[iu] > 0]):
+        ax.plot(*demo[[i, j]].T, color="tab:blue", lw=0.8, zorder=2)
+    ax.scatter(*demo.T, s=24, color="tab:blue", zorder=3, edgecolor="white", lw=0.5)
     b = reference.betti_numbers_of_graph(adj, threshold=0.5, max_homology_dim=2, max_nodes=30)
-    ax.set_title(f"$\\\\varepsilon$ = {eps}\\nbeta = {(b[0], b[1], b[2])}", fontsize=8)
-    ax.set_aspect("equal"); ax.axis("off"); ax.set_xlim(-1.35, 1.35); ax.set_ylim(-1.35, 1.35)
-fig.suptitle("Фильтрация Рипса на окружности: петля рождается и заполняется", fontsize=10)
+    neighbours = int(round(np.arcsin(min(eps, 2) / 2) / (np.pi / n_demo)))
+    ax.set_title(f"$\\\\varepsilon$ = {eps}   (до {neighbours} соседей)\\n"
+                 f"beta = {(b[0], b[1], b[2])}", fontsize=8)
+    ax.set_aspect("equal"); ax.axis("off"); ax.set_xlim(-1.3, 1.3); ax.set_ylim(-1.3, 1.3)
+fig.suptitle("Фильтрация Рипса на равномерной окружности", fontsize=10)
 fig.tight_layout(); plt.show()"""),
+    md("""Слева направо: изолированные вершины, рождение петли, петля живёт при растущей
+плотности рёбер и треугольников, и наконец $\\beta_1$ пропадает.
+
+**Последняя панель — не «петля заполнилась».** По Адамашеку–Адамсу комплекс Рипса
+окружности с ростом относительного масштаба последовательно эквивалентен
+$S^1, S^3, S^5, \\dots$ — он не стягивается. При $\\varepsilon = 1.95$ каждая вершина
+соединена с семью соседями с каждой стороны, комплекс покинул режим $S^1$, и родившийся
+класс живёт в размерности выше `max_homology_dim = 2`, то есть **не виден**. Гибель
+$\\beta_1$ без видимой причины здесь — это ровно тот известный артефакт, который
+`method.md` §5 перечисляет среди «не багов»: чинить его не нужно, достаточно ограничивать
+диапазон значимости."""),
     md("""То же на полном облаке, в виде штрихкода: каждый бар — класс, который живёт от
 своего рождения до гибели. Длинный бар в $H_1$ — это и есть петля окружности; короткие —
 шум выборки."""),
@@ -262,8 +297,12 @@ for ax, name in zip(axes, ("circle", "torus")):
     ax.set_xlabel(r"$\\varepsilon$"); ax.set_yticks([]); ax.set_xlim(0, diam * 0.62)
 fig.tight_layout(); plt.show()"""),
     md("""Бутылка Клейна вложена в $\\mathbb{R}^4$ и показана проекцией на первые три
-координаты: в $\\mathbb{R}^3$ существует лишь погружение с самопересечением, которое
-испортило бы ground-truth.
+координаты. На картинке она **похожа на тор** — и это не дефект рисунка: проекция
+теряет ровно ту склейку, которая их различает. В $\\mathbb{R}^3$ существует лишь
+погружение с самопересечением, которое испортило бы ground-truth, поэтому вложение
+взято четырёхмерное. Отличить эти два объекта здесь может не глаз, а поле
+коэффициентов: над $\\mathbb{Z}/2$ бутылка Клейна даёт $(1,2,1)$, над $\\mathbb{Z}/3$ —
+$(1,1,0)$, тогда как у тора ответ от поля не зависит.
 
 Тор и бутылка Клейна строятся **rejection sampling** по элементу площади. Наивная
 выборка равномерных параметров пересэмплирует внутренний обод и способна съесть бар
