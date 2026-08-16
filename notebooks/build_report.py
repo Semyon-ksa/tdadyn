@@ -53,6 +53,7 @@ import numpy as np
 warnings.filterwarnings("ignore")
 plt.rcParams.update({"figure.dpi": 110, "font.size": 9, "axes.grid": True,
                      "grid.alpha": 0.3, "figure.facecolor": "white"})
+palette = plt.get_cmap("tab10")   # общая раскраска сообществ и блоков
 
 from tdadyn.synthetic import (
     STATIC_GENERATORS, adjacency_from_snapshot, build_dynamic_graph, build_dynamic_sbm,
@@ -131,7 +132,61 @@ for name, adjacency, why in cases:
     md("""Счёт граней $K_4$ равен (4, 6, 4, 1) — это и есть проверка на то, что перечисляются
 **все** клики, а не только максимальные: `networkx.find_cliques` вернул бы один тетраэдр
 без рёбер и треугольников, граничные матрицы не сошлись бы по размерностям,
-а $\\beta_1$ вырос бы с 0 до 3.""")]
+а $\\beta_1$ вырос бы с 0 до 3.
+
+### Сами объекты
+
+Слева направо: треугольник, у которого флаг-комплекс заполняет грань; полный граф на
+четырёх вершинах, дающий сплошной тетраэдр; октаэдр, у которого максимальная клика равна
+трём, 3-симплексов нет — и потому остаётся настоящая полость."""),
+    code("""from matplotlib.patches import Polygon
+from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
+def triangles_of(adjacency):
+    cx = reference.flag_complex(adjacency, threshold=0.5, max_homology_dim=2, max_nodes=30)
+    return cx.simplices(2)
+
+fig = plt.figure(figsize=(12, 3.6))
+
+# K3 и K4 — плоские схемы с заполненными гранями
+for panel, (n, title) in enumerate([(3, "$K_3$: грань заполнена"),
+                                    (4, "$K_4$: сплошной тетраэдр")], start=1):
+    ax = fig.add_subplot(1, 3, panel)
+    a = complete(n)
+    ang = np.linspace(0, 2 * np.pi, n, endpoint=False) + np.pi / 2
+    pos = np.c_[np.cos(ang), np.sin(ang)]
+    for tri in triangles_of(a):
+        ax.add_patch(Polygon(pos[list(tri)], closed=True, alpha=0.22,
+                             facecolor="tab:blue", edgecolor="none"))
+    for i in range(n):
+        for j in range(i + 1, n):
+            ax.plot(*pos[[i, j]].T, color="tab:blue", lw=1.4, zorder=2)
+    ax.scatter(*pos.T, s=70, color="tab:blue", zorder=3, edgecolor="white")
+    faces, betti = flag_faces(a)
+    ax.set_title(f"{title}\\nграни {faces}, beta = {betti}", fontsize=8.5)
+    ax.set_aspect("equal"); ax.axis("off")
+
+# Октаэдр — в 3D, чтобы полость была видна
+ax = fig.add_subplot(1, 3, 3, projection="3d")
+oct_pos = np.array([[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]],
+                   dtype=float)
+oct_adj = multipartite([2, 2, 2])
+tris = triangles_of(oct_adj)
+ax.add_collection3d(Poly3DCollection([oct_pos[list(t)] for t in tris], alpha=0.25,
+                                     facecolor="tab:orange", edgecolor="tab:orange", lw=0.8))
+ax.scatter(*oct_pos.T, s=45, color="tab:orange", depthshade=False)
+faces, betti = flag_faces(oct_adj)
+ax.set_title(f"$K_{{2,2,2}}$ (октаэдр): оболочка $S^2$\\nграни {faces}, beta = {betti}",
+             fontsize=8.5)
+ax.set_xlim(-1.2, 1.2); ax.set_ylim(-1.2, 1.2); ax.set_zlim(-1.2, 1.2)
+ax.set_xticks([]); ax.set_yticks([]); ax.set_zticks([]); ax.grid(False)
+
+fig.suptitle("Флаг-комплексы, на которых проверяется эталон", fontsize=10)
+fig.tight_layout(); plt.show()"""),
+    md("""У октаэдра 8 треугольников и ни одного 3-симплекса — поэтому двумерные грани
+образуют замкнутую поверхность, которую нечем заполнить, и $\\beta_2 = 1$. У $K_4$
+треугольников тоже 4, но есть тетраэдр, который их заполняет, и полость исчезает. Ровно
+это различие и ловит счёт граней по размерностям.""")]
 
 # ---------------------------------------------------------------- S3-S4
 cells += [md("""---
@@ -156,6 +211,55 @@ for i, (name, dataset) in enumerate(clouds.items(), 1):
     ax.set_title(f"{name}\\nbeta = {tuple(betti[k] for k in range(3))}, N={len(pts)}",
                  fontsize=8)
 fig.suptitle("Семейство 1: объекты и ожидаемые числа Бетти (Z/2)", fontsize=11)
+fig.tight_layout(); plt.show()"""),
+    md("""### Что видит персистентность: фильтрация Вьеториса–Рипса
+
+Облако само по себе алгоритму не даётся — из него строится **вложенное семейство
+комплексов** по растущему масштабу $\\varepsilon$. Ниже 14 точек с окружности: сперва
+изолированные вершины, затем появляется петля, затем она заполняется треугольниками
+и умирает. Время её жизни и есть персистентность."""),
+    code("""demo = build_static_cloud("circle", CONFIG, n_points=14, noise_sigma=0.0).points
+demo_d = pairwise_distances(demo)
+
+fig, axes = plt.subplots(1, 5, figsize=(13.5, 2.9))
+for ax, eps in zip(axes, [0.20, 0.45, 0.70, 1.10, 1.60]):
+    adj = (demo_d <= eps).astype(float); np.fill_diagonal(adj, 0.0)
+    for tri in triangles_of(adj):
+        ax.add_patch(Polygon(demo[list(tri)], closed=True, alpha=0.20,
+                             facecolor="tab:blue", edgecolor="none"))
+    for i in range(len(demo)):
+        for j in range(i + 1, len(demo)):
+            if adj[i, j]:
+                ax.plot(*demo[[i, j]].T, color="tab:blue", lw=0.9, zorder=2)
+    ax.scatter(*demo.T, s=22, color="tab:blue", zorder=3, edgecolor="white", lw=0.5)
+    b = reference.betti_numbers_of_graph(adj, threshold=0.5, max_homology_dim=2, max_nodes=30)
+    ax.set_title(f"$\\\\varepsilon$ = {eps}\\nbeta = {(b[0], b[1], b[2])}", fontsize=8)
+    ax.set_aspect("equal"); ax.axis("off"); ax.set_xlim(-1.35, 1.35); ax.set_ylim(-1.35, 1.35)
+fig.suptitle("Фильтрация Рипса на окружности: петля рождается и заполняется", fontsize=10)
+fig.tight_layout(); plt.show()"""),
+    md("""То же на полном облаке, в виде штрихкода: каждый бар — класс, который живёт от
+своего рождения до гибели. Длинный бар в $H_1$ — это и есть петля окружности; короткие —
+шум выборки."""),
+    code("""fig, axes = plt.subplots(1, 2, figsize=(12, 3.4))
+for ax, name in zip(axes, ("circle", "torus")):
+    pts = clouds[name].points
+    dgms = persistence_diagrams(pairwise_distances(pts), max_homology_dim=2,
+                                coeff_field=TOPOLOGY.coeff_field)
+    diam = pairwise_distances(pts).max()
+    colours = {0: "tab:gray", 1: "tab:blue", 2: "tab:red"}
+    y = 0
+    for dim in (0, 1, 2):
+        d = dgms[dim]
+        d = d[np.isfinite(d[:, 1])]
+        order = np.argsort(-(d[:, 1] - d[:, 0]))[:22]
+        for b, dth in d[order]:
+            ax.plot([b, dth], [y, y], lw=1.7, color=colours[dim])
+            y += 1
+        y += 2
+    expected = clouds[name].ground_truth.expected_betti
+    ax.set_title(f"{name}: штрихкод (снизу вверх $H_0$, $H_1$, $H_2$)\\n"
+                 f"ожидание {tuple(expected[k] for k in range(3))}", fontsize=9)
+    ax.set_xlabel(r"$\\varepsilon$"); ax.set_yticks([]); ax.set_xlim(0, diam * 0.62)
 fig.tight_layout(); plt.show()"""),
     md("""Бутылка Клейна вложена в $\\mathbb{R}^4$ и показана проекцией на первые три
 координаты: в $\\mathbb{R}^3$ существует лишь погружение с самопересечением, которое
@@ -266,7 +370,7 @@ cells += [md("""---
 $\\mathrm{diam}_{geo}/\\mathrm{diam}_{euclid}$: приближение к единице означает вырождение."""),
     code("""from tdadyn.synthetic.network import (collapsed_weight_fraction, gaussian_kernel,
                                       geodesic_diameter_ratio, kernel_width,
-                                      knn_geodesic_distances)
+                                      knn_geodesic_distances, knn_graph)
 
 net = CONFIG.network_from_cloud
 torus_d = pairwise_distances(clouds["torus"].points)
@@ -298,7 +402,46 @@ fig.tight_layout(); plt.show()"""),
 числом: объекты семейства 1 различаются масштабом, и абсолютное значение, подходящее
 одному, схлопывает другой. Измерено: при $\\sigma = 0.5$ и диаметре тора 5.71 доля весов
 ниже $10^{-6}$ составляет 60%, и преобразование $1-w$ работает с уже уничтоженными
-данными.""")]
+данными.
+
+### Как выглядит сама сеть
+
+Одно и то же облако — окружность — в трёх видах: рёбра гауссова ядра с прозрачностью
+по весу, та же сеть матрицей, и разреженный $k$-NN-граф, по которому считается
+геодезика."""),
+    code("""ring = build_static_cloud("circle", CONFIG, n_points=90, noise_sigma=0.02).points
+ring_d = pairwise_distances(ring)
+sigma = kernel_width(ring_d, median_fraction=net.kernel_sigma_median_fraction)
+W = gaussian_kernel(ring_d, sigma=sigma)
+
+fig, ax = plt.subplots(1, 3, figsize=(13, 3.7))
+
+iu = np.triu_indices_from(W, 1)
+strong = W[iu] > 0.25
+for i, j, w in zip(iu[0][strong], iu[1][strong], W[iu][strong]):
+    ax[0].plot(*ring[[i, j]].T, color="tab:blue", lw=0.7, alpha=float(w) ** 2)
+ax[0].scatter(*ring.T, s=14, color="k", zorder=3)
+ax[0].set_title("Гауссово ядро: прозрачность ∝ весу", fontsize=9)
+ax[0].set_aspect("equal"); ax[0].axis("off")
+
+im = ax[1].imshow(W, cmap="viridis")
+ax[1].set_title("Та же сеть матрицей весов", fontsize=9)
+ax[1].set_xlabel("узел"); ax[1].set_ylabel("узел"); ax[1].grid(False)
+fig.colorbar(im, ax=ax[1], fraction=0.046)
+
+knn = knn_graph(ring_d, k=8, symmetrize=net.knn_symmetrize)
+ku = np.triu_indices_from(knn, 1)
+for i, j in zip(ku[0][knn[ku] > 0], ku[1][knn[ku] > 0]):
+    ax[2].plot(*ring[[i, j]].T, color="tab:green", lw=0.9, alpha=0.8)
+ax[2].scatter(*ring.T, s=14, color="k", zorder=3)
+ax[2].set_title("$k$-NN-граф ($k$=8): по нему идёт геодезика", fontsize=9)
+ax[2].set_aspect("equal"); ax[2].axis("off")
+fig.tight_layout(); plt.show()"""),
+    md("""Гауссово ядро даёт **полносвязную** взвешенную сеть — тот же тип объекта, что
+функциональный коннектом Задачи 3. $k$-NN-граф разрежен, но матрица кратчайших путей по
+нему снова плотная, поэтому средством контроля сложности он не является: его ценность
+в том, что внутренняя метрика на искривлённом многообразии отражает устройство точнее
+объемлющей.""")]
 
 # ---------------------------------------------------------------- S6
 cells += [md("""---
@@ -313,6 +456,40 @@ cells += [md("""---
     code("""lifecycle = build_dynamic_graph("cycle_lifecycle", CONFIG)
 gt = lifecycle.ground_truth
 curve, events = gt.betti_curve, gt.events
+
+# Пять различных графов на 60 снимков: сценарий целиком помещается в один ряд.
+n_nodes = lifecycle.snapshots.shape[1]
+ang = np.linspace(0, 2 * np.pi, n_nodes, endpoint=False) + np.pi / 2
+ring_pos = np.c_[np.cos(ang), np.sin(ang)]
+phases = [(0, "0–11: путь"), (12, "12–26: путь замкнулся"), (27, "27–40: + хорда (0,12)"),
+          (41, "41–47: удалено (6,7)"), (48, "48–54: удалено (3,4)")]
+
+fig, axes = plt.subplots(1, 5, figsize=(14, 3.1))
+for ax, (t, title) in zip(axes, phases):
+    adj = adjacency_from_snapshot(lifecycle.snapshots[t], edge_rule=gt.edge_rule,
+                                  edge_threshold=gt.edge_threshold)
+    iu = np.triu_indices(n_nodes, 1)
+    for i, j in zip(iu[0][adj[iu] > 0], iu[1][adj[iu] > 0]):
+        chord = abs(i - j) not in (1, n_nodes - 1)
+        ax.plot(*ring_pos[[i, j]].T, color="tab:red" if chord else "tab:blue",
+                lw=1.8 if chord else 1.2, zorder=2)
+    ax.scatter(*ring_pos.T, s=16, color="k", zorder=3)
+    for node in (0, 12):
+        ax.scatter(*ring_pos[node], s=42, facecolor="none", edgecolor="tab:red", zorder=4)
+    b = curve[0][t], curve[1][t], curve[2][t]
+    ax.set_title(f"{title}\\nbeta = {b}", fontsize=8)
+    ax.set_aspect("equal"); ax.axis("off")
+fig.suptitle("cycle_lifecycle: пять различных графов сценария (24 узла, 60 снимков)",
+             fontsize=10)
+fig.tight_layout(); plt.show()"""),
+    md("""Хорда $(0,12)$ показана красным: она делит 24-цикл на два цикла длины 13, и оба
+не короче трёх рёбер — иначе флаг-комплекс заполнил бы треугольник и второе рождение
+в $H_1$ не произошло бы. Треугольников в сценарии нет ни на одном снимке по построению.
+
+Снимки 55–59 совпадают с 41–47 **побайтово**: восстановление ребра возвращает граф ровно
+в прежнее состояние. Это намеренно — повтор проверяет, что конвейер не схлопывает
+состояния по идентичности графа и честно рапортует отдельные рождение и гибель $H_0$."""),
+    code("""
 
 fig, ax = plt.subplots(figsize=(11, 3.2))
 for dim, style in ((0, "-o"), (1, "-s")):
@@ -415,6 +592,36 @@ $2.4\\cdot10^{-16}$. Числа Бетти при этом **совпадают*
 Ловится не по $\\beta$, а по минимальному попарному расстоянию."""),
     code("""loop = build_dynamic_graph("geometric_loop", CONFIG)
 lgt = loop.ground_truth
+
+# Снимки лежат как РАССТОЯНИЯ, поэтому положения точек восстанавливаем из расписания.
+def loop_points(t):
+    gap = loop_cfg.gap_angle if loop_cfg.gap_open_at <= t < loop_cfg.gap_close_at else 2 * np.pi / n
+    radius = np.interp(t, np.linspace(0, CONFIG.dynamic_events.n_snapshots - 1,
+                                      len(radii)), radii)
+    a = np.arange(n) * (2 * np.pi - gap) / (n - 1)
+    return np.c_[radius * np.cos(a), radius * np.sin(a)], radius, gap
+
+fig, axes = plt.subplots(1, 4, figsize=(13.5, 3.5))
+for ax, t in zip(axes, (0, 19, 30, 50)):
+    pts, radius, gap = loop_points(t)
+    adj = adjacency_from_snapshot(loop.snapshots[t], edge_rule=lgt.edge_rule,
+                                  edge_threshold=lgt.edge_threshold)
+    iu = np.triu_indices(n, 1)
+    for i, j in zip(iu[0][adj[iu] > 0], iu[1][adj[iu] > 0]):
+        ax.plot(*pts[[i, j]].T, color="tab:blue", lw=0.8, alpha=0.65, zorder=2)
+    ax.scatter(*pts.T, s=18, color="k", zorder=3)
+    state = "разрыв открыт" if gap > 2 * np.pi / n else "дуга замкнута"
+    ax.set_title(f"снимок {t}: {state}\\nR = {radius:.2f}, рёбер {int(adj.sum() // 2)}, "
+                 f"beta_1 = {lgt.betti_curve[1][t]}", fontsize=8)
+    ax.set_aspect("equal"); ax.axis("off"); ax.set_xlim(-1.6, 1.6); ax.set_ylim(-1.6, 1.6)
+fig.suptitle("geometric_loop: метрическая фильтрация — радиус дышит, дуга рвётся",
+             fontsize=10)
+fig.tight_layout(); plt.show()"""),
+    md("""Видно оба механизма сразу. Радиус меняется от кадра к кадру и **меняет граф**
+(число рёбер на панелях разное), но $\\beta$ при этом не двигается. Разрыв дуги — двигает.
+Это и делает набор отрицательным контролем: детектор, срабатывающий на смену комплекса,
+поймается на дыхании радиуса."""),
+    code("""
 graphs = [adjacency_from_snapshot(s, edge_rule=lgt.edge_rule, edge_threshold=lgt.edge_threshold)
           for s in loop.snapshots]
 changes = [t for t in range(1, len(graphs)) if not np.array_equal(graphs[t], graphs[t - 1])]
@@ -489,7 +696,48 @@ for r, mats in sorted(grouped.items()):
     agreement = float(np.corrcoef(mean[off], kuramoto.coupling[r][off])[0, 1])
     print(f"{r:>7}{str(list(schedule.regimes[r])):>16}{agreement:>11.3f}")
 print(f"\\nпорог min_coupling_agreement = {win.min_coupling_agreement}")"""),
-    md("""**Чего эта статистика не делает: она не различает режимы.** Согласие с *чужим*
+    code("""fig, axes = plt.subplots(2, 3, figsize=(12, 7))
+osc_ang = np.linspace(0, 2 * np.pi, osc.n_channels, endpoint=False)
+osc_pos = np.c_[np.cos(osc_ang), np.sin(osc_ang)]
+
+def block_labels(partition):
+    return np.repeat(np.arange(len(partition)), partition)
+
+for col, (regime, mats) in enumerate(sorted(grouped.items())):
+    lab = block_labels(schedule.regimes[regime])
+    iu = np.triu_indices(osc.n_channels, 1)
+
+    ax = axes[0, col]
+    truth = kuramoto.coupling[regime]
+    for i, j in zip(iu[0][truth[iu] > 0], iu[1][truth[iu] > 0]):
+        ax.plot(*osc_pos[[i, j]].T, color=palette(lab[i]), lw=0.6, alpha=0.55)
+    ax.scatter(*osc_pos.T, s=34, c=[palette(k) for k in lab], zorder=3,
+               edgecolor="white", lw=0.5)
+    ax.set_title(f"истинная связь, режим {regime}: {list(schedule.regimes[regime])}",
+                 fontsize=8.5)
+    ax.set_aspect("equal"); ax.axis("off")
+
+    ax = axes[1, col]
+    recovered = np.mean(mats, axis=0)
+    keep = recovered[iu] > np.quantile(recovered[iu], 0.85)
+    for i, j, w in zip(iu[0][keep], iu[1][keep], recovered[iu][keep]):
+        ax.plot(*osc_pos[[i, j]].T, color="tab:purple", lw=0.7, alpha=float(w))
+    ax.scatter(*osc_pos.T, s=34, c=[palette(k) for k in lab], zorder=3,
+               edgecolor="white", lw=0.5)
+    agreement = float(np.corrcoef(recovered[off], truth[off])[0, 1])
+    ax.set_title(f"восстановлено окном: 15% сильнейших\\nсогласие {agreement:.3f}",
+                 fontsize=8.5)
+    ax.set_aspect("equal"); ax.axis("off")
+
+fig.suptitle("Курамото: сверху — истинное $A(t)$, снизу — что видит скользящее окно",
+             fontsize=10)
+fig.tight_layout(); plt.show()"""),
+    md("""Верхний ряд — вход, который задан расписанием; нижний — то, что удаётся
+восстановить из ряда. Блочная структура узнаётся, но не идеально: связь внутри блока
+у фазово-захваченных осцилляторов проявляется как $|\\cos\\Delta\\varphi|$, и часть пар
+внутри блока выглядит слабее, чем часть пар между блоками.
+
+**Чего эта статистика не делает: она не различает режимы.** Согласие с *чужим*
 режимом доходит до 0.440 при истинном минимуме 0.383 — классы перекрываются, и никакой
 порог их не разделит. Это следствие вложенности разбиений: $[20,10]$ — огрубление
 $[10,10,10]$, соседние режимы совпадают большей частью структуры. Честный нулевой
@@ -520,8 +768,29 @@ for s in sbm.snapshots:
     comps.add(connected_components(csr_matrix(a[np.ix_(keep, keep)]), directed=False)[0])
 print(f"truth_kind = {sbm.ground_truth.truth_kind}, betti_curve = {sbm.ground_truth.betti_curve}")
 print(f"компонент после удаления изолированных вершин, по всем снимкам: {sorted(comps)}")"""),
+    code("""fig, axes = plt.subplots(1, 2, figsize=(11, 5))
+sbm_ang = np.linspace(0, 2 * np.pi, CONFIG.dynamic_sbm.n_nodes, endpoint=False)
+sbm_pos = np.c_[np.cos(sbm_ang), np.sin(sbm_ang)]
+
+for ax, t in zip(axes, (10, 30)):
+    lab = labels[t]
+    adj = sbm.snapshots[t] > 0.5
+    iu = np.triu_indices(len(lab), 1)
+    for i, j in zip(iu[0][adj[iu]], iu[1][adj[iu]]):
+        same = lab[i] == lab[j]
+        ax.plot(*sbm_pos[[i, j]].T, lw=0.7 if same else 0.5,
+                color=palette(lab[i]) if same else "lightgray",
+                alpha=0.7 if same else 0.55, zorder=1 if same else 0)
+    ax.scatter(*sbm_pos.T, s=42, c=[palette(k) for k in lab], zorder=3,
+               edgecolor="white", lw=0.6)
+    cross = int(adj[iu][lab[iu[0]] != lab[iu[1]]].sum())
+    ax.set_title(f"снимок {t}: {len(set(lab))} сообщества\\n"
+                 f"межблочных рёбер {cross}", fontsize=9)
+    ax.set_aspect("equal"); ax.axis("off")
+fig.suptitle("Динамическая SBM: цвет — сообщество, серым — межблочные рёбра", fontsize=10)
+fig.tight_layout(); plt.show()"""),
     md("""**Слияние сообществ не является гомологическим событием.** Блоки прошиты между
-собой десятками рёбер (7–41 межблочных на снимке), граф связен, и слияние не меняет
+собой десятками рёбер (серые линии на рисунке), граф связен, и слияние не меняет
 ничего в гомологиях. $\\beta_0$ всё же гуляет между 1 и 2 — но из-за случайных
 изолированных вершин, а не из-за сообществ.
 
@@ -536,6 +805,40 @@ cells += [md("""---
 
 Двойка следует из параметризации: значение фильтрации симплекса в комплексе Рипса —
 его **диаметр**, поэтому сдвиг каждой точки на $\\delta$ меняет диаметр на $2\\delta$."""),
+    code("""from tdadyn.synthetic import make_noisy_snapshots
+
+fig, axes = plt.subplots(2, 4, figsize=(13.5, 6.4))
+clean_ring = build_static_cloud("circle", CONFIG, n_points=120, noise_sigma=0.0).points
+for ax, lvl in zip(axes[0], CONFIG.noise.point_jitter_sigma):
+    pts = make_jittered_cloud(clean_ring, "b", lvl, 0, rng_for(CONFIG.seed, "nb_show")).points
+    ax.scatter(*clean_ring.T, s=8, color="lightgray", label="чистое")
+    ax.scatter(*pts.T, s=9, color="tab:red", alpha=0.85, label="с джиттером")
+    ax.set_title(f"джиттер точек, $\\\\sigma$ = {lvl}", fontsize=8.5)
+    ax.set_aspect("equal"); ax.axis("off")
+axes[0, 0].legend(fontsize=6.5, loc="lower center")
+
+base_graph = lifecycle.snapshots
+for ax, lvl in zip(axes[1], CONFIG.noise.spurious_edge_fraction):
+    noisy = make_noisy_snapshots(base_graph, "b", "spurious_edges", lvl, gt.edge_rule,
+                                 gt.edge_threshold, 0, rng_for(CONFIG.seed, "nb_sp"))
+    adj = adjacency_from_snapshot(noisy.snapshots[30], edge_rule=gt.edge_rule,
+                                  edge_threshold=gt.edge_threshold)
+    orig = adjacency_from_snapshot(base_graph[30], edge_rule=gt.edge_rule,
+                                   edge_threshold=gt.edge_threshold)
+    iu = np.triu_indices(n_nodes, 1)
+    for i, j in zip(iu[0][adj[iu] > 0], iu[1][adj[iu] > 0]):
+        added = orig[i, j] == 0
+        ax.plot(*ring_pos[[i, j]].T, color="tab:red" if added else "tab:blue",
+                lw=1.1 if added else 0.9, alpha=0.9 if added else 0.6, zorder=2)
+    ax.scatter(*ring_pos.T, s=14, color="k", zorder=3)
+    ax.set_title(f"ложные рёбра, $p^+$ = {lvl}\\nрёбер {int(adj.sum() // 2)} "
+                 f"(было {int(orig.sum() // 2)})", fontsize=8.5)
+    ax.set_aspect("equal"); ax.axis("off")
+fig.suptitle("Семейство 4: что делает шум. Красным — добавленное", fontsize=10)
+fig.tight_layout(); plt.show()"""),
+    md("""$p^+$ — доля от **отсутствующих** рёбер, а не от существующих, поэтому при
+$p^+ = 0.10$ на разреженном графе добавляется заметно больше рёбер, чем было. Уровень 0.0
+даёт побитово исходный набор, и это проверяется сравнением sha256 в манифесте."""),
     code("""from persim import bottleneck
 
 def dgm1(points):
