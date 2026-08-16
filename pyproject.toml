@@ -19,6 +19,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# Отчётный ноутбук: notebooks/report.ipynb. Вынесено отдельно от dev, потому что
+# тестам это не нужно, а CI из-за jupyter тяжелеет заметно.
+notebook = ["matplotlib>=3.8", "nbformat>=5.9", "nbclient>=0.9", "ipykernel>=6.29"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
