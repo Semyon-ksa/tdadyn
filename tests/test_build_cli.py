@@ -137,6 +137,54 @@ def test_the_truth_digest_notices_a_changed_expectation(built):
 # --- reproducibility -----------------------------------------------------------------
 
 
+# --- the stability artefact (result 6) -----------------------------------------------
+
+
+def reduced(config, n_points, levels, repeats):
+    """The configuration shrunk so the curve is testable in seconds."""
+    import dataclasses
+
+    return dataclasses.replace(
+        config,
+        static_clouds=dataclasses.replace(config.static_clouds, n_points=n_points),
+        noise=dataclasses.replace(
+            config.noise, point_jitter_sigma=levels, n_repeats=repeats
+        ),
+    )
+
+
+def test_the_stability_curve_covers_more_than_one_object(config, tmp_path):
+    """One circle is not enough, and the shape of the artefact has to show it.
+
+    ``docs/method.md`` §4.2a: anisotropic and compact objects fail in opposite directions,
+    so a stability claim from a circle alone says nothing about :math:`H_2`.  Measured at
+    the configured size, the circle's :math:`H_2` curve is flat near 0.02 while the
+    sphere's runs to 0.30 — the dimension that matters is invisible on the circle.
+    """
+    from tdadyn.synthetic.build import STABILITY_OBJECTS, stability_curve
+
+    curve = stability_curve(reduced(config, 60, (0.0, 0.05), 2))
+    assert set(curve["objects"]) == set(STABILITY_OBJECTS)
+    assert len(STABILITY_OBJECTS) > 1
+    for name, entry in curve["objects"].items():
+        assert set(entry) >= {"levels", "n_repeats", "H1", "H2"}, name
+        for dim in ("H1", "H2"):
+            assert len(entry[dim]["mean"]) == len(entry["levels"])
+            assert entry[dim]["mean"][0] == 0.0, f"{name} {dim} at level 0"
+
+
+def test_the_artefact_is_written_by_the_build_not_by_the_tests(config, tmp_path):
+    # The tests verify the curve; the CLI produces it. Otherwise regenerating the report
+    # would require running the slow suite, and an unrelated failure would leave it
+    # unproduced.
+    from tdadyn.synthetic.build import RESULTS_DIR, STABILITY_FILE, write_stability
+
+    local = reduced(replace_output_root(config, tmp_path), 60, (0.0, 0.05), 2)
+    path = write_stability(local)
+    assert path == tmp_path / RESULTS_DIR / STABILITY_FILE
+    assert json.loads(path.read_text())["n_points"] == 60
+
+
 @pytest.mark.slow
 def test_a_rebuild_reproduces_the_same_hashes(config, tmp_path):
     first_root, second_root = tmp_path / "first", tmp_path / "second"

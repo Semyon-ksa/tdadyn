@@ -6,6 +6,11 @@ data/*
 !data/synthetic/
 data/synthetic/*
 !data/synthetic/manifest.json
+# Отчётные числа Результата 6: производятся сборкой (--results), а не тестами,
+# и должны переживать пересборку данных.
+!data/synthetic/results/
+data/synthetic/results/*
+!data/synthetic/results/stability.json
 
 .venv/
 __pycache__/
