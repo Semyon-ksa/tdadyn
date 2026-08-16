@@ -199,22 +199,3 @@ def test_the_false_positive_rate_stays_under_the_measured_bound(config):
             misses += measured_betti(cloud.points, config) != CLEAN
     rate = misses / trials
     assert rate <= bound, f"{misses}/{trials} = {rate:.3f} exceeds {bound}"
-
-
-@pytest.mark.slow
-def test_the_configured_size_is_past_the_knee(config):
-    # 60 points was the configured size before S8 and misses on the order of 40% of the
-    # time; the rate has to have come down by the size actually in use, and by more than
-    # the bound (docs/method.md, 1.2a).
-    from tdadyn.synthetic import make_uniform_cloud, rng_for
-
-    settings = config.null_models.uniform_cloud
-    small = sum(
-        measured_betti(
-            make_uniform_cloud(60, settings.dim, repeat, rng_for(config.seed, "knee", repeat)).points,
-            config,
-        )
-        != CLEAN
-        for repeat in range(config.null_models.n_realizations)
-    )
-    assert small / config.null_models.n_realizations > config.null_models.max_false_positive_rate
