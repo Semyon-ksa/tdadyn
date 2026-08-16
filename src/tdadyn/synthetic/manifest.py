@@ -8,6 +8,7 @@ the diff instead of being silently absorbed by ``data/``.
 from __future__ import annotations
 
 import hashlib
+import json
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from importlib.metadata import PackageNotFoundError, version
@@ -41,6 +42,10 @@ class ManifestEntry:
         Generator arguments.
     arrays : dict of str to str
         File name to sha256 of the ``.npy`` file's bytes.
+    truth_sha256 : str
+        sha256 of the **canonical serialisation** of the ground truth, not of the file's
+        bytes.  Hashing the bytes would make indentation, key order and float ``repr``
+        part of the digest, so a cosmetic reformat would read as changed data.
     package_version : str
         Version of ``tdadyn`` that produced the dataset.
     generated_at : str
@@ -54,6 +59,7 @@ class ManifestEntry:
     path: str
     params: dict
     arrays: dict[str, str]
+    truth_sha256: str
     package_version: str
     generated_at: str
 
@@ -128,6 +134,7 @@ def make_entry(
         path=relative.as_posix(),
         params=jsonify("params", ground_truth.params),
         arrays=arrays,
+        truth_sha256=truth_digest(read_json(dataset_dir / GROUND_TRUTH_FILE)),
         package_version=package_version(),
         generated_at=generated_at or _utc_now(),
     )
@@ -155,6 +162,67 @@ def entry_payload(entry: ManifestEntry | dict[str, Any]) -> dict[str, Any]:
     payload.pop("generated_at", None)
     payload.pop("package_version", None)
     return payload
+
+
+def truth_digest(payload: dict[str, Any]) -> str:
+    """sha256 of a ground-truth record, over its canonical serialisation.
+
+    Parameters
+    ----------
+    payload : dict
+        Parsed ``ground_truth.json``.
+
+    Returns
+    -------
+    str
+        Hex digest of the record dumped with sorted keys and fixed separators.
+
+    Notes
+    -----
+    Arrays are hashed by file bytes, deliberately (see :func:`sha256_file`); the truth is
+    not.  Its file is pretty-printed, so byte hashing would fold indentation, key order and
+    float ``repr`` into the digest, and a cosmetic reformat would read as changed data.
+    Hashing the parsed object makes the digest track what the truth *says*.
+
+    This is what makes "a rebuild reproduces the same hashes" cover the expected Betti
+    numbers, the event log and the notes — the whole value of these datasets, and exactly
+    what the array digests do not touch.
+
+    No key of the record depends on the environment: there is no timestamp, no path and no
+    package version among them.  Should one appear, it must be excluded here by an explicit
+    list rather than dropped from the file.
+    """
+    canonical = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def write_manifest(output_root: Path | str, entries: list[ManifestEntry]) -> Path:
+    """Replace the manifest with exactly these entries.
+
+    Parameters
+    ----------
+    output_root : pathlib.Path or str
+        Root the manifest sits in.
+    entries : list of ManifestEntry
+        The complete registry after a full rebuild.
+
+    Returns
+    -------
+    pathlib.Path
+        Path of the written manifest.
+
+    Notes
+    -----
+    A full rebuild replaces rather than accumulates.  :func:`update_manifest` never prunes,
+    so after a configuration change it would keep rows for datasets that no longer exist,
+    and "the rebuild reproduces the same hashes" would then compare against a registry
+    describing a directory tree nobody has.
+    """
+    rows = sorted((asdict(entry) for entry in entries), key=lambda item: item["dataset_id"])
+    path = manifest_path(output_root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_json(path, {"format_version": FORMAT_VERSION, "datasets": rows})
+    return path
 
 
 def manifest_path(output_root: Path | str) -> Path:

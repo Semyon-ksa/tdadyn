@@ -47,7 +47,15 @@ from .dynamic_events import (
 )
 from .dynamic_sbm import DYNAMIC_SBM_NOTES, make_dynamic_sbm
 from .io import load_dataset, load_ground_truth, save_dataset
-from .manifest import ManifestEntry, entry_payload, make_entry, read_manifest, update_manifest
+from .manifest import (
+    ManifestEntry,
+    entry_payload,
+    make_entry,
+    read_manifest,
+    truth_digest,
+    update_manifest,
+    write_manifest,
+)
 from .naming import format_dataset_id, make_dataset_id, register_name_order
 from .noise import (
     NOISE_KINDS,
@@ -185,6 +193,8 @@ __all__ = [
     "rng_for",
     "save_dataset",
     "significant_betti",
+    "truth_digest",
     "update_manifest",
     "validate_ground_truth_dict",
+    "write_manifest",
 ]
