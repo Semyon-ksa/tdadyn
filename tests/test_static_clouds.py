@@ -18,7 +18,7 @@ from tdadyn.synthetic import (
 )
 from tdadyn.synthetic.schema import validate_ground_truth_dict
 
-from conftest import STATIC_GENERATORS, build_planar_cloud, build_static_cloud
+from conftest import STATIC_GENERATORS, build_static_cloud, build_static_cloud
 
 # Transcribed from the table in docs/method.md §1.2, independently of what the
 # generators declare — comparing the two is the point of one of the tests below.
@@ -136,8 +136,8 @@ def test_hopf_link_expects_two_components(config):
 
 def test_noise_level_changes_the_cloud_but_not_the_underlying_sample(config):
     """Sampling comes first, so the curve is identical across noise levels."""
-    clean = build_planar_cloud("circle", config, noise_sigma=0.0)
-    noisy = build_planar_cloud("circle", config, noise_sigma=config.static_clouds.noise_sigma)
+    clean = build_static_cloud("circle", config, noise_sigma=0.0)
+    noisy = build_static_cloud("circle", config, noise_sigma=config.static_clouds.noise_sigma)
     assert not np.array_equal(clean.points, noisy.points)
     displacement = np.linalg.norm(noisy.points - clean.points, axis=1)
     # Displacements are Rayleigh-distributed with the configured sigma; a loose bound is
@@ -146,7 +146,7 @@ def test_noise_level_changes_the_cloud_but_not_the_underlying_sample(config):
 
 
 def test_circle_points_lie_on_the_circle_when_clean(config):
-    dataset = build_planar_cloud("circle", config, noise_sigma=0.0)
+    dataset = build_static_cloud("circle", config, noise_sigma=0.0)
     radii = np.linalg.norm(dataset.points, axis=1)
     assert np.allclose(radii, config.static_clouds.circle.radius)
 
@@ -154,7 +154,7 @@ def test_circle_points_lie_on_the_circle_when_clean(config):
 def test_two_circles_components_stay_apart(config):
     """A structural check on beta_0 = 2 that needs no persistent homology."""
     clouds = config.static_clouds
-    dataset = build_planar_cloud("two_circles", config, noise_sigma=0.0)
+    dataset = build_static_cloud("two_circles", config, noise_sigma=0.0)
     n_first = clouds.n_points // 2
     first, second = dataset.points[:n_first], dataset.points[n_first:]
     gap = np.linalg.norm(first[:, None, :] - second[None, :, :], axis=-1).min()
@@ -176,12 +176,12 @@ def test_overlapping_circles_are_refused(config):
 
 def test_figure_eight_records_its_non_uniform_density(config):
     """docs/method.md §1.1 allows the non-uniformity but requires it to be recorded."""
-    dataset = build_planar_cloud("figure_eight", config)
+    dataset = build_static_cloud("figure_eight", config)
     assert "самопересеч" in dataset.ground_truth.notes
 
 
 def test_figure_eight_passes_through_its_crossing(config):
-    dataset = build_planar_cloud("figure_eight", config, noise_sigma=0.0)
+    dataset = build_static_cloud("figure_eight", config, noise_sigma=0.0)
     assert np.linalg.norm(dataset.points, axis=1).min() < 0.1 * config.static_clouds.figure_eight.scale
 
 

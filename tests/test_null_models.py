@@ -23,7 +23,14 @@ from tdadyn.synthetic import (
 )
 from tdadyn.synthetic import reference
 
+from tdadyn.synthetic import build_dynamic_graph, null_edge_probability
+
 from conftest import build_null_cloud, build_null_graph
+
+
+def er_null(config, *, repeat=0):
+    """The ER null over a ``cycle_lifecycle`` built once, as the CLI does."""
+    return build_null_graph(config, build_dynamic_graph("cycle_lifecycle", config), repeat=repeat)
 
 CLEAN = (1, 0, 0)
 """What "no features" looks like: one component, nothing above it.  The infinite bar of
@@ -45,7 +52,7 @@ def null_cloud(config):
 
 @pytest.fixture
 def null_graph(config):
-    return build_null_graph(config)[1]
+    return er_null(config)
 
 
 def measured_betti(points, config):
@@ -66,7 +73,7 @@ def measured_betti(points, config):
 
 @pytest.mark.parametrize("which", ["cloud", "graph"])
 def test_the_truth_is_an_empty_event_log(config, which):
-    dataset = build_null_cloud(config) if which == "cloud" else build_null_graph(config)[1]
+    dataset = build_null_cloud(config) if which == "cloud" else er_null(config)
     ground_truth = dataset.ground_truth
     assert ground_truth.family == "null"
     assert ground_truth.truth_kind == "none"
@@ -80,20 +87,20 @@ def test_the_truth_is_an_empty_event_log(config, which):
 
 @pytest.mark.parametrize("which", ["cloud", "graph"])
 def test_the_dataset_survives_a_round_trip(config, which, tmp_path):
-    dataset = build_null_cloud(config) if which == "cloud" else build_null_graph(config)[1]
+    dataset = build_null_cloud(config) if which == "cloud" else er_null(config)
     path = save_dataset(dataset, tmp_path, float_precision=config.naming.float_precision)
     assert dataset_equal(load_dataset(path), dataset)
 
 
 @pytest.mark.parametrize("which", ["cloud", "graph"])
 def test_the_generator_is_deterministic(config, which):
-    build = build_null_cloud if which == "cloud" else (lambda c, **k: build_null_graph(c, **k)[1])
+    build = build_null_cloud if which == "cloud" else er_null
     assert dataset_equal(build(config), build(config))
 
 
 @pytest.mark.parametrize("which", ["cloud", "graph"])
 def test_the_global_seed_does_not_leak(config, which):
-    build = build_null_cloud if which == "cloud" else (lambda c, **k: build_null_graph(c, **k)[1])
+    build = build_null_cloud if which == "cloud" else er_null
     expected = build(config)
     np.random.seed(999)
     np.random.normal(size=1000)
@@ -102,7 +109,7 @@ def test_the_global_seed_does_not_leak(config, which):
 
 @pytest.mark.parametrize("which", ["cloud", "graph"])
 def test_realisations_differ(config, which):
-    build = build_null_cloud if which == "cloud" else (lambda c, **k: build_null_graph(c, **k)[1])
+    build = build_null_cloud if which == "cloud" else er_null
     assert not dataset_equal(build(config, repeat=0), build(config, repeat=1))
 
 
@@ -110,7 +117,9 @@ def test_realisations_differ(config, which):
 
 
 def test_the_er_null_matches_the_density_of_cycle_lifecycle(config):
-    probability, null = build_null_graph(config)
+    base = build_dynamic_graph("cycle_lifecycle", config)
+    probability = null_edge_probability(config, base)
+    null = build_null_graph(config, base)
     events = config.dynamic_events
     expected_edges = probability * events.n_nodes * (events.n_nodes - 1) / 2
     truth = null.ground_truth

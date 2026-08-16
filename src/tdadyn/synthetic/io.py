@@ -17,6 +17,7 @@ from typing import Any
 import numpy as np
 
 from .contracts import (
+    NetworkDataset,
     Dataset,
     DynamicGraphDataset,
     GroundTruth,
@@ -33,6 +34,7 @@ _ARRAY_FILES: dict[type, tuple[tuple[str, str, bool], ...]] = {
     PointCloudDataset: (("points", "points.npy", True), ("weights", "weights.npy", False)),
     DynamicGraphDataset: (("snapshots", "snapshots.npy", True),),
     SeriesDataset: (("series", "series.npy", True), ("coupling", "coupling.npy", True)),
+    NetworkDataset: (("weights", "weights.npy", True),),
 }
 
 # Load dispatches on the array files present, not on the family: a noisy point cloud
@@ -42,6 +44,15 @@ _LOAD_BY_MARKER: dict[str, type] = {
     "snapshots.npy": DynamicGraphDataset,
     "series.npy": SeriesDataset,
 }
+
+_FALLBACK_MARKER = ("weights.npy", NetworkDataset)
+"""Consulted only when none of the primary markers is present.
+
+``weights.npy`` cannot be a primary marker: a point cloud may legitimately carry one
+beside ``points.npy``, and the primary markers are mutually exclusive on purpose — two of
+them in one directory means the directory is malformed.  A directory holding *only*
+weights is a standalone network, which is how family 4 stores a jittered one
+(``contracts.NetworkDataset``)."""
 
 
 def dataset_arrays(dataset: Dataset) -> dict[str, np.ndarray]:
@@ -147,11 +158,19 @@ def load_dataset(path: Path | str, *, float_precision: int | None = None) -> Dat
     ground_truth = load_ground_truth(path, float_precision=float_precision)
 
     present = [marker for marker in _LOAD_BY_MARKER if (path / marker).exists()]
-    if len(present) != 1:
+    if len(present) > 1:
         raise ValueError(
             f"{path}: expected exactly one of {sorted(_LOAD_BY_MARKER)}, found {sorted(present)}"
         )
-    dataset_type = _LOAD_BY_MARKER[present[0]]
+    if present:
+        dataset_type = _LOAD_BY_MARKER[present[0]]
+    elif (path / _FALLBACK_MARKER[0]).exists():
+        dataset_type = _FALLBACK_MARKER[1]
+    else:
+        raise ValueError(
+            f"{path}: expected one of {sorted(_LOAD_BY_MARKER)} or {_FALLBACK_MARKER[0]}, "
+            "found none"
+        )
     arrays = {}
     for attribute, file_name, required in _ARRAY_FILES[dataset_type]:
         file_path = path / file_name

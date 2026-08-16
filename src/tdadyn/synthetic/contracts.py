@@ -409,7 +409,40 @@ class SeriesDataset:
             )
 
 
-Dataset = PointCloudDataset | DynamicGraphDataset | SeriesDataset
+@dataclass(frozen=True, eq=False)
+class NetworkDataset:
+    """A standalone weighted network, without the cloud it came from.
+
+    Parameters
+    ----------
+    weights : numpy.ndarray
+        Shape ``(n_nodes, n_nodes)``, float64, symmetric.
+    ground_truth : GroundTruth
+        Truth for this dataset.
+
+    Notes
+    -----
+    This exists for family 4.  The rule there is that **only the perturbed array reaches
+    disk**, and the source is recovered through ``noise_level["base"]``: jittering the
+    weights leaves the points untouched, so storing both would put a pair in one directory
+    where ``weights`` is no longer the network of ``points``.  A consumer who rebuilt the
+    network from the points would get something other than what is on disk, and would see
+    no error.
+
+    ``docs/data.md`` §2 already lists a weight matrix of shape ``(n_nodes, n_nodes)`` as
+    its own row of the axis table, so this is a container for an object the contract
+    already recognises — not a sequence of length one.
+    """
+
+    weights: np.ndarray
+    ground_truth: GroundTruth
+
+    def __post_init__(self) -> None:
+        _check_array("NetworkDataset.weights", self.weights, ndim=2)
+        _check_square_symmetric("NetworkDataset.weights", self.weights)
+
+
+Dataset = PointCloudDataset | DynamicGraphDataset | SeriesDataset | NetworkDataset
 
 
 def values_equal(left: Any, right: Any) -> bool:

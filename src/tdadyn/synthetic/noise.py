@@ -28,6 +28,7 @@ from .contracts import (
     FORMAT_VERSION,
     DynamicGraphDataset,
     GroundTruth,
+    NetworkDataset,
     PointCloudDataset,
 )
 from .naming import register_name_order
@@ -51,32 +52,23 @@ NOISY_NOTES = (
 )
 
 
-def make_noisy_cloud(
+def make_jittered_cloud(
     base_points: np.ndarray,
-    base_weights: np.ndarray | None,
     base_id: str,
-    kind: str,
     level: float,
-    weight_range: tuple[float, float],
     repeat: int,
     rng: np.random.Generator,
 ) -> PointCloudDataset:
-    """Apply ``point_jitter`` or ``weight_jitter`` to a family-1 cloud.
+    """Displace a family-1 cloud, storing the points alone.
 
     Parameters
     ----------
     base_points : numpy.ndarray
         Points of the clean dataset, shape ``(n_points, dim)``.
-    base_weights : numpy.ndarray or None
-        Its weighted network, if the noise kind needs one.
     base_id : str
         ``dataset_id`` of the clean dataset; recorded so the noisy set is reproducible.
-    kind : {'point_jitter', 'weight_jitter'}
-        Mechanism to apply.
     level : float
-        The level from ``config.noise``.
-    weight_range : tuple of float
-        Admissible weight range for clipping; ignored by ``point_jitter``.
+        The level from ``config.noise.point_jitter_sigma``.
     repeat : int
         Realisation index, part of the name so repeats do not overwrite each other.
     rng : numpy.random.Generator
@@ -85,25 +77,74 @@ def make_noisy_cloud(
     Returns
     -------
     PointCloudDataset
-        With ``family="noisy"`` and ``truth_kind="noise_level"``.
-    """
-    if kind == "point_jitter":
-        points = jitter_points(base_points, sigma=level, rng=rng)
-        weights = base_weights
-    elif kind == "weight_jitter":
-        if base_weights is None:
-            raise ValueError("weight_jitter needs a weighted network on the base dataset")
-        points = base_points
-        weights = jitter_weights(
-            base_weights, sigma=level, low=weight_range[0], high=weight_range[1], rng=rng
-        )
-    else:
-        raise ValueError(f"kind must be point_jitter or weight_jitter, got {kind!r}")
+        Points only, with ``family="noisy"`` and ``truth_kind="noise_level"``.
 
+    Notes
+    -----
+    No network is attached, deliberately.  Once the points have moved, the network built
+    from the *clean* ones no longer describes them — measured, the weights differ by up to
+    0.36 at level 0.10 — and a directory holding both would be a pair that disagrees with
+    itself.  The network is derivable from the stored points through the same calibrated
+    path family 1 uses, so nothing is lost by leaving it out.
+    """
+    points = jitter_points(base_points, sigma=level, rng=rng)
     return PointCloudDataset(
         points=points,
+        ground_truth=_ground_truth("point_jitter", base_id, level, repeat, rng),
+    )
+
+
+def make_jittered_network(
+    base_weights: np.ndarray,
+    base_id: str,
+    level: float,
+    weight_range: tuple[float, float],
+    repeat: int,
+    rng: np.random.Generator,
+) -> NetworkDataset:
+    """Perturb a weighted network, storing the weights alone.
+
+    Parameters
+    ----------
+    base_weights : numpy.ndarray
+        The clean network, square and symmetric.
+    base_id : str
+        ``dataset_id`` of the clean dataset the network was built from.
+    level : float
+        The level from ``config.noise.weight_jitter_sigma``.
+    weight_range : tuple of float
+        Admissible range to clip into.  Derived from the transform that produced the
+        weights, never configured: for a Gaussian kernel it is :math:`(0, 1]` by
+        definition of :math:`\\exp(-d^2/2\\sigma^2)`, and a configurable range would invite
+        a value the kernel can never produce.
+    repeat : int
+        Realisation index.
+    rng : numpy.random.Generator
+        Stream to draw from.
+
+    Returns
+    -------
+    NetworkDataset
+        Weights only, with ``family="noisy"`` and ``truth_kind="noise_level"``.
+
+    Notes
+    -----
+    The points are not stored, for the mirror of the reason in :func:`make_jittered_cloud`:
+    they are untouched while the weights are deliberately corrupted, so the pair on disk
+    would again disagree.  The same rule covers the whole family — **only the perturbed
+    array reaches disk, and the source is recovered through** ``noise_level["base"]``.
+    """
+    low, high = weight_range
+    if not np.all((base_weights >= low) & (base_weights <= high)):
+        raise ValueError(
+            f"base weights fall outside the range {weight_range} the transform can "
+            f"produce (observed {base_weights.min():.4f}..{base_weights.max():.4f}); "
+            "the range is a property of the transform, so this means the wrong one"
+        )
+    weights = jitter_weights(base_weights, sigma=level, low=low, high=high, rng=rng)
+    return NetworkDataset(
         weights=weights,
-        ground_truth=_ground_truth(kind, base_id, level, repeat, rng),
+        ground_truth=_ground_truth("weight_jitter", base_id, level, repeat, rng),
     )
 
 

@@ -24,13 +24,16 @@ from tdadyn.synthetic import (
     dataset_equal,
     edge_count,
     load_dataset,
-    make_noisy_cloud,
+    make_jittered_cloud,
+    make_jittered_network,
     make_noisy_snapshots,
     pairwise_distances,
     persistence_diagrams,
     rng_for,
     save_dataset,
 )
+
+from tdadyn.synthetic import GAUSSIAN_KERNEL_RANGE, noise_stream
 
 from conftest import build_dynamic_graph, build_static_cloud
 
@@ -61,19 +64,24 @@ def weighted_base(config, n_points):
     return base, gaussian_kernel(distances, sigma=sigma)
 
 
+BASE_ID = "circle_N200_radius1_sig0_coeff_field2_seed20260201"
+
+
 def noisy_cloud(config, *, kind="point_jitter", level=0.05, repeat=0, n_points=200):
-    """Build one noisy cloud over a clean base of the repository configuration."""
+    """Build one noisy dataset over a clean base of the repository configuration.
+
+    Returns ``(base, weights, noisy)``.  Which array the noisy dataset carries depends on
+    the mechanism: family 4 stores the perturbed array alone (``docs/data.md`` §1).
+    """
     base, weights = weighted_base(config, n_points)
-    return base, weights, make_noisy_cloud(
-        base.points,
-        weights,
-        "circle_N200_radius1_sig0_coeff_field2_seed20260201",
-        kind,
-        level,
-        (0.0, 1.0),
-        repeat,
-        rng_for(config.seed, f"noise_{kind}", repeat),
-    )
+    stream = rng_for(config.seed, noise_stream(kind, "circle"), repeat)
+    if kind == "point_jitter":
+        noisy = make_jittered_cloud(base.points, BASE_ID, level, repeat, stream)
+    else:
+        noisy = make_jittered_network(
+            weights, BASE_ID, level, GAUSSIAN_KERNEL_RANGE, repeat, stream
+        )
+    return base, weights, noisy
 
 
 def finite_bars(diagram):
@@ -136,14 +144,64 @@ def test_the_repeat_index_reaches_the_directory_name(config):
     assert first != second
 
 
+def test_only_the_perturbed_array_reaches_disk(config, tmp_path):
+    """The single layout rule of family 4 (``docs/data.md`` §1).
+
+    A directory must never hold a perturbed array beside the source it no longer matches.
+    Measured before the rule was applied: after point jitter at level 0.10 the carried
+    network differed from the network of the stored points by up to 0.36, and a consumer
+    who rebuilt it would have got something other than what was on disk, silently.
+    """
+    precision = config.naming.float_precision
+    _, _, jittered_points = noisy_cloud(config, kind="point_jitter")
+    _, _, jittered_network = noisy_cloud(config, kind="weight_jitter")
+
+    cloud_dir = save_dataset(jittered_points, tmp_path / "a", float_precision=precision)
+    network_dir = save_dataset(jittered_network, tmp_path / "b", float_precision=precision)
+    written = lambda path: {file.name for file in path.glob("*.npy")}
+
+    assert written(cloud_dir) == {"points.npy"}, "a jittered cloud must not carry a network"
+    assert written(network_dir) == {"weights.npy"}, "a jittered network must not carry points"
+
+
+def test_a_weights_only_directory_loads_as_a_network(config, tmp_path):
+    from tdadyn.synthetic import NetworkDataset
+
+    _, _, jittered = noisy_cloud(config, kind="weight_jitter")
+    path = save_dataset(jittered, tmp_path, float_precision=config.naming.float_precision)
+    loaded = load_dataset(path)
+    assert isinstance(loaded, NetworkDataset)
+    assert dataset_equal(loaded, jittered)
+
+
+def test_a_cloud_with_a_network_still_loads_as_a_cloud(fake_point_cloud, config, tmp_path):
+    # weights.npy is a fallback marker, not a primary one: a point cloud may legitimately
+    # carry a network beside its points, and that must not become ambiguous.
+    path = save_dataset(fake_point_cloud, tmp_path, float_precision=config.naming.float_precision)
+    assert {file.name for file in path.glob("*.npy")} == {"points.npy", "weights.npy"}
+    assert isinstance(load_dataset(path), type(fake_point_cloud))
+
+
+def test_a_weight_range_the_transform_cannot_produce_is_refused(config):
+    # The range is a property of the transform, not a setting: a Gaussian kernel lies in
+    # (0, 1], so base weights outside the declared range mean the wrong transform.
+    _, weights = weighted_base(config, 100)
+    with pytest.raises(ValueError, match="property of the transform"):
+        make_jittered_network(weights, BASE_ID, 0.05, (0.5, 0.9), 0, rng_for(1, "probe"))
+
+
 # --- level zero is the clean object -------------------------------------------------
 
 
 @pytest.mark.parametrize("kind", ["point_jitter", "weight_jitter"])
 def test_zero_level_reproduces_the_base_bitwise(config, kind):
     base, weights, noisy = noisy_cloud(config, kind=kind, level=0.0)
-    assert np.array_equal(noisy.points, base.points)
-    assert np.array_equal(noisy.weights, weights)
+    if kind == "point_jitter":
+        assert np.array_equal(noisy.points, base.points)
+        # No network beside moved points: docs/data.md 1, family 4.
+        assert noisy.weights is None
+    else:
+        assert np.array_equal(noisy.weights, weights)
 
 
 def test_the_draw_happens_even_at_zero(config):
@@ -248,9 +306,8 @@ def test_the_stability_theorem_holds_with_the_factor_two(config, seed):
     base = build_static_cloud(NOISY_BASE, config, n_points=400, noise_sigma=0.0)
     clean = diagrams_of(base.points, config)
     for level in config.noise.point_jitter_sigma[1:]:
-        noisy_points = make_noisy_cloud(
-            base.points, None, "base", "point_jitter", level, (0.0, 1.0), 0,
-            rng_for(seed, "stability"),
+        noisy_points = make_jittered_cloud(
+            base.points, "base", level, 0, rng_for(seed, "stability")
         ).points
         noisy = diagrams_of(noisy_points, config)
         separation = hausdorff(base.points, noisy_points)
