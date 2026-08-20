@@ -291,6 +291,60 @@ class NullModels:
 
 
 @dataclass(frozen=True)
+class EventMatching:
+    """How a predicted event log is matched against the true one (``docs/zigzag.md`` §6)."""
+
+    tolerance: int
+    match_dimension: bool
+    match_type: bool
+
+
+@dataclass(frozen=True)
+class Oracle:
+    """Depth of the independent check (``docs/zigzag.md`` §5.1)."""
+
+    level: str
+    max_index_count: int
+
+
+@dataclass(frozen=True)
+class ZigzagReport:
+    """Which bars are counted and reported rather than dropped in silence.
+
+    Every one of these defaults to being reported because each is a real phenomenon of
+    the construction, not noise of the implementation: an invisible bar spans no snapshot
+    index at all, an ephemeral one is born and dies inside a single transition, a
+    half-integer event happens on a union that is in neither snapshot, and a censored bar
+    touches the end of the sequence.  Their counts are a measurement of the union rule
+    that has to be known before any of this reaches a connectome (``docs/zigzag.md`` §4).
+    """
+
+    invisible_bars: bool
+    ephemeral_bars: bool
+    half_index_events: bool
+    censored_bars: bool
+
+
+@dataclass(frozen=True)
+class Zigzag:
+    """Task 2: zigzag persistence and time diagrams.
+
+    What is deliberately **absent** here is as much part of the specification as what is
+    present.  ``union_rule``, the index convention and any notion of bar significance are
+    module constants or nothing at all, because the invariant depends on them: a config
+    key would invite shifting one by one and getting a plausible barcode with a wrong
+    truth (``docs/roadmap.md``, "Ключи конфига").
+    """
+
+    backend: str
+    max_homology_dim: int
+    coeff_field: int
+    event_matching: EventMatching
+    oracle: Oracle
+    report: ZigzagReport
+
+
+@dataclass(frozen=True)
 class Naming:
     float_precision: int
 
@@ -322,6 +376,7 @@ class Config:
     sliding_window: SlidingWindow
     noise: Noise
     null_models: NullModels
+    zigzag: Zigzag
     naming: Naming
 
 
@@ -398,6 +453,7 @@ def parse_config(raw: Mapping[str, Any], *, config_path: Path | str) -> Config:
         sliding_window=_sliding_window(root.section("sliding_window")),
         noise=_noise(root.section("noise")),
         null_models=_null_models(root.section("null_models")),
+        zigzag=_zigzag(root.section("zigzag")),
         naming=_naming(root.section("naming")),
     )
     root.done()
@@ -773,6 +829,57 @@ def _null_models(reader: _Reader) -> NullModels:
     )
 
 
+def _zigzag(reader: _Reader) -> Zigzag:
+    backend = reader.string("backend", choices=("reference", "dionysus", "fzz"))
+    max_homology_dim = reader.integer("max_homology_dim", minimum=0)
+    coeff_field = reader.integer("coeff_field", minimum=2)
+
+    matching_reader = reader.section("event_matching")
+    event_matching = EventMatching(
+        tolerance=matching_reader.integer("tolerance", minimum=0),
+        match_dimension=matching_reader.boolean("match_dimension"),
+        match_type=matching_reader.boolean("match_type"),
+    )
+    matching_reader.done()
+
+    oracle_reader = reader.section("oracle")
+    oracle = Oracle(
+        level=oracle_reader.string("level", choices=("L1", "L2", "L3")),
+        max_index_count=oracle_reader.integer("max_index_count", minimum=1),
+    )
+    oracle_reader.done()
+
+    report_reader = reader.section("report")
+    report = ZigzagReport(
+        invisible_bars=report_reader.boolean("invisible_bars"),
+        ephemeral_bars=report_reader.boolean("ephemeral_bars"),
+        half_index_events=report_reader.boolean("half_index_events"),
+        censored_bars=report_reader.boolean("censored_bars"),
+    )
+    report_reader.done()
+
+    section = Zigzag(
+        backend=backend,
+        max_homology_dim=max_homology_dim,
+        coeff_field=coeff_field,
+        event_matching=event_matching,
+        oracle=oracle,
+        report=report,
+    )
+    reader.done()
+
+    # The reference implementation is Z/2 only and raises rather than quietly computing
+    # over Z/2 with p recorded as something else (``docs/method.md`` §1.2).  Refusing
+    # here means the run stops at the config, not halfway through a barcode.
+    if section.coeff_field != 2:
+        raise ConfigError(
+            f"{reader.origin}: zigzag.coeff_field is {section.coeff_field}; only 2 is "
+            "implemented. The independent path is Z/2 by design, and a zigzag barcode "
+            "with no oracle behind it is not a result (docs/zigzag.md, 3.1)"
+        )
+    return section
+
+
 def _naming(reader: _Reader) -> Naming:
     section = Naming(float_precision=reader.integer("float_precision", minimum=1, maximum=17))
     reader.done()
@@ -996,6 +1103,17 @@ def _check_cross_section(config: Config, *, origin: str) -> None:
         raise ConfigError(
             f"{origin}: dynamic_sbm.block_sizes sum to "
             f"{sum(config.dynamic_sbm.block_sizes)} but n_nodes is {config.dynamic_sbm.n_nodes}"
+        )
+
+    # The zigzag may ask for fewer dimensions than the generators computed — that is a
+    # cost decision — but never for more: above the generators' ceiling there is no
+    # betti_curve in the family-2 truth to check the answer against, and the oracle would
+    # be comparing a barcode with nothing.
+    if config.zigzag.max_homology_dim > topology.max_homology_dim:
+        raise ConfigError(
+            f"{origin}: zigzag.max_homology_dim ({config.zigzag.max_homology_dim}) exceeds "
+            f"topology_check.max_homology_dim ({topology.max_homology_dim}); the datasets "
+            "carry no truth in that dimension, so nothing would check the result"
         )
 
     # docs/method.md §3.4: a window longer than a regime smears the event across the

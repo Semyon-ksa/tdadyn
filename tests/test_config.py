@@ -489,3 +489,76 @@ def test_edge_threshold_must_admit_the_edge_weight(raw):
     weight = raw["dynamic_events"]["edge_weight"]
     with pytest.raises(ConfigError, match="threshold"):
         parse_config(mutate(raw, "dynamic_events.threshold", weight), config_path=CONFIG_PATH)
+
+
+# --- Задача 2: секция zigzag -------------------------------------------------------
+
+
+def test_the_zigzag_section_is_read(raw):
+    zigzag = load_config(CONFIG_PATH).zigzag
+    assert zigzag.backend == "reference"
+    assert zigzag.coeff_field == 2
+    assert zigzag.event_matching.tolerance == 0
+    assert zigzag.oracle.level == "L3"
+    assert zigzag.report.invisible_bars is True
+
+
+@pytest.mark.parametrize(
+    "dotted",
+    [
+        "zigzag.backend",
+        "zigzag.max_homology_dim",
+        "zigzag.coeff_field",
+        "zigzag.event_matching.tolerance",
+        "zigzag.oracle.level",
+        "zigzag.oracle.max_index_count",
+        "zigzag.report.invisible_bars",
+    ],
+)
+def test_a_missing_zigzag_key_is_reported(raw, dotted):
+    with pytest.raises(ConfigError, match=dotted.split(".")[-1]):
+        parse_config(drop(raw, dotted), config_path=CONFIG_PATH)
+
+
+@pytest.mark.parametrize(
+    ("dotted", "value"),
+    [
+        ("zigzag.backend", "gudhi"),
+        ("zigzag.oracle.level", "L4"),
+        ("zigzag.max_homology_dim", -1),
+        ("zigzag.oracle.max_index_count", 0),
+        ("zigzag.event_matching.tolerance", -1),
+        ("zigzag.event_matching.match_type", "yes"),
+        ("zigzag.report.censored_bars", 1),
+    ],
+)
+def test_an_impossible_zigzag_value_is_refused(raw, dotted, value):
+    with pytest.raises(ConfigError):
+        parse_config(mutate(raw, dotted, value), config_path=CONFIG_PATH)
+
+
+def test_the_zigzag_field_of_coefficients_must_be_two(raw):
+    """The independent path is Z/2 by design (``docs/method.md`` §1.2).
+
+    The refusal belongs in the config rather than halfway through a barcode: a zigzag run
+    at p = 3 has no oracle behind it, and a barcode nothing checks is not a result.
+    """
+    with pytest.raises(ConfigError, match="only 2 is implemented"):
+        parse_config(mutate(raw, "zigzag.coeff_field", 3), config_path=CONFIG_PATH)
+
+
+def test_the_zigzag_may_ask_for_fewer_dimensions_but_never_more(raw):
+    """Below the generators' ceiling is a cost decision; above it there is no truth.
+
+    Family 2 carries ``betti_curve`` up to ``topology_check.max_homology_dim``.  Asking
+    the zigzag for more would produce bars in a dimension where nothing can contradict
+    them — the failure mode the whole task is built to avoid.
+    """
+    ceiling = raw["topology_check"]["max_homology_dim"]
+    assert parse_config(
+        mutate(raw, "zigzag.max_homology_dim", ceiling), config_path=CONFIG_PATH
+    ).zigzag.max_homology_dim == ceiling
+    with pytest.raises(ConfigError, match="carry no truth in that dimension"):
+        parse_config(
+            mutate(raw, "zigzag.max_homology_dim", ceiling + 1), config_path=CONFIG_PATH
+        )

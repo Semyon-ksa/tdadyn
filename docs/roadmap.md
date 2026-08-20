@@ -194,8 +194,13 @@
 ```yaml
 zigzag:
   backend: reference          # reference | dionysus | fzz — реализация, не истина
-  max_homology_dim: 1         # комплекс строится до max_homology_dim + 1
-  coefficient_field: 2        # при p != 2 — явная ошибка, как в reference/
+  max_homology_dim: 1         # комплекс строится до max_homology_dim + 1. Меньше, чем
+                              # у topology_check, — намеренно, ради стоимости; больше —
+                              # запрещено перекрёстной проверкой: выше потолка
+                              # генераторов истины нет, и бары нечем опровергнуть
+  coeff_field: 2              # при p != 2 — явная ошибка, как в reference/. Названо
+                              # как в topology_check: два написания одного понятия
+                              # в одном файле — приглашение прочитать не тот ключ
   event_matching:
     tolerance: 0              # допуск по индексу снимка при сопоставлении логов
     match_dimension: true
