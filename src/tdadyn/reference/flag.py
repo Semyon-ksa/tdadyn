@@ -1,8 +1,26 @@
-"""Layer 2: the flag complex of a thresholded graph.
+"""Layer 2: the flag complex of a graph.
 
 The truth of family 2 is stated for the flag (clique) complex of the thresholded
 graph, because that is what the pipeline uses (``docs/method.md`` §2.3).  Every
 clique of the graph is declared a simplex; nothing beyond the graph is introduced.
+
+**Thresholding happens elsewhere, and that is the point.**  This module takes a graph
+that already exists — a 0/1 adjacency matrix — and never decides for itself which
+weights count as edges.  It used to: it compared ``adjacency > threshold``, which is a
+second implementation of ``weight_above`` wired in the similarity direction.  On a
+metric dataset, where an edge is :math:`d_{ij} \\le \\varepsilon`, that spelling builds
+the flag complex of the **complement** graph — connected, plausible, and wrong without
+a single error.  The one implementation of the rule is
+:func:`tdadyn.core.contracts.adjacency_from_snapshot`; the caller applies it first:
+
+.. code-block:: python
+
+    adjacency = adjacency_from_snapshot(snapshot, edge_rule=gt.edge_rule,
+                                        edge_threshold=gt.edge_threshold)
+    complex = flag_complex(adjacency, max_homology_dim=2, max_nodes=30)
+
+A non-binary matrix is refused rather than thresholded at some default, because the
+only way to get one here is to have skipped that step.
 
 Two consequences drive this module:
 
@@ -30,21 +48,18 @@ from .homology import REFERENCE_COEFF_FIELD, SimplicialComplex, betti_numbers
 def flag_complex(
     adjacency: np.ndarray,
     *,
-    threshold: float,
     max_homology_dim: int,
     max_nodes: int,
 ) -> SimplicialComplex:
-    """Build the flag complex of a weighted graph thresholded at ``threshold``.
+    """Build the flag complex of a graph.
 
     Parameters
     ----------
     adjacency : numpy.ndarray
-        Square symmetric weight matrix of shape ``(n_nodes, n_nodes)``; the diagonal
-        is ignored.
-    threshold : float
-        An edge is present where the weight is **strictly above** the threshold.  A
-        weight equal to the threshold does not exceed it, and at ``threshold = 0`` the
-        strict comparison keeps zero weights — that is, absent edges — out of the graph.
+        Square symmetric **0/1** adjacency matrix of shape ``(n_nodes, n_nodes)``, as
+        returned by :func:`tdadyn.core.contracts.adjacency_from_snapshot`; the diagonal
+        is ignored.  Weights are not accepted: which weights are edges is decided by the
+        dataset's ``edge_rule``, one layer down, and never here.
     max_homology_dim : int
         Highest homology dimension the complex must support.  Simplices are built up
         to dimension ``max_homology_dim + 1``.
@@ -59,12 +74,10 @@ def flag_complex(
         is itself a clique.
     """
     _check_adjacency(adjacency, max_nodes=max_nodes)
-    if not np.isfinite(threshold):
-        raise ValueError(f"threshold must be finite, got {threshold!r}")
     if max_homology_dim < 0:
         raise ValueError(f"max_homology_dim must be >= 0, got {max_homology_dim}")
 
-    edges = np.asarray(adjacency) > threshold
+    edges = np.asarray(adjacency) != 0.0
     np.fill_diagonal(edges, False)
 
     n_nodes = edges.shape[0]
@@ -82,19 +95,16 @@ def flag_complex(
 def betti_numbers_of_graph(
     adjacency: np.ndarray,
     *,
-    threshold: float,
     max_homology_dim: int,
     max_nodes: int,
     coeff_field: int = REFERENCE_COEFF_FIELD,
 ) -> dict[int, int]:
-    """Betti numbers of the flag complex of a thresholded graph.
+    """Betti numbers of the flag complex of a graph.
 
     Parameters
     ----------
     adjacency : numpy.ndarray
-        Square symmetric weight matrix.
-    threshold : float
-        Edges are the entries strictly above this value.
+        Square symmetric 0/1 adjacency matrix; see :func:`flag_complex`.
     max_homology_dim : int
         Highest homology dimension to report.
     max_nodes : int
@@ -115,7 +125,6 @@ def betti_numbers_of_graph(
     """
     complex = flag_complex(
         adjacency,
-        threshold=threshold,
         max_homology_dim=max_homology_dim,
         max_nodes=max_nodes,
     )
@@ -136,8 +145,17 @@ def _check_adjacency(adjacency: np.ndarray, *, max_nodes: int) -> None:
     if adjacency.shape[0] != adjacency.shape[1]:
         raise ValueError(f"adjacency must be square, got shape {adjacency.shape}")
     if not np.isfinite(adjacency).all():
-        # NaN > threshold is quietly False, which would drop edges without a word.
+        # NaN compares False against anything, which would drop edges without a word.
         raise ValueError("adjacency holds non-finite values")
+    off_diagonal = adjacency[~np.eye(adjacency.shape[0], dtype=bool)]
+    if not np.isin(off_diagonal, (0.0, 1.0)).all():
+        raise ValueError(
+            "adjacency must be a 0/1 matrix, and this one is not — which means the "
+            "thresholding step was skipped. Apply the dataset's own rule first: "
+            "core.contracts.adjacency_from_snapshot(snapshot, edge_rule=..., "
+            "edge_threshold=...). Thresholding here would be a second implementation "
+            "of the edge rule and, on a metric dataset, would build the complement graph."
+        )
     if not np.array_equal(adjacency, adjacency.T):
         raise ValueError("adjacency must be symmetric")
     if not isinstance(max_nodes, (int, np.integer)) or isinstance(max_nodes, bool):

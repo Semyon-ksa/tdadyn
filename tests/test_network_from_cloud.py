@@ -240,7 +240,6 @@ def test_bridges_between_components_create_spurious_loops():
     for n_bridges, expected in expected_beta_1.items():
         betti = betti_numbers_of_graph(
             two_cycles_with_bridges(n_bridges),
-            threshold=0.5,
             max_homology_dim=2,
             max_nodes=30,
         )

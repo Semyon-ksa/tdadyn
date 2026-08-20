@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from tdadyn import reference
-from tdadyn.core import dataset_equal, load_dataset, save_dataset
+from tdadyn.core import adjacency_from_snapshot, dataset_equal, load_dataset, save_dataset
 from tdadyn.synthetic import (
     cycle_lifecycle_density,
     edge_count,
@@ -155,10 +155,12 @@ def test_the_er_null_is_not_topologically_empty(config, null_graph):
     this test fails and §4.2 has to be revisited rather than quietly left wrong.
     """
     topology = config.topology_check
+    truth = null_graph.ground_truth
     curves = [
         reference.betti_numbers_of_graph(
-            snapshot,
-            threshold=null_graph.ground_truth.edge_threshold,
+            adjacency_from_snapshot(
+                snapshot, edge_rule=truth.edge_rule, edge_threshold=truth.edge_threshold
+            ),
             max_homology_dim=topology.max_homology_dim,
             max_nodes=topology.reference_max_nodes,
         )

@@ -28,13 +28,11 @@ from tdadyn.reference import (
     rank_mod2,
 )
 
-EDGE_WEIGHT = 1.0
-THRESHOLD = 0.5
+EDGE = 1.0
 MAX_NODES = 30
 MAX_HOMOLOGY_DIM = 2
 
 FLAG_ARGS = {
-    "threshold": THRESHOLD,
     "max_homology_dim": MAX_HOMOLOGY_DIM,
     "max_nodes": MAX_NODES,
 }
@@ -46,8 +44,8 @@ FLAG_ARGS = {
 def graph_from_edges(n_nodes: int, edges) -> np.ndarray:
     adjacency = np.zeros((n_nodes, n_nodes))
     for left, right in edges:
-        adjacency[left, right] = EDGE_WEIGHT
-        adjacency[right, left] = EDGE_WEIGHT
+        adjacency[left, right] = EDGE
+        adjacency[right, left] = EDGE
     return adjacency
 
 
@@ -58,7 +56,7 @@ def complete_graph(n_nodes: int) -> np.ndarray:
 def complete_multipartite_graph(part_sizes) -> np.ndarray:
     """Edges between parts only; ``[2, 2, 2]`` is the octahedron."""
     part = np.concatenate([[index] * size for index, size in enumerate(part_sizes)])
-    return (part[:, None] != part[None, :]) * EDGE_WEIGHT
+    return (part[:, None] != part[None, :]) * EDGE
 
 
 def cycle_graph(n_nodes: int) -> np.ndarray:
@@ -256,23 +254,31 @@ def test_every_subset_of_a_simplex_is_in_the_complex(adjacency):
 
 
 def test_simplices_are_built_one_dimension_above_the_homology_dimension():
-    complex = flag_complex(complete_graph(4), threshold=THRESHOLD, max_homology_dim=1,
-                           max_nodes=MAX_NODES)
+    complex = flag_complex(complete_graph(4), max_homology_dim=1, max_nodes=MAX_NODES)
     assert complex.dimension == 2  # triangles needed for beta_1, no tetrahedra
 
 
-def test_the_threshold_is_strict():
-    # A weight equal to the threshold does not exceed it.
-    adjacency = graph_from_edges(2, [(0, 1)])
-    assert betti_numbers_of_graph(adjacency, threshold=EDGE_WEIGHT, max_homology_dim=1,
-                                  max_nodes=MAX_NODES) == {0: 2, 1: 0}
-    assert betti_numbers_of_graph(adjacency, threshold=EDGE_WEIGHT / 2, max_homology_dim=1,
-                                  max_nodes=MAX_NODES) == {0: 1, 1: 0}
+def test_a_weight_matrix_is_refused_instead_of_thresholded():
+    """The edge rule lives in ``core.contracts`` and nowhere else.
+
+    This module used to threshold its input at ``adjacency > threshold``, a second
+    implementation of ``weight_above`` wired in the similarity direction.  Fed a metric
+    dataset it built the flag complex of the *complement* graph — connected, plausible
+    and wrong in silence.  The parameter is gone, so the only way a weight matrix can
+    arrive here is that the caller skipped the thresholding step, and the refusal has to
+    say so.  Whether the comparison itself is strict or not is checked where it now
+    lives: ``test_dynamic_events.test_weight_above_is_strict_and_distance_within_is_not``.
+    """
+    weights = graph_from_edges(3, [(0, 1)]) * 0.7
+    with pytest.raises(ValueError, match="0/1 matrix"):
+        flag_complex(weights, **FLAG_ARGS)
+    with pytest.raises(ValueError, match="adjacency_from_snapshot"):
+        betti_numbers_of_graph(weights, **FLAG_ARGS)
 
 
 def test_node_limit_is_enforced():
     with pytest.raises(ValueError, match="reference_max_nodes"):
-        flag_complex(complete_graph(6), threshold=THRESHOLD, max_homology_dim=2, max_nodes=5)
+        flag_complex(complete_graph(6), max_homology_dim=2, max_nodes=5)
 
 
 @pytest.mark.parametrize(

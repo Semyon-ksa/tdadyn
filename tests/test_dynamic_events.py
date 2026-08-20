@@ -61,7 +61,6 @@ def dynamic_graph(config):
 def reference_args(config):
     """Arguments the reference implementation takes for a snapshot of this family."""
     return {
-        "threshold": config.dynamic_events.threshold,
         "max_homology_dim": config.topology_check.max_homology_dim,
         "max_nodes": config.topology_check.reference_max_nodes,
     }
@@ -350,6 +349,36 @@ def test_the_closed_arc_is_the_uniform_circle(geometric_loop, config):
     assert off_diagonal.min() > 0.1
 
 
+def test_the_closed_arc_has_the_face_counts_the_document_states(geometric_loop, config):
+    """``docs/method.md`` §2.1a states (24, 72, 72, 24) for the closed arc; here it is.
+
+    The point is not the numbers but the path to them.  The reference used to threshold
+    its own input with ``adjacency > threshold`` — the similarity rule — and this dataset
+    is metric, so that path built the complex of the **complement** graph.  Had the table
+    been measured that way it would have been measured on the wrong graph, and nothing in
+    the suite would have said so.  Measured through the one implementation of the edge
+    rule, it agrees: the complement gives (24, 204, 728, 990), which is nowhere near.
+
+    This also pins the 72 triangles behind the remark that closes §2.1a: the cyclomatic
+    number here is 72 - 24 + 1 = 49 while beta_1 is 1, a discrepancy of 49 on real data.
+    """
+    truth = geometric_loop.ground_truth
+    adjacency = adjacency_from_snapshot(
+        geometric_loop.snapshots[0],
+        edge_rule=truth.edge_rule,
+        edge_threshold=truth.edge_threshold,
+    )
+    complex_ = reference.flag_complex(
+        adjacency,
+        max_homology_dim=config.topology_check.max_homology_dim,
+        max_nodes=config.topology_check.reference_max_nodes,
+    )
+    assert complex_.face_counts() == (24, 72, 72, 24)
+    n_edges, n_nodes = 72, 24
+    assert n_edges - n_nodes + 1 == 49
+    assert truth.betti_curve[1][0] == 1
+
+
 def test_the_loop_dataset_id_stays_readable(geometric_loop, config):
     # docs/data.md 1.1: the name exists so the directory says what is in it. Six raw
     # parameter names would defeat that, hence the abbreviations and the sched group.
@@ -468,7 +497,6 @@ def test_the_loop_curve_matches_the_snapshots_on_disk(geometric_loop, config, tm
         )
         betti = reference.betti_numbers_of_graph(
             adjacency,
-            threshold=0.5,
             max_homology_dim=config.topology_check.max_homology_dim,
             max_nodes=config.topology_check.reference_max_nodes,
         )
@@ -526,7 +554,6 @@ def test_the_recorded_edge_rule_is_the_one_that_reproduces_the_curve(dynamic_gra
             )
             betti = reference.betti_numbers_of_graph(
                 adjacency,
-                threshold=0.5,
                 max_homology_dim=topology.max_homology_dim,
                 max_nodes=topology.reference_max_nodes,
             )

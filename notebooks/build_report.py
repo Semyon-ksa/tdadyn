@@ -279,9 +279,8 @@ cells += [md("""---
    возвращает только максимальные, и на $K_4$ выдал бы один тетраэдр без рёбер
    и треугольников."""),
     code("""def flag_faces(adjacency):
-    complex_ = reference.flag_complex(adjacency, threshold=0.5, max_homology_dim=2, max_nodes=30)
-    betti = reference.betti_numbers_of_graph(adjacency, threshold=0.5, max_homology_dim=2,
-                                             max_nodes=30)
+    complex_ = reference.flag_complex(adjacency, max_homology_dim=2, max_nodes=30)
+    betti = reference.betti_numbers_of_graph(adjacency, max_homology_dim=2, max_nodes=30)
     return complex_.face_counts(), tuple(betti[k] for k in range(3))
 
 def complete(n):
@@ -315,7 +314,7 @@ for name, adjacency, why in cases:
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
 def triangles_of(adjacency):
-    cx = reference.flag_complex(adjacency, threshold=0.5, max_homology_dim=2, max_nodes=30)
+    cx = reference.flag_complex(adjacency, max_homology_dim=2, max_nodes=30)
     return cx.simplices(2)
 
 fig = plt.figure(figsize=(12, 3.6))
@@ -444,7 +443,7 @@ print(f"шаг по дуге {2*np.pi/n_demo:.3f}, хорда соседей {2*
 
 fig, axes = plt.subplots(1, 5, figsize=(13.5, 3.0))
 for ax, eps in zip(axes, [0.30, 0.45, 0.80, 1.50, 1.95]):
-    adj = (demo_d <= eps).astype(float); np.fill_diagonal(adj, 0.0)
+    adj = adjacency_from_snapshot(demo_d, edge_rule="distance_within", edge_threshold=eps)
     for tri in triangles_of(adj):
         ax.add_patch(Polygon(demo[list(tri)], closed=True, alpha=0.16,
                              facecolor="tab:blue", edgecolor="none"))
@@ -452,7 +451,7 @@ for ax, eps in zip(axes, [0.30, 0.45, 0.80, 1.50, 1.95]):
     for i, j in zip(iu[0][adj[iu] > 0], iu[1][adj[iu] > 0]):
         ax.plot(*demo[[i, j]].T, color="tab:blue", lw=0.8, zorder=2)
     ax.scatter(*demo.T, s=24, color="tab:blue", zorder=3, edgecolor="white", lw=0.5)
-    b = reference.betti_numbers_of_graph(adj, threshold=0.5, max_homology_dim=2, max_nodes=30)
+    b = reference.betti_numbers_of_graph(adj, max_homology_dim=2, max_nodes=30)
     neighbours = int(round(np.arcsin(min(eps, 2) / 2) / (np.pi / n_demo)))
     ax.set_title(f"$\\\\varepsilon$ = {eps}   (до {neighbours} соседей)\\n"
                  f"beta = {(b[0], b[1], b[2])}", fontsize=8)
@@ -899,7 +898,9 @@ $[27, \\infty)$.
 «неверная» пара, и отладка пошла бы в алгоритм, а не в лог."""),
     code("""theta = lifecycle.snapshots[40]
 broken = lifecycle.snapshots[41]
-cx = reference.flag_complex(theta, threshold=gt.edge_threshold, max_homology_dim=2, max_nodes=30)
+theta_graph = adjacency_from_snapshot(theta, edge_rule=gt.edge_rule,
+                                      edge_threshold=gt.edge_threshold)
+cx = reference.flag_complex(theta_graph, max_homology_dim=2, max_nodes=30)
 edges = cx.simplices(1)
 position = {e: i for i, e in enumerate(edges)}
 boundary = reference.boundary_matrix(cx, 1).astype(np.int64)
@@ -913,8 +914,9 @@ def chain(pairs):
 cycle24 = chain([(i, i + 1) for i in range(23)] + [(23, 0)])
 c2 = chain([(i, i + 1) for i in range(12, 23)] + [(23, 0), (0, 12)])
 removed = position[(6, 7)]
-betti41 = reference.betti_numbers_of_graph(broken, threshold=gt.edge_threshold,
-                                           max_homology_dim=2, max_nodes=30)
+broken_graph = adjacency_from_snapshot(broken, edge_rule=gt.edge_rule,
+                                       edge_threshold=gt.edge_threshold)
+betti41 = reference.betti_numbers_of_graph(broken_graph, max_homology_dim=2, max_nodes=30)
 
 print("Проверяется каноническая часть утверждения (тождество класса непроверяемо:")
 print("базис H_1 тета-графа не канонический).\\n")
@@ -969,8 +971,8 @@ def loop_betti(radius, eps, gap):
     ang = np.arange(n) * (2 * np.pi - gap) / (n - 1)
     p = np.c_[radius * np.cos(ang), radius * np.sin(ang)]
     d = np.linalg.norm(p[:, None] - p[None, :], axis=-1)
-    w = (d <= eps).astype(float); np.fill_diagonal(w, 0.0)
-    b = reference.betti_numbers_of_graph(w, threshold=0.5, max_homology_dim=2, max_nodes=30)
+    w = adjacency_from_snapshot(d, edge_rule="distance_within", edge_threshold=eps)
+    b = reference.betti_numbers_of_graph(w, max_homology_dim=2, max_nodes=30)
     return (b[0], b[1], b[2])
 
 closed = 2 * np.pi / n
@@ -1466,7 +1468,7 @@ for m in (12, 24, 36, 60, 100, 180, 220):
         iu = np.triu_indices(24, 1)
         pick = r.choice(len(iu[0]), size=m, replace=False)
         a = np.zeros((24, 24)); a[iu[0][pick], iu[1][pick]] = 1.0; a = a + a.T
-        b = reference.betti_numbers_of_graph(a, threshold=0.5, max_homology_dim=2, max_nodes=30)
+        b = reference.betti_numbers_of_graph(a, max_homology_dim=2, max_nodes=30)
         bb = (b[0], b[1], b[2]); out.append(bb); clean_n += bb == (1, 0, 0)
     spans = [span([o[k] for o in out]) for k in range(3)]
     print(f"{m:>5}{m/pairs:>8.3f}{spans[0]:>9}{spans[1]:>9}{spans[2]:>9}   {clean_n}/5")"""),

@@ -23,6 +23,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from tdadyn.core import adjacency_from_snapshot
+from tdadyn.reference import betti_numbers_of_graph
 from tdadyn.synthetic import (
     betti_at_scale,
     cross_check_scales,
@@ -30,7 +32,6 @@ from tdadyn.synthetic import (
     persistence_diagrams,
     significant_betti,
 )
-from tdadyn.reference import betti_numbers_of_graph
 
 from conftest import STATIC_GENERATORS, build_static_cloud
 
@@ -175,13 +176,14 @@ def test_paths_a_and_b_agree_on_the_same_complex(name, config):
 
     for scale in scales:
         path_a = betti_at_scale(diagrams, scale)
-        # The proximity graph as a 0/1 matrix; the reference takes an edge where the
-        # weight is strictly above the threshold, so 0.0 selects exactly the ones.
-        adjacency = (distances <= scale).astype(np.float64)
-        np.fill_diagonal(adjacency, 0.0)
+        # The proximity graph, through the project's one implementation of the edge
+        # rule: at scale eps an edge is d <= eps, which is `distance_within`.  Writing
+        # the comparison here by hand would be a third spelling of the same rule.
+        adjacency = adjacency_from_snapshot(
+            distances, edge_rule="distance_within", edge_threshold=scale
+        )
         path_b = betti_numbers_of_graph(
             adjacency,
-            threshold=0.0,
             max_homology_dim=topology.max_homology_dim,
             max_nodes=topology.reference_max_nodes,
         )

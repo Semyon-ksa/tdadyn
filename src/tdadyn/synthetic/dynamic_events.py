@@ -435,7 +435,6 @@ def _betti_curve(
             )
             betti = betti_numbers_of_graph(
                 adjacency,
-                threshold=0.5,
                 max_homology_dim=max_homology_dim,
                 max_nodes=reference_max_nodes,
                 coeff_field=coeff_field,
