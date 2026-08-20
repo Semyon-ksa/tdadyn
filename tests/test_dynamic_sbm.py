@@ -12,7 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from tdadyn.synthetic import dataset_equal, load_dataset, save_dataset
+from tdadyn.core import dataset_equal, load_dataset, save_dataset
 
 from conftest import build_dynamic_sbm
 

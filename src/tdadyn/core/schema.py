@@ -123,7 +123,7 @@ def ground_truth_from_json_dict(payload: dict[str, Any]) -> GroundTruth:
     -------
     GroundTruth
         The record; the ``dataset_id`` field of the file is not part of the record
-        and is verified by :mod:`tdadyn.synthetic.io` instead.
+        and is verified by :mod:`tdadyn.core.io` instead.
 
     Raises
     ------

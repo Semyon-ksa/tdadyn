@@ -12,16 +12,21 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tdadyn.synthetic import (
-    DYNAMIC_GENERATORS,
+from tdadyn.core import (
     FORMAT_VERSION,
-    SERIES_GENERATORS,
-    STATIC_GENERATORS,
     DynamicGraphDataset,
     Event,
     GroundTruth,
     PointCloudDataset,
     SeriesDataset,
+    load_config,
+    rng_for,
+)
+from tdadyn.core import naming
+from tdadyn.synthetic import (
+    DYNAMIC_GENERATORS,
+    SERIES_GENERATORS,
+    STATIC_GENERATORS,
     build_dynamic_graph,
     build_dynamic_sbm,
     build_network,
@@ -29,10 +34,7 @@ from tdadyn.synthetic import (
     build_null_graph,
     build_series,
     build_static_cloud,
-    load_config,
-    rng_for,
 )
-from tdadyn.synthetic import naming
 
 SEED = 20260201
 

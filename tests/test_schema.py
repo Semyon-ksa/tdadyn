@@ -7,8 +7,8 @@ import copy
 import numpy as np
 import pytest
 
-from tdadyn.synthetic import FORMAT_VERSION, Event, GroundTruth, ground_truth_equal
-from tdadyn.synthetic.schema import (
+from tdadyn.core import FORMAT_VERSION, Event, GroundTruth, ground_truth_equal
+from tdadyn.core.schema import (
     SchemaError,
     ground_truth_from_json_dict,
     ground_truth_to_json_dict,

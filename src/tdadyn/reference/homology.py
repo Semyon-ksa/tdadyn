@@ -13,7 +13,7 @@ raises instead of quietly computing over Z/2.
 
 This layer takes the simplices it is given and asks no questions about where they
 came from, so the question of truncating the dimension does not arise here.  It is
-settled one layer up, in :mod:`tdadyn.synthetic.reference.flag`.
+settled one layer up, in :mod:`tdadyn.reference.flag`.
 """
 
 from __future__ import annotations

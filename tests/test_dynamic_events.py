@@ -12,16 +12,16 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from tdadyn.synthetic import (
+from tdadyn.core import (
     adjacency_from_snapshot,
     dataset_equal,
     load_dataset,
-    make_cycle_lifecycle,
     make_dataset_id,
-    reference,
     rng_for,
     save_dataset,
 )
+from tdadyn import reference
+from tdadyn.synthetic import make_cycle_lifecycle
 
 from conftest import build_dynamic_graph
 

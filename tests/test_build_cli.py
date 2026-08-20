@@ -14,10 +14,10 @@ import json
 
 import pytest
 
-from tdadyn.synthetic import entry_payload, read_manifest, truth_digest
+from tdadyn.core import entry_payload, read_manifest, truth_digest
 from tdadyn.synthetic.build import FAMILY_CHOICES, build_all, replace_output_root
-from tdadyn.synthetic.io import GROUND_TRUTH_FILE, read_json
-from tdadyn.synthetic.manifest import write_manifest
+from tdadyn.core.io import GROUND_TRUTH_FILE, read_json
+from tdadyn.core.manifest import write_manifest
 
 
 @pytest.fixture(scope="module")

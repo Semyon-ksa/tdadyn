@@ -8,15 +8,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from tdadyn.synthetic import (
-    dataset_equal,
-    load_dataset,
-    make_dataset_id,
-    make_two_circles,
-    rng_for,
-    save_dataset,
-)
-from tdadyn.synthetic.schema import validate_ground_truth_dict
+from tdadyn.core import dataset_equal, load_dataset, make_dataset_id, rng_for, save_dataset
+from tdadyn.synthetic import make_two_circles
+from tdadyn.core.schema import validate_ground_truth_dict
 
 from conftest import STATIC_GENERATORS, build_static_cloud, build_static_cloud
 
@@ -88,7 +82,7 @@ def test_seed_is_taken_from_the_stream(static_name, config):
 
 
 def test_ground_truth_passes_schema_validation(static_name, config):
-    from tdadyn.synthetic.schema import ground_truth_to_json_dict
+    from tdadyn.core.schema import ground_truth_to_json_dict
 
     dataset = build_static_cloud(static_name, config)
     dataset_id = make_dataset_id(

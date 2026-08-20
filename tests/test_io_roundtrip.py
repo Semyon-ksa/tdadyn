@@ -8,7 +8,7 @@ import json
 import numpy as np
 import pytest
 
-from tdadyn.synthetic import (
+from tdadyn.core import (
     dataset_equal,
     entry_payload,
     load_dataset,
@@ -17,7 +17,7 @@ from tdadyn.synthetic import (
     save_dataset,
     update_manifest,
 )
-from tdadyn.synthetic.io import GROUND_TRUTH_FILE
+from tdadyn.core.io import GROUND_TRUTH_FILE
 
 FLOAT_PRECISION = 6
 
@@ -69,7 +69,7 @@ def test_overwrite_replaces_the_directory_whole(fake_point_cloud, output_root):
 
 
 def test_a_failed_save_leaves_no_staging_directory(fake_point_cloud, output_root, monkeypatch):
-    import tdadyn.synthetic.io as io_module
+    import tdadyn.core.io as io_module
 
     def explode(*args, **kwargs):
         raise RuntimeError("disk on fire")

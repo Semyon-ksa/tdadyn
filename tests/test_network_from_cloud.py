@@ -224,7 +224,7 @@ def test_bridges_between_components_create_spurious_loops():
     Two disjoint 6-cycles joined by m bridges between non-adjacent pairs:
     beta_1 = 2 + (m - 1) for m >= 1, which is why connecting components is not free.
     """
-    from tdadyn.synthetic.reference import betti_numbers_of_graph
+    from tdadyn.reference import betti_numbers_of_graph
 
     def two_cycles_with_bridges(n_bridges):
         adjacency = np.zeros((12, 12))

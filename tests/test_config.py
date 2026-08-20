@@ -8,8 +8,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-from tdadyn.synthetic import load_config, parse_config
-from tdadyn.synthetic.config import ConfigError
+from tdadyn.core import load_config, parse_config
+from tdadyn.core.config import ConfigError
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPO_ROOT / "config.yaml"

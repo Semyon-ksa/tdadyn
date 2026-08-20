@@ -30,7 +30,7 @@ from tdadyn.synthetic import (
     persistence_diagrams,
     significant_betti,
 )
-from tdadyn.synthetic.reference import betti_numbers_of_graph
+from tdadyn.reference import betti_numbers_of_graph
 
 from conftest import STATIC_GENERATORS, build_static_cloud
 

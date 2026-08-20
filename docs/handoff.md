@@ -24,7 +24,7 @@
 | `spurious_edges`, `missing_edges` | `noisy/` | те же сценарии под шумом рёбер |
 
 ```python
-from tdadyn.synthetic import load_dataset, adjacency_from_snapshot
+from tdadyn.core import load_dataset, adjacency_from_snapshot
 
 d = load_dataset("data/synthetic/dynamic_graph/cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201")
 gt = d.ground_truth

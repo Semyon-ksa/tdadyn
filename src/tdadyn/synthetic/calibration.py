@@ -28,11 +28,12 @@ from pathlib import Path
 
 import numpy as np
 
-from .config import Config, load_config
-from .io import read_json, write_json
+from tdadyn.core.config import Config, load_config
+from tdadyn.core.io import read_json, write_json
+from tdadyn.core.rng import rng_for
+
 from .network import knn_geodesic_distances
 from .persistence import pairwise_distances, persistence_diagrams
-from .rng import rng_for
 from .static_clouds import (
     klein_bottle_betti,
     make_circle,

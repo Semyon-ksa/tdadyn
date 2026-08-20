@@ -33,13 +33,14 @@ from .builders import (
     build_static_cloud,
     noise_stream,
 )
-from .config import Config, load_config
-from .contracts import Dataset
-from .io import save_dataset
-from .manifest import ManifestEntry, make_entry, write_manifest
-from .naming import make_dataset_id
+from tdadyn.core.config import Config, load_config
+from tdadyn.core.contracts import Dataset
+from tdadyn.core.io import save_dataset
+from tdadyn.core.manifest import ManifestEntry, make_entry, write_manifest
+from tdadyn.core.naming import make_dataset_id
+from tdadyn.core.rng import rng_for
+
 from .noise import make_jittered_cloud, make_jittered_network, make_noisy_snapshots
-from .rng import rng_for
 
 FAMILY_CHOICES = ("static_cloud", "dynamic_graph", "series", "noisy", "null")
 
@@ -243,7 +244,7 @@ def stability_curve(config: Config) -> dict:
 
 def write_stability(config: Config) -> Path:
     """Compute the stability curve and write it beside the manifest."""
-    from .io import write_json
+    from tdadyn.core.io import write_json
 
     path = config.output_root / RESULTS_DIR / STABILITY_FILE
     path.parent.mkdir(parents=True, exist_ok=True)

@@ -23,9 +23,14 @@ from __future__ import annotations
 
 import numpy as np
 
-from .contracts import FORMAT_VERSION, DynamicGraphDataset, GroundTruth, PointCloudDataset
-from .naming import register_name_order
-from .rng import base_seed_of
+from tdadyn.core.contracts import (
+    FORMAT_VERSION,
+    DynamicGraphDataset,
+    GroundTruth,
+    PointCloudDataset,
+)
+from tdadyn.core.naming import register_name_order
+from tdadyn.core.rng import base_seed_of
 
 register_name_order("uniform_cloud", ("n_points", "dim", "repeat"))
 register_name_order("erdos_renyi", ("n_nodes", "n_snapshots", "edge_probability", "repeat"))

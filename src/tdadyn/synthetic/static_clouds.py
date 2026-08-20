@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import numpy as np
 
-from .contracts import FORMAT_VERSION, GroundTruth, PointCloudDataset
-from .naming import register_name_order
-from .rng import base_seed_of
+from tdadyn.core.contracts import FORMAT_VERSION, GroundTruth, PointCloudDataset
+from tdadyn.core.naming import register_name_order
+from tdadyn.core.rng import base_seed_of
 
 CIRCLE_BETTI = {0: 1, 1: 1, 2: 0}
 TWO_CIRCLES_BETTI = {0: 2, 1: 2, 2: 0}

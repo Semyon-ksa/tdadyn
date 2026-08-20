@@ -21,9 +21,9 @@ from __future__ import annotations
 import numpy as np
 from scipy.integrate import solve_ivp
 
-from .contracts import FORMAT_VERSION, GroundTruth, SeriesDataset
-from .naming import register_name_order
-from .rng import base_seed_of
+from tdadyn.core.contracts import FORMAT_VERSION, GroundTruth, SeriesDataset
+from tdadyn.core.naming import register_name_order
+from tdadyn.core.rng import base_seed_of
 
 register_name_order(
     "kuramoto", ("n_channels", "n_timepoints", "K", "omega_scale", "regime_length")

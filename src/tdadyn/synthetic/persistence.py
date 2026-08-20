@@ -3,7 +3,7 @@
 This is the harness ``docs/roadmap.md`` S3 asks for: point cloud → distance matrix →
 Vietoris–Rips filtration → count of significant bars.  It is what the generators of
 family 1 are checked with, and deliberately separate from
-:mod:`tdadyn.synthetic.reference`, which must never import a persistence library.
+:mod:`tdadyn.reference`, which must never import a persistence library.
 
 Notes
 -----

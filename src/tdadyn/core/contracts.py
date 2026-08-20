@@ -160,7 +160,7 @@ class GroundTruth:
     """Machine-readable truth for a generated dataset.
 
     ``dataset_id`` is deliberately absent: it is a function of
-    ``(generator, params, seed)`` and is derived by :mod:`tdadyn.synthetic.naming`.
+    ``(generator, params, seed)`` and is derived by :mod:`tdadyn.core.naming`.
     Storing it as well would allow the identifier and the parameters to drift apart.
 
     Parameters

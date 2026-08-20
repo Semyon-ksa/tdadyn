@@ -102,7 +102,7 @@ def make_entry(
     Parameters
     ----------
     dataset_dir : pathlib.Path or str
-        Directory returned by :func:`tdadyn.synthetic.io.save_dataset`.
+        Directory returned by :func:`tdadyn.core.io.save_dataset`.
     output_root : pathlib.Path or str
         Root the recorded path is relative to.
     ground_truth : GroundTruth

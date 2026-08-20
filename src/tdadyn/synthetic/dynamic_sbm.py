@@ -24,9 +24,9 @@ from __future__ import annotations
 import networkx as nx
 import numpy as np
 
-from .contracts import FORMAT_VERSION, DynamicGraphDataset, GroundTruth
-from .naming import register_name_order
-from .rng import base_seed_of
+from tdadyn.core.contracts import FORMAT_VERSION, DynamicGraphDataset, GroundTruth
+from tdadyn.core.naming import register_name_order
+from tdadyn.core.rng import base_seed_of
 
 register_name_order(
     "dynamic_sbm",

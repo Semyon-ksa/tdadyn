@@ -20,16 +20,16 @@ from __future__ import annotations
 
 import numpy as np
 
-from .contracts import (
+from tdadyn.core.contracts import (
     FORMAT_VERSION,
     DynamicGraphDataset,
     Event,
     GroundTruth,
     adjacency_from_snapshot,
 )
-from .naming import register_name_order
-from .reference import REFERENCE_COEFF_FIELD, betti_numbers_of_graph
-from .rng import base_seed_of
+from tdadyn.core.naming import register_name_order
+from tdadyn.core.rng import base_seed_of
+from tdadyn.reference import REFERENCE_COEFF_FIELD, betti_numbers_of_graph
 
 register_name_order(
     "cycle_lifecycle",

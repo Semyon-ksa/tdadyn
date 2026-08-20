@@ -18,8 +18,8 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tdadyn.synthetic import reference
-from tdadyn.synthetic.reference import (
+from tdadyn import reference
+from tdadyn.reference import (
     SimplicialComplex,
     betti_numbers,
     betti_numbers_of_graph,

@@ -8,6 +8,19 @@
 иначе валидировать было бы нечем и появился бы соблазн объявить истиной то, что выдал
 алгоритм.
 
+## Где что лежит
+
+| Пакет | Что в нём |
+|---|---|
+| `tdadyn.core` | общее для всех слоёв: контракты данных, `rng_for`, разбор конфига, чтение наборов |
+| `tdadyn.reference` | независимый счёт над $\mathbb{Z}/2$ без библиотек персистентности — путь B проверок |
+| `tdadyn.synthetic` | генераторы, сборка, критерий значимости — то, о чём этот README |
+| `tdadyn.zigzag` | зигзаг-персистентность (Задача 2), в работе |
+
+Зависимости односторонни: слой, производящий истину, не знает о слое, который её
+потребляет. Поэтому `load_dataset`, `rng_for` и `adjacency_from_snapshot` импортируются
+из `tdadyn.core`, а не из `tdadyn.synthetic`.
+
 ## Установка и сборка
 
 ```bash
@@ -60,7 +73,7 @@ python -m venv .venv && .venv/bin/pip install -e ".[dev]"
 ## Как прочитать набор
 
 ```python
-from tdadyn.synthetic import load_dataset
+from tdadyn.core import load_dataset
 
 dataset = load_dataset("data/synthetic/static_cloud/circle_N400_radius1_sig0.03_coeff_field2_seed20260201")
 dataset.points          # (400, 2)

@@ -20,17 +20,14 @@ import warnings
 import numpy as np
 import pytest
 
+from tdadyn.core import dataset_equal, load_dataset, rng_for, save_dataset
 from tdadyn.synthetic import (
-    dataset_equal,
     edge_count,
-    load_dataset,
     make_jittered_cloud,
     make_jittered_network,
     make_noisy_snapshots,
     pairwise_distances,
     persistence_diagrams,
-    rng_for,
-    save_dataset,
 )
 
 from tdadyn.synthetic import GAUSSIAN_KERNEL_RANGE, noise_stream
@@ -134,7 +131,7 @@ def test_the_dataset_survives_a_round_trip(config, tmp_path):
 
 
 def test_the_repeat_index_reaches_the_directory_name(config):
-    from tdadyn.synthetic import make_dataset_id
+    from tdadyn.core import make_dataset_id
 
     precision = config.naming.float_precision
     first = make_dataset_id(noisy_cloud(config, repeat=0)[2].ground_truth, float_precision=precision)
@@ -165,7 +162,7 @@ def test_only_the_perturbed_array_reaches_disk(config, tmp_path):
 
 
 def test_a_weights_only_directory_loads_as_a_network(config, tmp_path):
-    from tdadyn.synthetic import NetworkDataset
+    from tdadyn.core import NetworkDataset
 
     _, _, jittered = noisy_cloud(config, kind="weight_jitter")
     path = save_dataset(jittered, tmp_path, float_precision=config.naming.float_precision)

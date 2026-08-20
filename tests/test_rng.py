@@ -9,13 +9,13 @@ import sys
 import numpy as np
 import pytest
 
-from tdadyn.synthetic import rng_for
+from tdadyn.core import rng_for
 
 SEED = 20260201
 
 _PROBE = (
     "import json;"
-    "from tdadyn.synthetic import rng_for;"
+    "from tdadyn.core import rng_for;"
     "print(json.dumps(rng_for(20260201, 'torus', 2).normal(size=4).tolist()))"
 )
 

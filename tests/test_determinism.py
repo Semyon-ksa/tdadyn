@@ -5,9 +5,9 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from tdadyn.synthetic import dataset_equal, format_dataset_id, make_dataset_id
-from tdadyn.synthetic.contracts import values_equal
-from tdadyn.synthetic.naming import register_name_order
+from tdadyn.core import dataset_equal, format_dataset_id, make_dataset_id
+from tdadyn.core.contracts import values_equal
+from tdadyn.core.naming import register_name_order
 
 from conftest import make_fake_dynamic_graph, make_fake_point_cloud, make_fake_series
 
@@ -188,7 +188,7 @@ def test_a_malformed_group_is_refused():
 
 
 def test_registering_a_group_order_is_idempotent(monkeypatch):
-    from tdadyn.synthetic import naming
+    from tdadyn.core import naming
 
     monkeypatch.setattr(naming, "_NAME_ORDER", dict(naming._NAME_ORDER))
     register_name_order("grouped", ["a", ("s", ["b", "c"])])
@@ -207,7 +207,7 @@ def test_unusable_values_are_rejected():
 
 
 def test_registering_a_conflicting_order_is_refused(monkeypatch):
-    from tdadyn.synthetic import naming
+    from tdadyn.core import naming
 
     monkeypatch.setitem(naming._NAME_ORDER, "duplicate", ("a", "b"))
     register_name_order("duplicate", ("a", "b"))  # idempotent
@@ -216,7 +216,7 @@ def test_registering_a_conflicting_order_is_refused(monkeypatch):
 
 
 def test_unregistered_generator_is_reported(fake_point_cloud, monkeypatch):
-    from tdadyn.synthetic import naming
+    from tdadyn.core import naming
 
     monkeypatch.delitem(naming._NAME_ORDER, "fake_cloud")
     with pytest.raises(KeyError, match="no registered name order"):

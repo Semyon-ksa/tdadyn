@@ -126,11 +126,13 @@ plt.rcParams.update({"figure.dpi": 110, "font.size": 9, "axes.grid": True,
                      "grid.alpha": 0.3, "figure.facecolor": "white"})
 palette = plt.get_cmap("tab10")   # общая раскраска сообществ и блоков
 
+from tdadyn import reference
+from tdadyn.core import adjacency_from_snapshot, load_config, rng_for
 from tdadyn.synthetic import (
-    STATIC_GENERATORS, adjacency_from_snapshot, build_dynamic_graph, build_dynamic_sbm,
+    STATIC_GENERATORS, build_dynamic_graph, build_dynamic_sbm,
     build_network, build_null_cloud, build_null_graph, build_series, build_static_cloud,
-    edge_count, load_config, make_jittered_cloud, noise_stream, pairwise_distances,
-    persistence_diagrams, reference, rng_for, significant_betti,
+    edge_count, make_jittered_cloud, noise_stream, pairwise_distances,
+    persistence_diagrams, significant_betti,
 )
 from tdadyn.synthetic import sliding_window as sw
 

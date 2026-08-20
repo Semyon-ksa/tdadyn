@@ -12,16 +12,14 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from tdadyn import reference
+from tdadyn.core import dataset_equal, load_dataset, save_dataset
 from tdadyn.synthetic import (
     cycle_lifecycle_density,
-    dataset_equal,
     edge_count,
-    load_dataset,
     pairwise_distances,
-    save_dataset,
     significant_betti,
 )
-from tdadyn.synthetic import reference
 
 from tdadyn.synthetic import build_dynamic_graph, null_edge_probability
 
@@ -189,7 +187,8 @@ def test_the_false_positive_rate_stays_under_the_measured_bound(config):
     trials = misses = 0
     for seed in config.topology_check.calibration_seeds:
         for repeat in range(config.null_models.n_realizations):
-            from tdadyn.synthetic import make_uniform_cloud, rng_for
+            from tdadyn.core import rng_for
+            from tdadyn.synthetic import make_uniform_cloud
 
             settings = config.null_models.uniform_cloud
             cloud = make_uniform_cloud(

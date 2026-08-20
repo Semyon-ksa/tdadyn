@@ -12,13 +12,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from tdadyn.synthetic import (
-    coupling_matrix,
-    dataset_equal,
-    load_dataset,
-    rng_for,
-    save_dataset,
-)
+from tdadyn.core import dataset_equal, load_dataset, rng_for, save_dataset
+from tdadyn.synthetic import coupling_matrix
 from tdadyn.synthetic import sliding_window as sw
 
 from conftest import build_series
