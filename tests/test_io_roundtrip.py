@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+import sys
 
 import numpy as np
 import pytest
@@ -160,3 +162,34 @@ def test_manifest_of_a_directory_without_arrays_is_refused(fake_point_cloud, out
     empty.mkdir()
     with pytest.raises(ValueError, match="no arrays"):
         make_entry(empty, tmp_path, fake_point_cloud.ground_truth)
+
+
+def test_a_core_only_consumer_is_refused_a_name_rather_than_given_a_wrong_one(
+    output_root, fake_dynamic_graph
+):
+    """The name-order registry is filled by importing the generators, and only then.
+
+    ``register_name_order`` is called at import time next to each generator, so a consumer
+    that imports ``tdadyn.core`` alone — which is exactly what ``tdadyn.zigzag`` will be —
+    finds the registry empty.  Reading a dataset works, because ``load_dataset`` only
+    recomputes the id when asked; asking for the recomputation raises.
+
+    The behaviour is pinned here so that Z1 does not read it as a defect of dataset
+    reading and "fix" it.  What matters is not that it refuses but *how*: an explicit
+    error naming the generator, never a plausible-looking name built from an empty order.
+    """
+    path = store(fake_dynamic_graph, output_root)
+    probe = (
+        "import sys; from tdadyn.core import load_dataset\n"
+        f"load_dataset({str(path)!r}, float_precision={FLOAT_PRECISION})\n"
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", probe], capture_output=True, text=True, check=False
+    )
+    assert result.returncode != 0, "a core-only consumer silently produced a name"
+    assert "no registered name order" in result.stderr
+    assert "fake_dynamic" in result.stderr
+
+    # And the same read without the recomputation is fine, so the refusal is scoped to
+    # the one operation that needs the registry.
+    assert load_dataset(path).ground_truth.generator == "fake_dynamic"

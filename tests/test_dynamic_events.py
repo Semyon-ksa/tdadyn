@@ -362,6 +362,7 @@ def test_the_closed_arc_has_the_face_counts_the_document_states(geometric_loop, 
     This also pins the 72 triangles behind the remark that closes §2.1a: the cyclomatic
     number here is 72 - 24 + 1 = 49 while beta_1 is 1, a discrepancy of 49 on real data.
     """
+    loop = config.dynamic_events.scenarios.geometric_loop
     truth = geometric_loop.ground_truth
     adjacency = adjacency_from_snapshot(
         geometric_loop.snapshots[0],
@@ -373,8 +374,24 @@ def test_the_closed_arc_has_the_face_counts_the_document_states(geometric_loop, 
         max_homology_dim=config.topology_check.max_homology_dim,
         max_nodes=config.topology_check.reference_max_nodes,
     )
-    assert complex_.face_counts() == (24, 72, 72, 24)
-    n_edges, n_nodes = 72, 24
+
+    # The edge count is computed from the geometry rather than copied out of the table:
+    # on the closed arc the points sit at angular step 2*pi/n on a circle of radius R, so
+    # the chord across j steps is 2*R*sin(j*pi/n) and each point is joined to the
+    # `reach` neighbours on either side whose chord fits inside eps.
+    n_nodes, radius = loop.n_points, loop.radius_schedule[0]
+    reach = sum(
+        1
+        for step in range(1, n_nodes // 2 + 1)
+        if 2 * radius * np.sin(step * np.pi / n_nodes) <= loop.rips_epsilon
+    )
+    assert reach == 3
+    assert complex_.face_counts() == (n_nodes, n_nodes * reach, 72, 24)
+
+    # The remark that closes §2.1a: 72 triangles, so beta_1 is 1 where the cyclomatic
+    # number is 49. This is what the metric scenario adds over `cycle_lifecycle`, which
+    # has no triangles at all and where the two therefore agree by construction.
+    n_edges = n_nodes * reach
     assert n_edges - n_nodes + 1 == 49
     assert truth.betti_curve[1][0] == 1
 
