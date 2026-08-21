@@ -1,0 +1,733 @@
+{
+  "datasets": [
+    {
+      "arrays": {
+        "points.npy": "cd457f2bb352e00d7dfd991ef4274302034d56cca912de667aa15f8715bf4710"
+      },
+      "dataset_id": "circle_N400_radius1_sig0.03_coeff_field2_seed20260201",
+      "family": "static_cloud",
+      "generated_at": "2026-08-21T07:19:11Z",
+      "generator": "circle",
+      "package_version": "0.1.0",
+      "params": {
+        "coeff_field": 2,
+        "n_points": 400,
+        "noise_sigma": 0.03,
+        "radius": 1.0
+      },
+      "path": "static_cloud/circle_N400_radius1_sig0.03_coeff_field2_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "d9925c4d36daade883e0ab694c84ce002eba9158d8177d11e82500a222e6f64d"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "0d25d71fa73eed393106a9cd870ed6116939591a59479e6c713867decf7d712e"
+      },
+      "dataset_id": "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
+      "family": "dynamic_graph",
+      "generated_at": "2026-08-21T07:19:11Z",
+      "generator": "cycle_lifecycle",
+      "package_version": "0.1.0",
+      "params": {
+        "chord_added_at": 27,
+        "component_merges_at": 55,
+        "component_splits_at": 48,
+        "edge_removed_at": 41,
+        "edge_weight": 1.0,
+        "n_nodes": 24,
+        "n_snapshots": 60,
+        "path_closes_at": 12,
+        "threshold": 0.5
+      },
+      "path": "dynamic_graph/cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "c1b5541bba25137bdf6f98308be1ac450223b78f850ade25782996195e87f44f"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "2bf6b35996d217691dfdc3de04835d1941508e28395e40c770463f6600cc1f5b"
+      },
+      "dataset_id": "dynamic_sbm_N60_T60_p_in0.35_p_out0.02_block_sizes15-15-15-15_sched20-40_seed20260201",
+      "family": "dynamic_graph",
+      "generated_at": "2026-08-21T07:19:11Z",
+      "generator": "dynamic_sbm",
+      "package_version": "0.1.0",
+      "params": {
+        "block_sizes": [
+          15,
+          15,
+          15,
+          15
+        ],
+        "merge_at": 20,
+        "n_nodes": 60,
+        "n_snapshots": 60,
+        "p_in": 0.35,
+        "p_out": 0.02,
+        "split_at": 40
+      },
+      "path": "dynamic_graph/dynamic_sbm_N60_T60_p_in0.35_p_out0.02_block_sizes15-15-15-15_sched20-40_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "764b93bb03ba571ad6268f4f059d36d0213d290beadddc4485befc827d0378e4"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "46981a4e1fd937ee71182e01f479ed8df21867b31a86745f7d9015ff9c81dbfc"
+      },
+      "dataset_id": "erdos_renyi_N24_T60_edge_probability0.0833333_repeat0_seed20260201",
+      "family": "null",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "erdos_renyi",
+      "package_version": "0.1.0",
+      "params": {
+        "edge_probability": 0.08333333333333333,
+        "n_nodes": 24,
+        "n_snapshots": 60,
+        "repeat": 0
+      },
+      "path": "null/erdos_renyi_N24_T60_edge_probability0.0833333_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "98ce0a46a72bfb1434bb0d1d974e75bc024162b541f5387b8397704a63d158e4"
+    },
+    {
+      "arrays": {
+        "points.npy": "58613e7efe2cb6bd5d5e7b79a7c3a8c77cc3f1c0ec57dc1c68bede54986a304f"
+      },
+      "dataset_id": "figure_eight_N400_scale1_sig0.03_coeff_field2_seed20260201",
+      "family": "static_cloud",
+      "generated_at": "2026-08-21T07:19:11Z",
+      "generator": "figure_eight",
+      "package_version": "0.1.0",
+      "params": {
+        "coeff_field": 2,
+        "n_points": 400,
+        "noise_sigma": 0.03,
+        "scale": 1.0
+      },
+      "path": "static_cloud/figure_eight_N400_scale1_sig0.03_coeff_field2_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "05b90c593ca4781cd7fbc0c22775d5e58ef75f9fb05e31b6c5151f913aab6991"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "a3ae2de6c0dfe75762dbb6c66fd1c4caea7eb91b5ca5d1f9ca9101f478b7a929"
+      },
+      "dataset_id": "geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201",
+      "family": "dynamic_graph",
+      "generated_at": "2026-08-21T07:19:11Z",
+      "generator": "geometric_loop",
+      "package_version": "0.1.0",
+      "params": {
+        "gap_angle": 1.2,
+        "gap_closes_at": 45,
+        "gap_opens_at": 20,
+        "n_points": 24,
+        "n_snapshots": 60,
+        "radius_schedule": [
+          1.0,
+          1.4,
+          1.0
+        ],
+        "rips_epsilon": 0.8
+      },
+      "path": "dynamic_graph/geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "75a1c4c13c90468f99cfcb954fbae0f9b25610c69eef49ba3f0758f82b84a06e"
+    },
+    {
+      "arrays": {
+        "points.npy": "0fd4f33041cb98968682eed45ba1f76c151746787e730a6a108b3ddea53f1bdc"
+      },
+      "dataset_id": "hopf_link_N400_radius1_offset1_sig0.03_coeff_field2_seed20260201",
+      "family": "static_cloud",
+      "generated_at": "2026-08-21T07:19:11Z",
+      "generator": "hopf_link",
+      "package_version": "0.1.0",
+      "params": {
+        "coeff_field": 2,
+        "n_points": 400,
+        "noise_sigma": 0.03,
+        "offset": 1.0,
+        "radius": 1.0
+      },
+      "path": "static_cloud/hopf_link_N400_radius1_offset1_sig0.03_coeff_field2_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "bdf74624ed3e2627ba9f7c970c09e31249a9ddbec9c5b353f03702894c313abb"
+    },
+    {
+      "arrays": {
+        "points.npy": "b9a8be478fc258c048a4cdf11a297c860edb155d3ce707acac6e44c38a4f9335"
+      },
+      "dataset_id": "klein_bottle_N900_a1.8_b1_sig0.03_sampling-rejection_coeff_field2_seed20260201",
+      "family": "static_cloud",
+      "generated_at": "2026-08-21T07:19:11Z",
+      "generator": "klein_bottle",
+      "package_version": "0.1.0",
+      "params": {
+        "a": 1.8,
+        "b": 1.0,
+        "coeff_field": 2,
+        "n_points": 900,
+        "noise_sigma": 0.03,
+        "sampling": "rejection"
+      },
+      "path": "static_cloud/klein_bottle_N900_a1.8_b1_sig0.03_sampling-rejection_coeff_field2_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "ecec29ea8aef5cc35fa74a471702a83ebd6c748a5b40295c72dd006dba796fde"
+    },
+    {
+      "arrays": {
+        "coupling.npy": "2a0ba91ea9abf36c9f901c816d1032d00215ed0ef5ed371dedc5b008843b15c2",
+        "series.npy": "e74b94e3bcb66bd8e5ee81c8f4be52158569e1d1106a9ed0555841a2d9504f70"
+      },
+      "dataset_id": "kuramoto_N30_T3000_K6_omega_scale1_regime_length1000_seed20260201",
+      "family": "series",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "kuramoto",
+      "package_version": "0.1.0",
+      "params": {
+        "K": 6.0,
+        "n_channels": 30,
+        "n_timepoints": 3000,
+        "omega_scale": 1.0,
+        "regime_length": 1000
+      },
+      "path": "series/kuramoto_N30_T3000_K6_omega_scale1_regime_length1000_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "86cf08236d47c0c74fee8dad0781691bab44adf22bd7d69d5efc048b537f8778"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "0d25d71fa73eed393106a9cd870ed6116939591a59479e6c713867decf7d712e"
+      },
+      "dataset_id": "missing_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0.02_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "missing_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
+        "level": 0.02,
+        "repeat": 0
+      },
+      "path": "noisy/missing_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0.02_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "63d203239708d39bd84c663144527d7934083b4eb09f78e02869b10117af54c4"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "a9ee800aae6e9b03ea7c5ace5111989af26e6e24b6bd67b8acf3e4c1b15543a6"
+      },
+      "dataset_id": "missing_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0.05_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "missing_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
+        "level": 0.05,
+        "repeat": 0
+      },
+      "path": "noisy/missing_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0.05_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "c4964c6f2431ece2197705ddc81f90be2a37d047823fb758e3603586d648c1eb"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "cadc0a16d91e012e87deae59a18cb744968aae6608ee6315f01c0584d2a2c4f9"
+      },
+      "dataset_id": "missing_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0.1_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "missing_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
+        "level": 0.1,
+        "repeat": 0
+      },
+      "path": "noisy/missing_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0.1_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "b161104171a3d2ef41ad1f0c021520e4b2ac2bb7fb6dbabc25527da3727f9776"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "0d25d71fa73eed393106a9cd870ed6116939591a59479e6c713867decf7d712e"
+      },
+      "dataset_id": "missing_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "missing_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
+        "level": 0.0,
+        "repeat": 0
+      },
+      "path": "noisy/missing_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "9a15dd805552371d784059de51947552a9a70e60ac975788369bcbb6a2dcd525"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "b3c8e3bf67a96d1f1ce068d16929fef2a7b1164936e6c90053cb189854ba7cf6"
+      },
+      "dataset_id": "missing_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0.02_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "missing_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201",
+        "level": 0.02,
+        "repeat": 0
+      },
+      "path": "noisy/missing_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0.02_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "1446a4bf96e96907d99f259251f074140901a29ba7516352f1dceee193db6cee"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "9f8bf5cc3094bc18a581b117d7e95f2ffda144bf2b8d3e2db34bf6ec512b8e3e"
+      },
+      "dataset_id": "missing_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0.05_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "missing_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201",
+        "level": 0.05,
+        "repeat": 0
+      },
+      "path": "noisy/missing_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0.05_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "fa1ac8ece28b80dac8b190450e498ddf6e4458359ff2f131479d7add43545946"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "a23ab76295bf2a7dfa073dd127869789470aebc65ad6faa0550c8782d8e05562"
+      },
+      "dataset_id": "missing_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0.1_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "missing_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201",
+        "level": 0.1,
+        "repeat": 0
+      },
+      "path": "noisy/missing_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0.1_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "4357ee243277717ee412dc1d8037f3f0cc73a5ec5a6a846662d6a6c9035c37fd"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "a3ae2de6c0dfe75762dbb6c66fd1c4caea7eb91b5ca5d1f9ca9101f478b7a929"
+      },
+      "dataset_id": "missing_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "missing_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201",
+        "level": 0.0,
+        "repeat": 0
+      },
+      "path": "noisy/missing_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "1aed27886670e7f9dbe29b7983318bcecd763689a08417ab04e7a896b3764ca8"
+    },
+    {
+      "arrays": {
+        "points.npy": "7b48ddfcee2e4ef09d8f81571420b971c4eb2c9bc4ba2626a1df9c4ad04d8175"
+      },
+      "dataset_id": "point_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0.02_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "point_jitter",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "circle_N400_radius1_sig0.03_coeff_field2_seed20260201",
+        "level": 0.02,
+        "repeat": 0
+      },
+      "path": "noisy/point_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0.02_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "005b5be53660740204137ff8a07d610b1d7caaca59a7616c2ea8fb51bd53d7a2"
+    },
+    {
+      "arrays": {
+        "points.npy": "5bb52e94bb32deb53b0b94886faf1811c3b4b6f5cf79b4d4f1e33c3fe1b76037"
+      },
+      "dataset_id": "point_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0.05_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "point_jitter",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "circle_N400_radius1_sig0.03_coeff_field2_seed20260201",
+        "level": 0.05,
+        "repeat": 0
+      },
+      "path": "noisy/point_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0.05_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "96af9e565cb3c7d5f27ce4f45e54297bf992cbb179cc2b39a5e57f75e60de621"
+    },
+    {
+      "arrays": {
+        "points.npy": "0f81f20315c4d30d45bc51f7510396547946038cb21b2b63d266e974c2596ec1"
+      },
+      "dataset_id": "point_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0.1_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "point_jitter",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "circle_N400_radius1_sig0.03_coeff_field2_seed20260201",
+        "level": 0.1,
+        "repeat": 0
+      },
+      "path": "noisy/point_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0.1_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "2c2204e78315548f96cb70a085341132bc0989243a1234cf526dba7334162c74"
+    },
+    {
+      "arrays": {
+        "points.npy": "cd457f2bb352e00d7dfd991ef4274302034d56cca912de667aa15f8715bf4710"
+      },
+      "dataset_id": "point_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "point_jitter",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "circle_N400_radius1_sig0.03_coeff_field2_seed20260201",
+        "level": 0.0,
+        "repeat": 0
+      },
+      "path": "noisy/point_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "c1870de1a65d6ca9498d35c558a3f7b37343f6b3effd53e835f8b128c4813a50"
+    },
+    {
+      "arrays": {
+        "coupling.npy": "2a0ba91ea9abf36c9f901c816d1032d00215ed0ef5ed371dedc5b008843b15c2",
+        "series.npy": "9a10e8d9502ad4da9296884c9b94ab933954f0ab987b5804cebab985874d62d6"
+      },
+      "dataset_id": "roessler_N30_T3000_epsilon0.01_c5.7_regime_length1000_seed20260201",
+      "family": "series",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "roessler",
+      "package_version": "0.1.0",
+      "params": {
+        "c": 5.7,
+        "epsilon": 0.01,
+        "n_channels": 30,
+        "n_timepoints": 3000,
+        "regime_length": 1000
+      },
+      "path": "series/roessler_N30_T3000_epsilon0.01_c5.7_regime_length1000_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "2e8b4cd98d8dbd1c5b1655172322ecfc90b5dd73a5f471329f8d89d8ccf6a7b7"
+    },
+    {
+      "arrays": {
+        "points.npy": "f20aec9f5a7726a5516e02845986b78a6b145fc4cbc5683dad4fa6959a7b2f81"
+      },
+      "dataset_id": "sphere_N400_radius1_sig0.03_sampling-muller_coeff_field2_seed20260201",
+      "family": "static_cloud",
+      "generated_at": "2026-08-21T07:19:11Z",
+      "generator": "sphere",
+      "package_version": "0.1.0",
+      "params": {
+        "coeff_field": 2,
+        "n_points": 400,
+        "noise_sigma": 0.03,
+        "radius": 1.0,
+        "sampling": "muller"
+      },
+      "path": "static_cloud/sphere_N400_radius1_sig0.03_sampling-muller_coeff_field2_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "5dcb9d431531037a2609dcababc70a81ea57c31133b6b927143b130dd31c305b"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "628d9dac2c0202ab78ef0022e33a67aba83033428c31fd57445176d56efaae2b"
+      },
+      "dataset_id": "spurious_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0.02_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "spurious_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
+        "level": 0.02,
+        "repeat": 0
+      },
+      "path": "noisy/spurious_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0.02_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "a526cdd641d62808c9877f0bc47a51ae7fab2a42172fe14740c2706f53bfb97d"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "51f81163ae073fa36f9bee442c0df8b242708a434541eff466e36849810f1fbf"
+      },
+      "dataset_id": "spurious_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0.05_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "spurious_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
+        "level": 0.05,
+        "repeat": 0
+      },
+      "path": "noisy/spurious_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0.05_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "913ccc16f6f6277c930c8eef815224a21409787e594100a350f0bda7ef53f91f"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "d39a24db5aef8ec48b0f005756d4ebd80e842cd8f7dceac8181c4f682f9e248a"
+      },
+      "dataset_id": "spurious_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0.1_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "spurious_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
+        "level": 0.1,
+        "repeat": 0
+      },
+      "path": "noisy/spurious_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0.1_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "6e57a791e3506c890d4bb0c30f18ce66d8243593053c49ce02fcd9706b489165"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "0d25d71fa73eed393106a9cd870ed6116939591a59479e6c713867decf7d712e"
+      },
+      "dataset_id": "spurious_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "spurious_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
+        "level": 0.0,
+        "repeat": 0
+      },
+      "path": "noisy/spurious_edges_base-cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201_level0_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "8c2dfdc38ed9cd44c5a4e8b13cb21576ab36d07f6de8acb3794d8a438b36cffa"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "eff01e4eb5c5b0ff506fda354622879c37b3f4b3cacd912ed32916561332b9bb"
+      },
+      "dataset_id": "spurious_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0.02_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "spurious_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201",
+        "level": 0.02,
+        "repeat": 0
+      },
+      "path": "noisy/spurious_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0.02_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "dd6bdb5cbae8b74e31bae98010e39d9605632200984f7ec1eb36c1c1f051126b"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "98d89a9ae2427cbb23d5fd2144402ddb5cadb1f5177cbaec930065366b85719e"
+      },
+      "dataset_id": "spurious_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0.05_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "spurious_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201",
+        "level": 0.05,
+        "repeat": 0
+      },
+      "path": "noisy/spurious_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0.05_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "207e9609168bfeb1049d55a3533484d05c902fb4f58750e5d35a6acbcb2eb1d7"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "d802c19602e36588e8ee57f685aaf7dc4802eb951278b853653b67669141135b"
+      },
+      "dataset_id": "spurious_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0.1_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "spurious_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201",
+        "level": 0.1,
+        "repeat": 0
+      },
+      "path": "noisy/spurious_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0.1_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "1d365f70b378899c132d8ee97b9408fe1806100a12e9c0cadb2dc0b34b1e09a6"
+    },
+    {
+      "arrays": {
+        "snapshots.npy": "a3ae2de6c0dfe75762dbb6c66fd1c4caea7eb91b5ca5d1f9ca9101f478b7a929"
+      },
+      "dataset_id": "spurious_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "spurious_edges",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201",
+        "level": 0.0,
+        "repeat": 0
+      },
+      "path": "noisy/spurious_edges_base-geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201_level0_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "b9e3c8a8aa4bbb4d556ef456d63b19974d9d896d040d14c28443a2d8af7fc2df"
+    },
+    {
+      "arrays": {
+        "points.npy": "4db5954268e5721cbb3341476152521c3b285cd82c729b4fe12a7ff280a40973"
+      },
+      "dataset_id": "torus_N900_R2_r0.8_sig0.03_sampling-rejection_coeff_field2_seed20260201",
+      "family": "static_cloud",
+      "generated_at": "2026-08-21T07:19:11Z",
+      "generator": "torus",
+      "package_version": "0.1.0",
+      "params": {
+        "R": 2.0,
+        "coeff_field": 2,
+        "n_points": 900,
+        "noise_sigma": 0.03,
+        "r": 0.8,
+        "sampling": "rejection"
+      },
+      "path": "static_cloud/torus_N900_R2_r0.8_sig0.03_sampling-rejection_coeff_field2_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "c7f3c09d0db52bb8f040ce2a920e853781e650da797993e6d1b504be1a9c3780"
+    },
+    {
+      "arrays": {
+        "points.npy": "0aa12bc61111adedb98b2f985d92eab9eeba7f02b8dadfb068ce2e6902e184e9"
+      },
+      "dataset_id": "two_circles_N400_radius1_separation3_sig0.03_coeff_field2_seed20260201",
+      "family": "static_cloud",
+      "generated_at": "2026-08-21T07:19:11Z",
+      "generator": "two_circles",
+      "package_version": "0.1.0",
+      "params": {
+        "coeff_field": 2,
+        "n_points": 400,
+        "noise_sigma": 0.03,
+        "radius": 1.0,
+        "separation": 3.0
+      },
+      "path": "static_cloud/two_circles_N400_radius1_separation3_sig0.03_coeff_field2_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "a868afec73b77debe89564ee966a225b9ff783f96df407c4a48c6464bdbfbe0b"
+    },
+    {
+      "arrays": {
+        "points.npy": "1feaf05a85c1c4fe66a910efb966f09ad12f133e97fc07f37e81e4bc70b1bcaa"
+      },
+      "dataset_id": "uniform_cloud_N400_dim3_repeat0_seed20260201",
+      "family": "null",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "uniform_cloud",
+      "package_version": "0.1.0",
+      "params": {
+        "dim": 3,
+        "n_points": 400,
+        "repeat": 0
+      },
+      "path": "null/uniform_cloud_N400_dim3_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "b1e7c8322e730c89ddabcac68180b538dbf7337a4ae8d3fce44e0ab1d80eb168"
+    },
+    {
+      "arrays": {
+        "weights.npy": "32b978f0f5aae03d069fe8021d11ad4f55114e663aeafc16b51d6ea585bd338c"
+      },
+      "dataset_id": "weight_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0.05_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "weight_jitter",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "circle_N400_radius1_sig0.03_coeff_field2_seed20260201",
+        "level": 0.05,
+        "repeat": 0
+      },
+      "path": "noisy/weight_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0.05_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "98ac12ee1039d807cff18db5d576bdc43217b755b72d90f621e02252d03723c3"
+    },
+    {
+      "arrays": {
+        "weights.npy": "fa442882ba645518886a6a117d6a208c6c83bea1e8ac2e843225e00f8c41731e"
+      },
+      "dataset_id": "weight_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0.1_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "weight_jitter",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "circle_N400_radius1_sig0.03_coeff_field2_seed20260201",
+        "level": 0.1,
+        "repeat": 0
+      },
+      "path": "noisy/weight_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0.1_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "3ab388805c650e0d2c815058d8f75b86a486a20716c3338b0c12c089dabcbbf1"
+    },
+    {
+      "arrays": {
+        "weights.npy": "6b63b5e3597427aac17d07178280c00c06bc74f72ea754a543908651af438304"
+      },
+      "dataset_id": "weight_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0.2_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "weight_jitter",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "circle_N400_radius1_sig0.03_coeff_field2_seed20260201",
+        "level": 0.2,
+        "repeat": 0
+      },
+      "path": "noisy/weight_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0.2_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "8452231d4b16de00436daf4c2bc468bd1bb48d0bb1ae39dac82815daed6d1c2a"
+    },
+    {
+      "arrays": {
+        "weights.npy": "d8cf8920ed20a5329a129b9fe8e9f932c4d72dbb326e6e8c5b8069477177144a"
+      },
+      "dataset_id": "weight_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0_repeat0_seed20260201",
+      "family": "noisy",
+      "generated_at": "2026-08-21T07:19:12Z",
+      "generator": "weight_jitter",
+      "package_version": "0.1.0",
+      "params": {
+        "base": "circle_N400_radius1_sig0.03_coeff_field2_seed20260201",
+        "level": 0.0,
+        "repeat": 0
+      },
+      "path": "noisy/weight_jitter_base-circle_N400_radius1_sig0.03_coeff_field2_seed20260201_level0_repeat0_seed20260201",
+      "seed": 20260201,
+      "truth_sha256": "595c8eb0059c035b922db25a1997faf2bfb320605f13036b3313ebd93730b20c"
+    }
+  ],
+  "format_version": 2
+}
