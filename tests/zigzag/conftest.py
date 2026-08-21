@@ -19,17 +19,22 @@ so its complexes cannot be built at all — see the measurement in ``docs/plan_t
 """
 
 
-@pytest.fixture
+# Session-scoped: the generators are deterministic and the datasets are read-only here, so
+# rebuilding one per test bought nothing and cost more than every assertion put together —
+# measured at 0.25 s of setup against milliseconds of checking.
+
+
+@pytest.fixture(scope="session")
 def cycle_lifecycle(config):
     return build_dynamic_graph("cycle_lifecycle", config)
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def geometric_loop(config):
     return build_dynamic_graph("geometric_loop", config)
 
 
-@pytest.fixture(params=FAMILY_TWO)
+@pytest.fixture(scope="session", params=FAMILY_TWO)
 def family_two_dataset(request, config):
     """Each family-2 scenario in turn, so the invariants are checked on both."""
     return build_dynamic_graph(request.param, config)
