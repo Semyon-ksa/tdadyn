@@ -213,8 +213,55 @@ def boundary_matrix(complex: SimplicialComplex, dim: int) -> np.ndarray:
     return matrix
 
 
+def row_reduce_mod2(matrix: np.ndarray) -> tuple[np.ndarray, tuple[int, ...]]:
+    """Reduced row echelon form over Z/2, with the pivot columns.
+
+    Parameters
+    ----------
+    matrix : numpy.ndarray
+        Boolean matrix; it is not modified.
+
+    Returns
+    -------
+    reduced : numpy.ndarray
+        The reduced form: row ``i`` has its leading one in ``pivots[i]`` and that column
+        is zero in every other row.
+    pivots : tuple of int
+        Indices of the pivot columns, increasing.  Their number is the rank.
+
+    Notes
+    -----
+    Adding one row to another over Z/2 is XOR, and no division is needed — which is the
+    whole reason this module is restricted to that field.  Everything else here is built
+    on this one elimination rather than on a second copy of it.
+    """
+    work = np.array(matrix, dtype=bool, copy=True)
+    if work.ndim != 2:
+        raise ValueError(f"expected a 2-D matrix, got shape {work.shape}")
+    n_rows, n_columns = work.shape
+
+    pivots: list[int] = []
+    row = 0
+    for column in range(n_columns):
+        if row == n_rows:
+            break
+        candidates = np.flatnonzero(work[row:, column])
+        if candidates.size == 0:
+            continue
+        pivot = row + int(candidates[0])
+        if pivot != row:
+            work[[row, pivot]] = work[[pivot, row]]
+        affected = np.flatnonzero(work[:, column])
+        affected = affected[affected != row]
+        if affected.size:
+            work[affected] ^= work[row]
+        pivots.append(column)
+        row += 1
+    return work, tuple(pivots)
+
+
 def rank_mod2(matrix: np.ndarray) -> int:
-    """Rank of a boolean matrix over Z/2 by Gaussian elimination.
+    """Rank of a boolean matrix over Z/2.
 
     Parameters
     ----------
@@ -224,34 +271,85 @@ def rank_mod2(matrix: np.ndarray) -> int:
     Returns
     -------
     int
-        The rank.
+        The rank, that is the number of pivot columns of :func:`row_reduce_mod2`.
+    """
+    return len(row_reduce_mod2(matrix)[1])
+
+
+def nullspace_mod2(matrix: np.ndarray) -> np.ndarray:
+    """Basis of the kernel of a boolean matrix over Z/2, as columns.
+
+    Parameters
+    ----------
+    matrix : numpy.ndarray
+        Boolean matrix of shape ``(n_rows, n_columns)``.
+
+    Returns
+    -------
+    numpy.ndarray
+        Boolean matrix of shape ``(n_columns, n_columns - rank)`` whose columns are a
+        basis of the kernel.
 
     Notes
     -----
-    Adding one row to another over Z/2 is XOR, and no division is needed — which is
-    the whole reason this module is restricted to that field.
+    Each free column of the reduced form contributes one basis vector: a one in that
+    column, and in each pivot column the entry the reduced form records there.  The
+    zigzag oracle uses this for the cycle spaces :math:`Z_k` and for the limit of a
+    module restricted to an interval (``docs/zigzag.md`` §3.3).
     """
-    work = np.array(matrix, dtype=bool, copy=True)
-    if work.ndim != 2:
-        raise ValueError(f"expected a 2-D matrix, got shape {work.shape}")
-    n_rows, n_columns = work.shape
+    reduced, pivots = row_reduce_mod2(matrix)
+    n_columns = reduced.shape[1]
+    free = [column for column in range(n_columns) if column not in set(pivots)]
+    kernel = np.zeros((n_columns, len(free)), dtype=bool)
+    for position, column in enumerate(free):
+        kernel[column, position] = True
+        for row, pivot in enumerate(pivots):
+            kernel[pivot, position] = reduced[row, column]
+    return kernel
 
-    rank = 0
-    for column in range(n_columns):
-        if rank == n_rows:
-            break
-        candidates = np.flatnonzero(work[rank:, column])
-        if candidates.size == 0:
-            continue
-        pivot = rank + int(candidates[0])
-        if pivot != rank:
-            work[[rank, pivot]] = work[[pivot, rank]]
-        affected = np.flatnonzero(work[:, column])
-        affected = affected[affected != rank]
-        if affected.size:
-            work[affected] ^= work[rank]
-        rank += 1
-    return rank
+
+def coordinates_mod2(spanning: np.ndarray, vector: np.ndarray) -> np.ndarray | None:
+    """Write a vector over a spanning set: solve ``spanning @ x = vector`` over Z/2.
+
+    Parameters
+    ----------
+    spanning : numpy.ndarray
+        Boolean matrix whose **columns** span the subspace.
+    vector : numpy.ndarray
+        Boolean vector of length ``spanning.shape[0]``.
+
+    Returns
+    -------
+    numpy.ndarray or None
+        One solution ``x``, or ``None`` if the vector is outside the span.
+
+    Notes
+    -----
+    The spanning set need not be independent, so the solution need not be unique; any
+    one of them is a correct decomposition, and the caller uses only the coordinates it
+    asked for.  The oracle needs this to express the image of a homology class in the
+    basis chosen at the target index: the class is written over that basis **plus** the
+    boundaries, and the boundary coordinates are then discarded.
+    """
+    spanning = np.asarray(spanning, dtype=bool)
+    vector = np.asarray(vector, dtype=bool)
+    if spanning.ndim != 2:
+        raise ValueError(f"spanning must be 2-D, got shape {spanning.shape}")
+    if vector.shape != (spanning.shape[0],):
+        raise ValueError(
+            f"vector of length {vector.shape} does not match spanning set of shape "
+            f"{spanning.shape}"
+        )
+    augmented = np.column_stack([spanning, vector])
+    reduced, pivots = row_reduce_mod2(augmented)
+    last = spanning.shape[1]
+    if last in pivots:
+        # A pivot in the augmented column is the row 0 = 1: no solution.
+        return None
+    solution = np.zeros(last, dtype=bool)
+    for row, pivot in enumerate(pivots):
+        solution[pivot] = reduced[row, last]
+    return solution
 
 
 def _normalise_simplex(raw: Any) -> tuple[int, ...]:

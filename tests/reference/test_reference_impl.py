@@ -24,8 +24,11 @@ from tdadyn.reference import (
     betti_numbers,
     betti_numbers_of_graph,
     boundary_matrix,
+    coordinates_mod2,
     flag_complex,
+    nullspace_mod2,
     rank_mod2,
+    row_reduce_mod2,
 )
 
 EDGE = 1.0
@@ -305,3 +308,69 @@ def test_the_reference_does_not_import_a_persistence_library():
         for library in ("ripser", "gudhi", "persim"):
             assert f"import {library}" not in source, f"{path.name} imports {library}"
             assert f"from {library}" not in source, f"{path.name} imports from {library}"
+
+
+# --- linear algebra over Z/2, the primitives the oracle needs ----------------------
+
+
+def test_row_reduction_reports_the_pivot_columns():
+    # Second column is the first one again, so it carries no pivot.
+    matrix = np.array([[1, 1, 0], [0, 0, 1]], dtype=bool)
+    _, pivots = row_reduce_mod2(matrix)
+    assert pivots == (0, 2)
+
+
+def test_row_reduction_agrees_with_the_rank_it_replaces():
+    rng = np.random.default_rng(20260201)
+    for shape in ((5, 7), (7, 5), (12, 12), (1, 4), (4, 1)):
+        matrix = rng.random(shape) < 0.4
+        _, pivots = row_reduce_mod2(matrix)
+        assert len(pivots) == rank_mod2(matrix)
+
+
+def test_the_nullspace_is_a_basis_of_the_kernel():
+    rng = np.random.default_rng(7)
+    for shape in ((5, 9), (9, 5), (10, 10)):
+        matrix = rng.random(shape) < 0.4
+        kernel = nullspace_mod2(matrix)
+        assert kernel.shape[0] == matrix.shape[1]
+        # rank-nullity, and every column really is in the kernel
+        assert kernel.shape[1] == matrix.shape[1] - rank_mod2(matrix)
+        assert not ((matrix.astype(np.int64) @ kernel.astype(np.int64)) % 2).any()
+        # independent: no non-trivial combination vanishes
+        assert rank_mod2(kernel) == kernel.shape[1]
+
+
+def test_a_full_rank_square_matrix_has_a_trivial_kernel():
+    identity = np.eye(4, dtype=bool)
+    assert nullspace_mod2(identity).shape == (4, 0)
+
+
+def test_the_zero_matrix_has_everything_in_its_kernel():
+    kernel = nullspace_mod2(np.zeros((3, 4), dtype=bool))
+    assert kernel.shape == (4, 4)
+    assert rank_mod2(kernel) == 4
+
+
+def test_coordinates_decompose_a_vector_over_the_spanning_set():
+    spanning = np.array([[1, 0], [0, 1], [1, 1]], dtype=bool)
+    vector = np.array([1, 1, 0], dtype=bool)  # = first + second
+    solution = coordinates_mod2(spanning, vector)
+    assert solution is not None
+    assert solution.tolist() == [True, True]
+
+
+def test_coordinates_return_none_when_the_vector_is_outside_the_span():
+    spanning = np.array([[1], [0]], dtype=bool)
+    assert coordinates_mod2(spanning, np.array([0, 1], dtype=bool)) is None
+
+
+def test_coordinates_pick_one_solution_when_the_spanning_set_is_dependent():
+    # Third column repeats the first: solutions are not unique, and any one will do
+    # as long as it reproduces the vector.
+    spanning = np.array([[1, 0, 1], [0, 1, 0]], dtype=bool)
+    vector = np.array([1, 0], dtype=bool)
+    solution = coordinates_mod2(spanning, vector)
+    assert solution is not None
+    product = (spanning.astype(np.int64) @ solution.astype(np.int64)) % 2
+    assert product.tolist() == [1, 0]

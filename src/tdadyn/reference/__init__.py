@@ -10,7 +10,10 @@ from .homology import (
     SimplicialComplex,
     betti_numbers,
     boundary_matrix,
+    coordinates_mod2,
+    nullspace_mod2,
     rank_mod2,
+    row_reduce_mod2,
 )
 
 __all__ = [
@@ -19,6 +22,9 @@ __all__ = [
     "betti_numbers",
     "betti_numbers_of_graph",
     "boundary_matrix",
+    "coordinates_mod2",
     "flag_complex",
+    "nullspace_mod2",
     "rank_mod2",
+    "row_reduce_mod2",
 ]
