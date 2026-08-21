@@ -99,9 +99,15 @@ def test_the_moved_names_are_not_reachable_through_synthetic():
 
 
 def test_every_layer_named_in_the_rule_exists():
-    """Guards the rule itself: a renamed package would silently empty the check above."""
+    """Guards the rule itself: a renamed package would silently empty the check above.
+
+    Until Z1 the list allowed ``zigzag`` to be missing.  It is here now, so the allowance
+    is gone: every layer the rule names must exist, and a package renamed out from under
+    the rule fails here instead of quietly reducing it to nothing.
+    """
     missing = [layer for layer in FORBIDDEN if not (PACKAGE_ROOT / layer).is_dir()]
-    assert missing == ["zigzag"], (
-        f"unexpected set of missing layers: {missing}. Only 'zigzag' may be absent — it "
-        "arrives in Z1; anything else means a package was renamed and this rule went blind"
+    assert missing == [], (
+        f"layers named in the rule but absent from the package: {missing}. Either the "
+        "package was renamed and this rule went blind, or the rule names a layer that "
+        "was never built"
     )
