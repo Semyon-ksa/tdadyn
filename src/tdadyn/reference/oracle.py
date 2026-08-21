@@ -164,6 +164,153 @@ def module_from_complexes(
     return ZigzagModule(dimensions=dimensions, arrows=tuple(arrows))
 
 
+# --- L3: generalized rank and Mobius inversion ------------------------------------
+
+
+def generalized_rank(
+    module: ZigzagModule, birth: int, death: int, *, component: int | None = None
+) -> int:
+    """Level L3: :math:`r(b,d)`, the rank of :math:`\\varprojlim \\to \\varinjlim`.
+
+    Parameters
+    ----------
+    module : ZigzagModule
+        The module.
+    birth, death : int
+        Closed interval of positions, ``birth <= death``.
+    component : int, optional
+        Which component of a compatible tuple the canonical map reads.  Any of them gives
+        the same rank — that is what makes the map canonical — and the parameter exists so
+        that a test can check it rather than take it on trust.  Defaults to ``birth``.
+
+    Returns
+    -------
+    int
+        The rank.  Because every module over :math:`A_N` is interval decomposable
+        (Gabriel), this equals the number of bars containing ``[birth, death]``, which is
+        what Mobius inversion then turns back into multiplicities.
+
+    Notes
+    -----
+    Over Z/2 both constructions are ranks of matrices and nothing else.  The limit is the
+    subspace of compatible tuples in :math:`\\bigoplus V_i` — the kernel of the
+    compatibility matrix.  The colimit is the quotient of the same sum by the relations
+    identifying a vector with its image.  The canonical map takes a compatible tuple to the
+    class of one component; the relations make the choice immaterial.
+    """
+    n = len(module.dimensions)
+    if not 0 <= birth <= death < n:
+        raise ValueError(
+            f"interval [{birth}, {death}] does not lie inside a module of {n} positions"
+        )
+    if component is None:
+        component = birth
+    if not birth <= component <= death:
+        raise ValueError(
+            f"component {component} lies outside the interval [{birth}, {death}]"
+        )
+
+    dimensions = module.dimensions[birth : death + 1]
+    if any(dimension == 0 for dimension in dimensions):
+        # A zero space anywhere inside kills every compatible tuple, so the limit is zero.
+        return 0
+    offsets, total = [], 0
+    for dimension in dimensions:
+        offsets.append(total)
+        total += dimension
+
+    def block_of(position: int) -> slice:
+        start = offsets[position - birth]
+        return slice(start, start + module.dimensions[position])
+
+    constraints, relations = [], []
+    for position in range(birth, death):
+        _, matrix = module.arrows[position]
+        source, target = module.source_and_target(position)
+        source_block, target_block = block_of(source), block_of(target)
+        source_dim = module.dimensions[source]
+        target_dim = module.dimensions[target]
+
+        # Compatibility: f(v_source) + v_target = 0, one row block per arrow.
+        constraint = np.zeros((target_dim, total), dtype=bool)
+        constraint[:, source_block] = matrix
+        constraint[:, target_block] ^= np.eye(target_dim, dtype=bool)
+        constraints.append(constraint)
+
+        # The same equations read as generators of what the colimit divides out.
+        relation = np.zeros((total, source_dim), dtype=bool)
+        relation[source_block, :] = np.eye(source_dim, dtype=bool)
+        relation[target_block, :] ^= matrix
+        relations.append(relation)
+
+    compatibility = (
+        np.vstack(constraints) if constraints else np.zeros((0, total), dtype=bool)
+    )
+    limit = nullspace_mod2(compatibility)
+
+    identifications = (
+        np.column_stack(relations) if relations else np.zeros((total, 0), dtype=bool)
+    )
+    read = block_of(component)
+    images = np.zeros((total, limit.shape[1]), dtype=bool)
+    images[read, :] = limit[read, :]
+
+    if images.shape[1] == 0:
+        return 0
+    return rank_mod2(np.column_stack([images, identifications])) - rank_mod2(identifications)
+
+
+def barcode(module: ZigzagModule) -> tuple[tuple[int, int], ...]:
+    """The full barcode, by Mobius inversion of the generalized rank.
+
+    Returns
+    -------
+    tuple of (int, int)
+        Bars as closed intervals of positions, sorted, **with repetition**: a bar of
+        multiplicity two appears twice.  Comparing barcodes as sets would silently lose a
+        repeated bar, and the comparisons this oracle exists for are bar for bar.
+
+    Notes
+    -----
+    :math:`m_{[b,d]} = r(b,d) - r(b^-,d) - r(b,d^+) + r(b^-,d^+)`, with :math:`r := 0`
+    outside the module (``docs/zigzag.md`` §3.3).
+
+    The search prunes on the monotonicity of :math:`r`: for a fixed birth, once
+    :math:`r(b,d)` reaches zero every wider interval is zero as well and is skipped.  That
+    is the only shortcut taken, it is exact rather than heuristic, and it is checked by a
+    test instead of being assumed.
+    """
+    n = len(module.dimensions)
+    ranks: dict[tuple[int, int], int] = {}
+    for birth in range(n):
+        for death in range(birth, n):
+            value = generalized_rank(module, birth, death)
+            if value == 0:
+                break
+            ranks[(birth, death)] = value
+
+    def rank_at(birth: int, death: int) -> int:
+        if birth < 0 or death >= n or birth > death:
+            return 0
+        return ranks.get((birth, death), 0)
+
+    bars: list[tuple[int, int]] = []
+    for (birth, death), value in sorted(ranks.items()):
+        multiplicity = (
+            value
+            - rank_at(birth - 1, death)
+            - rank_at(birth, death + 1)
+            + rank_at(birth - 1, death + 1)
+        )
+        if multiplicity < 0:
+            raise AssertionError(
+                f"Mobius inversion gave multiplicity {multiplicity} for [{birth}, {death}]; "
+                "the generalized ranks are inconsistent, which means a bug in this module"
+            )
+        bars.extend([(birth, death)] * multiplicity)
+    return tuple(sorted(bars))
+
+
 # --- homology bases and induced maps ----------------------------------------------
 
 

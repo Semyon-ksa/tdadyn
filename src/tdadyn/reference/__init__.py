@@ -15,15 +15,29 @@ from .homology import (
     rank_mod2,
     row_reduce_mod2,
 )
+from .oracle import (
+    ZigzagModule,
+    arrow_ranks,
+    barcode,
+    betti_curve,
+    generalized_rank,
+    module_from_complexes,
+)
 
 __all__ = [
     "REFERENCE_COEFF_FIELD",
     "SimplicialComplex",
+    "ZigzagModule",
+    "arrow_ranks",
+    "barcode",
+    "betti_curve",
     "betti_numbers",
     "betti_numbers_of_graph",
     "boundary_matrix",
     "coordinates_mod2",
     "flag_complex",
+    "generalized_rank",
+    "module_from_complexes",
     "nullspace_mod2",
     "rank_mod2",
     "row_reduce_mod2",

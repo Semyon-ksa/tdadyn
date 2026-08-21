@@ -20,7 +20,9 @@ from tdadyn.reference import SimplicialComplex, betti_numbers
 from tdadyn.reference.oracle import (
     ZigzagModule,
     arrow_ranks,
+    barcode,
     betti_curve,
+    generalized_rank,
     module_from_complexes,
 )
 
@@ -200,3 +202,125 @@ def test_a_module_with_mismatched_arrow_shapes_is_refused():
 def test_a_module_needs_one_arrow_fewer_than_it_has_spaces():
     with pytest.raises(ValueError, match="arrows"):
         ZigzagModule(dimensions=(1, 2, 2), arrows=((True, np.array([[True]])),))
+
+
+# --- L3: generalized rank and Mobius inversion -------------------------------------
+
+
+def test_l3_on_t1_reproduces_the_barcode_written_by_hand():
+    """``docs/zigzag.md`` §5.1 states it: ``{[0,2], [0,0], [2,2]}`` in snapshot terms.
+
+    In positions along the zigzag those are ``(0,4)``, ``(0,0)`` and ``(4,4)``: the two
+    vertices are one component for the whole middle, and each end carries one extra
+    component that exists only at that snapshot.
+    """
+    assert barcode(module_from_complexes(complexes_of(*T1), 0)) == ((0, 0), (0, 4), (4, 4))
+
+
+def test_l3_on_t2_gives_one_loop_with_half_integer_ends():
+    """The loop lives on the union before it lives on a snapshot, and after it too.
+
+    Positions 1 and 3 are the unions ``K_½`` and ``K_1½``.  The edges arrive with snapshot
+    1, so ``K_½ = K_1`` already carries the loop; they leave with snapshot 2, so
+    ``K_1½ = K_1`` still carries it.  Exactly the half-step of ``docs/zigzag.md`` §5.1a.
+    """
+    assert barcode(module_from_complexes(complexes_of(*T2), 1)) == ((1, 3),)
+    assert barcode(module_from_complexes(complexes_of(*T2), 0)) == (
+        (0, 0), (0, 0), (0, 4), (4, 4), (4, 4)
+    )
+
+
+def test_l3_on_t3_decides_the_pairing_that_l1_and_l2_could_not():
+    """T3 is the fork of §3.2 in miniature, and only L3 resolves it.
+
+    The cut removes an edge of the **first** cycle, so the class carried in from position 0
+    is the one that dies, and the class that survives to the end is the one born with the
+    third path.  The alternative pairing ``{(0,4), (1,3)}`` has the same Betti curve and the
+    same arrow ranks — both are checked above — so a checker stopping below L3 accepts it.
+    """
+    bars = barcode(module_from_complexes(complexes_of(*T3), 1))
+    assert bars == ((0, 3), (1, 4))
+    assert bars != ((0, 4), (1, 3))
+
+
+def test_l3_tells_the_two_t4_modules_apart():
+    """The test of discriminating power (``docs/zigzag.md`` §5.1, T4).
+
+    Same dimensions, same arrow ranks, different barcodes.  Without this the oracle could
+    be a covering counter and nothing would say so.
+    """
+    assert barcode(hand_module(T4_NESTED)) == ((0, 3), (1, 2))
+    assert barcode(hand_module(T4_CROSSING)) == ((0, 2), (1, 3))
+
+
+# --- properties of the oracle -----------------------------------------------------
+
+
+@pytest.mark.parametrize("toy, dim", [(T1, 0), (T2, 0), (T2, 1), (T3, 0), (T3, 1)])
+def test_the_bars_account_for_every_dimension(toy, dim):
+    """Sum of bar lengths equals the total dimension: nothing invented, nothing lost."""
+    module = module_from_complexes(complexes_of(*toy), dim)
+    bars = barcode(module)
+    assert sum(death - birth + 1 for birth, death in bars) == sum(module.dimensions)
+
+
+@pytest.mark.parametrize("toy, dim", [(T1, 0), (T2, 1), (T3, 1)])
+def test_the_bars_covering_an_index_reproduce_its_betti_number(toy, dim):
+    """L3 against L1: necessary, and **not** sufficient — T3 above is the counterexample."""
+    diagram = complexes_of(*toy)
+    module = module_from_complexes(diagram, dim)
+    for position, expected in enumerate(betti_curve(diagram, dim)):
+        covering = sum(1 for birth, death in barcode(module) if birth <= position <= death)
+        assert covering == expected
+
+
+@pytest.mark.parametrize("toy, dim", [(T1, 0), (T3, 1)])
+def test_the_bars_crossing_an_arrow_reproduce_its_rank(toy, dim):
+    """L3 against L2: also necessary and also not sufficient (T4)."""
+    module = module_from_complexes(complexes_of(*toy), dim)
+    for position, rank in enumerate(arrow_ranks(module)):
+        crossing = sum(
+            1 for birth, death in barcode(module) if birth <= position and death >= position + 1
+        )
+        assert crossing == rank
+
+
+def test_the_generalized_rank_does_not_grow_when_the_interval_does():
+    """``r(b,d)`` counts the bars containing ``[b,d]``, so widening can only drop it.
+
+    The barcode search prunes on this — once ``r`` hits zero the wider intervals are
+    skipped — so the property is checked rather than assumed.
+    """
+    module = module_from_complexes(complexes_of(*T3), 1)
+    n = len(module.dimensions)
+    for birth in range(n):
+        ranks = [generalized_rank(module, birth, death) for death in range(birth, n)]
+        assert ranks == sorted(ranks, reverse=True)
+
+
+def test_the_generalized_rank_does_not_depend_on_which_component_is_read():
+    """The canonical map sends a compatible tuple to the class of *any* component.
+
+    The implementation reads the leftmost one.  If that choice mattered, the construction
+    would be wrong, and the error would look exactly like a wrong barcode.
+    """
+    module = module_from_complexes(complexes_of(*T3), 1)
+    n = len(module.dimensions)
+    for birth in range(n):
+        for death in range(birth, n):
+            expected = generalized_rank(module, birth, death)
+            for component in range(birth, death + 1):
+                assert generalized_rank(module, birth, death, component=component) == expected
+
+
+def test_the_oracle_refuses_a_field_other_than_two():
+    with pytest.raises(NotImplementedError, match="Z/2"):
+        module_from_complexes(complexes_of(*T1), 0, coeff_field=3)
+
+
+def test_an_interval_outside_the_module_is_refused():
+    module = hand_module(T4_NESTED)
+    with pytest.raises(ValueError, match="interval"):
+        generalized_rank(module, 2, 1)
+    with pytest.raises(ValueError, match="interval"):
+        generalized_rank(module, 0, 9)
