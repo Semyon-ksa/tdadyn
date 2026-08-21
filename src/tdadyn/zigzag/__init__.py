@@ -9,11 +9,23 @@ through :mod:`tdadyn.core` and the complexes are built by :mod:`tdadyn.reference
 
 from .construction import UNION_RULE, snapshot_complex, union_complex, zigzag_complexes
 from .indices import CoarseIndex, index_set
+from .operations import (
+    CoarseSpan,
+    Operation,
+    OperationStream,
+    operation_stream,
+    replay,
+)
 
 __all__ = [
     "UNION_RULE",
     "CoarseIndex",
+    "CoarseSpan",
+    "Operation",
+    "OperationStream",
     "index_set",
+    "operation_stream",
+    "replay",
     "snapshot_complex",
     "union_complex",
     "zigzag_complexes",
