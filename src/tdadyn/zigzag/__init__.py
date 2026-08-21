@@ -7,9 +7,14 @@ and the log there is fixed here until the reference says otherwise (``docs/zigza
 through :mod:`tdadyn.core` and the complexes are built by :mod:`tdadyn.reference`.
 """
 
+from .construction import UNION_RULE, snapshot_complex, union_complex, zigzag_complexes
 from .indices import CoarseIndex, index_set
 
 __all__ = [
+    "UNION_RULE",
     "CoarseIndex",
     "index_set",
+    "snapshot_complex",
+    "union_complex",
+    "zigzag_complexes",
 ]
