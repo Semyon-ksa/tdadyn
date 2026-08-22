@@ -9,6 +9,7 @@ through :mod:`tdadyn.core` and the complexes are built by :mod:`tdadyn.reference
 
 from .backend import barcode_from, dionysus_barcode, presence_runs
 from .construction import UNION_RULE, snapshot_complex, union_complex, zigzag_complexes
+from .events import EventLog, PredictedEvent, event_log, events_from_barcode
 from .indices import CoarseIndex, index_set
 from .operations import (
     CoarseSpan,
@@ -23,11 +24,15 @@ __all__ = [
     "UNION_RULE",
     "CoarseIndex",
     "CoarseSpan",
+    "EventLog",
+    "PredictedEvent",
     "Operation",
     "OperationStream",
     "barcode_from",
     "coarse_bar_of",
     "dionysus_barcode",
+    "event_log",
+    "events_from_barcode",
     "index_set",
     "presence_runs",
     "operation_stream",
