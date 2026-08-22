@@ -18,6 +18,7 @@ import numpy as np
 import pytest
 
 from tdadyn.reference import betti_curve, rank_mod2
+from tdadyn.zigzag import event_log
 
 pytestmark = pytest.mark.slow_zigzag
 
@@ -183,31 +184,25 @@ def test_the_pairing_the_oracle_rejects_is_not_ruled_out_below_l3(
 def test_the_barcode_accounts_for_every_event_in_the_truth_log(
     family_two_dataset, config, zigzag_of
 ):
-    """Measured now, implemented in Z4: bar ends translate back to the logged snapshots.
+    """The oracle's barcode and the truth log describe the same events.
 
-    A birth at ``b`` is the first snapshot index at or after ``b``; a death at ``d`` is the
-    first snapshot index strictly after ``d``.  The rule already in ``docs/zigzag.md`` §4.2
-    ("``d`` integer -> death at ``d + 1``") is the special case, and the half-integer ends
-    this session uncovered are the general one.
+    Written in Z2 with the translation rule spelled out inline, because the layer did not
+    exist yet.  It goes through :func:`event_log` now: the rule of ``docs/zigzag.md`` §4.2
+    is introduced in exactly one place, and a test carrying its own copy would be a second
+    implementation — the shift by one is precisely what this project keeps to a single site.
 
-    Kept here as a measurement rather than a translation layer: building the event log is
-    Z4.  Its value now is that it shows the corrected barcode and the truth log agree, so
-    Z4 starts from a reconciled pair instead of discovering the mismatch as a recall of one
-    third.
+    What it still checks is what it checked then, and it is not what Z4's metrics check:
+    that the **oracle's** barcode reconciles with the log.  Z4 measures the backend's.
     """
     _, indices = zigzag_of.complexes(family_two_dataset)
-    predicted = set()
-    for dim in range(config.zigzag.max_homology_dim + 1):
-        for birth, death in zigzag_of.bars(family_two_dataset, dim):
-            if birth > 0:
-                first = next(p for p in range(birth, len(indices)) if indices[p].is_snapshot)
-                predicted.add((indices[first].snapshot, dim, "birth"))
-            if death < len(indices) - 1:
-                after = next(
-                    p for p in range(death + 1, len(indices)) if indices[p].is_snapshot
-                )
-                predicted.add((indices[after].snapshot, dim, "death"))
-
+    bars = {
+        dim: zigzag_of.bars(family_two_dataset, dim)
+        for dim in range(config.zigzag.max_homology_dim + 1)
+    }
+    predicted = {
+        (event.snapshot, event.dim, event.type)
+        for event in event_log(bars, indices=indices).uncensored()
+    }
     logged = {
         (event.snapshot, event.dim, event.type)
         for event in family_two_dataset.ground_truth.events

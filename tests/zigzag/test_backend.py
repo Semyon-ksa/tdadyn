@@ -19,6 +19,7 @@ import pytest
 from tdadyn.reference import barcode, module_from_complexes
 from tdadyn.zigzag import (
     coarse_bar_of,
+    event_log,
     operation_stream,
     presence_runs,
     zigzag_complexes,
@@ -325,9 +326,13 @@ def test_no_bar_of_either_dataset_is_invisible(family_two_dataset, config, zigza
     reaches a connectome.
     """
     _, indices = zigzag_of.complexes(family_two_dataset)
-    for dim in range(config.zigzag.max_homology_dim + 1):
-        for birth, death in zigzag_of.bars(family_two_dataset, dim):
-            assert any(indices[p].is_snapshot for p in range(birth, death + 1))
+    bars = {
+        dim: zigzag_of.bars(family_two_dataset, dim)
+        for dim in range(config.zigzag.max_homology_dim + 1)
+    }
+    # Counted by the event layer rather than by a predicate written again here: what makes a
+    # bar invisible is part of the translation rule and lives in one place.
+    assert event_log(bars, indices=indices).invisible_bars == 0
 
 
 # --- the dispatcher -----------------------------------------------------------------
