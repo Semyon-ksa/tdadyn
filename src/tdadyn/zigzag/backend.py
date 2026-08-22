@@ -98,9 +98,18 @@ def dionysus_barcode(complexes, *, max_homology_dim: int) -> dict[int, Barcode]:
     complexes are truncated at ``max_homology_dim + 1``, so :math:`\\partial_{k+2}` is absent
     and every closed chain of the top dimension is miscounted as a cavity
     (``method.md`` §2.3).  Measured on ``geometric_loop``: Dionysus returns 69 such bars in
-    dimension 2 while the truth carries none.  They are dropped here rather than by the
-    caller because ``cycle_lifecycle`` has no triangles at all and shows none of them, so a
-    check on one dataset would not have caught them.
+    dimension 2.
+
+    That they are artefacts is not an assumption about homology nobody computed.  The
+    generator built its complexes one dimension higher — ``topology_check.max_homology_dim``
+    is 2, so up to dimension 3, with :math:`\\partial_3` present — and its ``betti_curve``
+    records :math:`\\beta_2 = 0` at every snapshot of both datasets.  The 69 bars contradict
+    a number that *was* computed properly, which is what makes them artefacts rather than a
+    finding.
+
+    They are dropped here rather than by the caller because ``cycle_lifecycle`` has no
+    triangles at all and shows none of them, so a check on one dataset would not have caught
+    them.
     """
     try:
         import dionysus
@@ -132,11 +141,30 @@ def dionysus_barcode(complexes, *, max_homology_dim: int) -> dict[int, Barcode]:
             barcodes[dim] = ()
             continue
         bars = [
-            (int(point.birth), last if point.death == float("inf") else int(point.death) - 1)
+            (_position(point.birth), last if point.death == float("inf")
+             else _position(point.death) - 1)
             for point in diagrams[dim]
         ]
         barcodes[dim] = tuple(sorted(bars))
     return barcodes
+
+
+def _position(time: float) -> int:
+    """A Dionysus time back to a position, refusing anything that is not one.
+
+    Every time handed over is an integer position, so every time handed back must be one.
+    Converting with a bare ``int`` would floor a fractional value instead, shifting the bar
+    by one and producing a barcode that is still well formed — the exact failure this layer
+    exists to prevent (``docs/zigzag.md`` §2.4).
+    """
+    position = int(time)
+    if position != time:
+        raise AssertionError(
+            f"the backend reported a fractional time {time!r}; every time given to it was "
+            "an integer position, so this means the adapter and Dionysus disagree about "
+            "the index convention"
+        )
+    return position
 
 
 

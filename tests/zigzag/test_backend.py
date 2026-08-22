@@ -189,6 +189,11 @@ def test_the_backend_reports_nothing_above_the_requested_dimension(
     with_artefacts = dionysus_barcode(complexes, max_homology_dim=2)
     assert len(with_artefacts[2]) > 50
 
+    # They contradict a number that was computed properly: the generator built its complexes
+    # to dimension 3, with the boundary operator these lack, and recorded beta_2 = 0
+    # everywhere. That is what makes them artefacts rather than a finding.
+    assert set(geometric_loop.ground_truth.betti_curve[2]) == {0}
+
 
 def test_relabelling_the_nodes_leaves_the_backend_barcode_alone(
     cycle_lifecycle, config, zigzag_of
