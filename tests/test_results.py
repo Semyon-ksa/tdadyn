@@ -215,3 +215,41 @@ def test_git_does_not_ignore_the_artefact():
     assert "!" in result.stdout or result.returncode != 0, (
         f"{target} is ignored by: {result.stdout.strip()}"
     )
+
+
+# --- the report ---------------------------------------------------------------------
+
+
+def test_the_report_reads_the_artefact_and_computes_nothing():
+    """Why the report cannot disagree with the artefact.
+
+    S9 caught the same quantity printed with two different values in three places.  Here the
+    report has no second source: it opens the file the build wrote and prints from it.  A
+    generator that called the pipeline itself could drift from the artefact between runs, and
+    nothing would say which number was right.
+    """
+    source = (REPO_ROOT / "notebooks" / "build_zigzag_report.py").read_text(encoding="utf-8")
+    assert "zigzag_events.json" in source
+    for computing in ("analyse(", "measure_null(", "degradation_row(", "dionysus_barcode("):
+        assert computing not in source, f"the report computes {computing} instead of reading"
+
+
+def test_the_report_notebook_is_executed_and_not_merely_written():
+    """``make report-zigzag`` runs it; an unexecuted notebook proves nothing about its prose.
+
+    The report of task 5 is in exactly that state — written by a script, executed by hand —
+    so "every number is the output of an executed cell" was never checkable for it.
+    """
+    notebook = REPO_ROOT / "notebooks" / "zigzag_report.ipynb"
+    if not notebook.exists():
+        pytest.skip("the report is not built; run make report-zigzag")
+    cells = json.loads(notebook.read_text(encoding="utf-8"))["cells"]
+    code = [cell for cell in cells if cell["cell_type"] == "code"]
+    assert code, "the report has no code cells at all"
+    assert all(cell["outputs"] for cell in code), "some cell was never executed"
+
+
+def test_the_makefile_builds_the_artefact_before_the_report():
+    """Order matters: a report built from a stale artefact is the failure it exists to avoid."""
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+    assert "report-zigzag: results" in makefile
