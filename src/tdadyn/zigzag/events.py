@@ -153,3 +153,164 @@ def event_log(barcodes: dict[int, tuple], *, indices: tuple[CoarseIndex, ...]) -
         invisible += one.invisible_bars
         censored += one.censored_ends
     return EventLog(tuple(events), invisible_bars=invisible, censored_ends=censored)
+
+
+# --- matching and metrics (docs/zigzag.md §6) ---------------------------------------
+
+
+@dataclass(frozen=True)
+class Match:
+    """One true event paired with the prediction that stood for it."""
+
+    truth: object
+    predicted: PredictedEvent
+    delta: int
+
+
+@dataclass(frozen=True)
+class DimensionMetrics:
+    """Metrics of one homology dimension, or of everything at once."""
+
+    n_truth: int
+    n_predicted: int
+    n_matched: int
+    recall: float | None
+    precision: float | None
+    mean_localisation_error: float
+    max_localisation_error: int
+
+
+@dataclass(frozen=True)
+class EventMetrics(DimensionMetrics):
+    """Summary metrics plus the per-dimension breakdown.
+
+    The breakdown is not a formality.  ``cycle_lifecycle`` has three events in :math:`H_1`
+    and two in :math:`H_0`; a summary recall would hide an algorithm that is perfect in one
+    dimension and blind in the other, which is the failure worth catching.
+    """
+
+    by_dimension: dict[int, DimensionMetrics]
+
+
+def match_events(
+    predicted,
+    truth,
+    *,
+    tolerance: int,
+    match_dimension: bool = True,
+    match_type: bool = True,
+) -> tuple[Match, ...]:
+    """Pair predicted events with true ones, greedily (``docs/zigzag.md`` §6).
+
+    Parameters
+    ----------
+    predicted : sequence of PredictedEvent
+        Censored events are **not** filtered here; the caller decides, and
+        :meth:`EventLog.uncensored` is what it usually passes.
+    truth : sequence
+        True events; anything with ``snapshot``, ``dim`` and ``type``, which is what
+        :class:`tdadyn.core.contracts.Event` carries.
+    tolerance : int
+        Largest admissible ``|delta t|``.  Zero means only an exact hit matches.
+    match_dimension, match_type : bool
+        Whether a pair must agree on dimension and on birth-versus-death.
+
+    Returns
+    -------
+    tuple of Match
+        Each true and each predicted event is used at most once.
+
+    Notes
+    -----
+    Greedy over all admissible pairs at once, ordered by ``|delta t|`` and then by the time
+    of the true event.  Both keys are fixed by §6: without the second, a tie would be broken
+    by whatever order the events happened to arrive in, and the metric would depend on it.
+    """
+    if tolerance < 0:
+        raise ValueError(f"tolerance must not be negative, got {tolerance}")
+
+    candidates = []
+    for truth_index, want in enumerate(truth):
+        for predicted_index, got in enumerate(predicted):
+            if match_dimension and got.dim != want.dim:
+                continue
+            if match_type and got.type != want.type:
+                continue
+            delta = abs(got.snapshot - want.snapshot)
+            if delta <= tolerance:
+                candidates.append((delta, want.snapshot, truth_index, predicted_index))
+
+    used_truth: set[int] = set()
+    used_predicted: set[int] = set()
+    matches: list[Match] = []
+    for delta, _, truth_index, predicted_index in sorted(candidates):
+        if truth_index in used_truth or predicted_index in used_predicted:
+            continue
+        used_truth.add(truth_index)
+        used_predicted.add(predicted_index)
+        matches.append(Match(truth[truth_index], predicted[predicted_index], delta))
+    return tuple(matches)
+
+
+def event_metrics(
+    predicted,
+    truth,
+    *,
+    tolerance: int,
+    match_dimension: bool = True,
+    match_type: bool = True,
+) -> EventMetrics:
+    """Recall, precision and localisation error, in total and per dimension.
+
+    Returns
+    -------
+    EventMetrics
+        ``recall`` and ``precision`` are ``None`` when their denominator is zero — which is
+        a real case, not a guard: ``geometric_loop`` has no :math:`H_0` events at all, and
+        reporting 0.0 there would read as a failure to find something that was never there.
+
+    Notes
+    -----
+    The localisation error is reported because §6 asks for it, and at ``tolerance = 0`` it is
+    identically zero: only an exact hit can match.  Measured across eight noisy datasets,
+    raising the tolerance recovers one event in one of them, so under noise the failure is
+    missing and spurious events rather than misplaced ones.  recall and precision are the
+    numbers that carry information.
+    """
+    matches = match_events(
+        predicted, truth, tolerance=tolerance,
+        match_dimension=match_dimension, match_type=match_type,
+    )
+    dimensions = {event.dim for event in truth} | {event.dim for event in predicted}
+    by_dimension = {
+        dim: _metrics(
+            [event for event in truth if event.dim == dim],
+            [event for event in predicted if event.dim == dim],
+            [match for match in matches if match.truth.dim == dim],
+        )
+        for dim in sorted(dimensions)
+    }
+    summary = _metrics(list(truth), list(predicted), list(matches))
+    return EventMetrics(
+        n_truth=summary.n_truth,
+        n_predicted=summary.n_predicted,
+        n_matched=summary.n_matched,
+        recall=summary.recall,
+        precision=summary.precision,
+        mean_localisation_error=summary.mean_localisation_error,
+        max_localisation_error=summary.max_localisation_error,
+        by_dimension=by_dimension,
+    )
+
+
+def _metrics(truth, predicted, matches) -> DimensionMetrics:
+    deltas = [match.delta for match in matches]
+    return DimensionMetrics(
+        n_truth=len(truth),
+        n_predicted=len(predicted),
+        n_matched=len(matches),
+        recall=len(matches) / len(truth) if truth else None,
+        precision=len(matches) / len(predicted) if predicted else None,
+        mean_localisation_error=sum(deltas) / len(deltas) if deltas else 0.0,
+        max_localisation_error=max(deltas) if deltas else 0,
+    )
