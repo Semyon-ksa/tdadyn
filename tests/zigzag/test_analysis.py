@@ -15,6 +15,7 @@ import pytest
 from tdadyn.zigzag.analysis import (
     FalsePositiveRate,
     analyse,
+    degradation_row,
     ephemeral_counts,
     measure_null,
     wilson_interval,
@@ -230,3 +231,127 @@ def test_the_family_one_threshold_is_not_the_quantity_measured_here(config):
     source = pathlib.Path(module.__file__).read_text(encoding="utf-8")
     assert "max_false_positive_rate" in source, "the reason must be written down"
     assert "not consulted" in source or "is **not** consulted" in source
+
+
+# --- degradation under noise --------------------------------------------------------
+
+
+@pytest.fixture(scope="session")
+def degradation(config):
+    """Every dynamic noisy dataset, measured once.
+
+    Eight of the twenty-four datasets in ``noisy/`` are **not** here: ``point_jitter`` and
+    ``weight_jitter`` are built on the ``circle`` point cloud, which is family 1 and has no
+    snapshots.  The zigzag works on the sixteen dynamic ones.
+    """
+    from tdadyn.core import load_dataset
+
+    root = pathlib.Path(__file__).resolve().parents[2] / "data" / "synthetic"
+    if not (root / "noisy").is_dir():
+        pytest.skip("the datasets are not built; run python -m tdadyn.synthetic.build")
+    bases = {path.name: load_dataset(path) for path in (root / "dynamic_graph").glob("*")}
+
+    rows = []
+    for path in sorted((root / "noisy").glob("*")):
+        dataset = load_dataset(path)
+        if not hasattr(dataset, "snapshots"):
+            continue
+        base = bases[dataset.ground_truth.noise_level["base"]]
+        rows.append(
+            (
+                base,
+                degradation_row(
+                    dataset, config=config, truth=base.ground_truth.events,
+                    with_fine_path=True,
+                ),
+            )
+        )
+    return rows
+
+
+@DATASETS
+def test_only_the_dynamic_noisy_datasets_are_in_scope(degradation):
+    assert len(degradation) == 16
+    assert {row.kind for _, row in degradation} == {"spurious_edges", "missing_edges"}
+
+
+@DATASETS
+def test_zero_noise_reproduces_the_clean_dataset_exactly(degradation, config):
+    """The free check of the plan: at level 0.0 nothing may differ.
+
+    It catches at once a wrongly wired base, a random stream that shifted between levels and
+    an unconditional clip — the failures that would otherwise surface as an unexplained step
+    at the start of every degradation curve.
+    """
+    checked = 0
+    for base, row in degradation:
+        if row.level != 0.0:
+            continue
+        clean = analyse(base, config=config, truth=base.ground_truth.events)
+        assert row.report.metrics.recall == clean.metrics.recall
+        assert row.report.metrics.precision == clean.metrics.precision
+        assert row.report.invisible_bars == clean.invisible_bars
+        checked += 1
+    assert checked == 4, "all four mechanism-and-base combinations must be compared"
+
+
+@DATASETS
+def test_precision_never_improves_as_the_noise_grows(degradation):
+    """Row by row within each mechanism and base, not on an average over them."""
+    series: dict[tuple[str, str], list[tuple[float, float]]] = {}
+    for base, row in degradation:
+        key = (base.ground_truth.generator, row.kind)
+        series.setdefault(key, []).append((row.level, row.precision))
+    for key, points in series.items():
+        levels = [precision for _, precision in sorted(points)]
+        assert levels == sorted(levels, reverse=True), key
+
+
+@DATASETS
+def test_the_two_datasets_degrade_differently_and_that_is_a_property_of_them(degradation):
+    """``geometric_loop`` keeps recall at one everywhere; ``cycle_lifecycle`` does not.
+
+    Named rather than averaged: both events of the metric dataset are found at every level,
+    and only the precision suffers, while the combinatorial one loses events outright.  A
+    summary over the sixteen rows would hide the difference.
+    """
+    by_base: dict[str, list[float]] = {}
+    for base, row in degradation:
+        by_base.setdefault(base.ground_truth.generator, []).append(row.recall)
+    assert all(recall == pytest.approx(1.0) for recall in by_base["geometric_loop"])
+    assert min(by_base["cycle_lifecycle"]) < 1.0
+
+
+@DATASETS
+def test_invisible_bars_are_absent_when_clean_and_appear_under_noise(degradation):
+    """``docs/zigzag.md`` §4.3 calls them false positives by construction.
+
+    Until now the count was known only where it is zero, which is to say it had never been
+    measured.  It is not zero under noise.
+    """
+    clean = [row.report.invisible_bars for _, row in degradation if row.level == 0.0]
+    noisy = [row.report.invisible_bars for _, row in degradation if row.level > 0.0]
+    assert set(clean) == {0}
+    assert max(noisy) > 0
+
+
+@DATASETS
+def test_the_prologue_part_of_the_ephemeral_count_stays_put(degradation):
+    """The open question from Z3, answered: it does, and the rest carries the whole signal.
+
+    The prologue counts the order in which the first complex is assembled — arbitrary, fixed
+    in Z1 — and drifts by units across the noise levels, while the part outside grows by
+    orders.  Reporting the total would present that assembly order as the measurement, and
+    at level 0.0 it would be the *whole* measurement.
+    """
+    inside: dict[tuple[str, str], list[int]] = {}
+    outside: dict[tuple[str, str], list[int]] = {}
+    for base, row in degradation:
+        key = (base.ground_truth.generator, row.kind)
+        inside.setdefault(key, []).append(row.report.ephemeral_in_prologue)
+        outside.setdefault(key, []).append(row.report.ephemeral_outside_prologue())
+
+    for key, counts in inside.items():
+        assert max(counts) - min(counts) <= 20, f"{key}: the prologue moved a lot"
+    grew = [key for key, counts in outside.items() if max(counts) > min(counts) + 100]
+    assert grew, "the part outside the prologue must carry the signal somewhere"

@@ -351,3 +351,67 @@ def _null_log(dataset, *, config) -> EventLog:
     barcodes = dionysus_barcode([diagram[index] for index in indices],
                                 max_homology_dim=ceiling)
     return event_log(barcodes, indices=indices)
+
+
+# --- degradation under noise --------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class DegradationRow:
+    """One noisy dataset, measured against the truth of the dataset it was made from."""
+
+    base: str
+    kind: str
+    level: float
+    bars: int
+    report: EventReport
+
+    @property
+    def recall(self) -> float | None:
+        return self.report.metrics.recall
+
+    @property
+    def precision(self) -> float | None:
+        return self.report.metrics.precision
+
+
+def degradation_row(dataset, *, config, truth, with_fine_path: bool = False) -> DegradationRow:
+    """Measure one noisy dataset.
+
+    Parameters
+    ----------
+    dataset : DynamicGraphDataset
+        A dataset whose truth is a ``noise_level``.
+    truth : sequence
+        The event log of the **base** dataset: a noisy dataset carries none of its own.
+
+    Notes
+    -----
+    The localisation error is not among the reported columns.  At the default tolerance of
+    zero it is identically zero — only an exact hit can match — so a column of zeros would
+    read as a result (``docs/zigzag.md`` §6).  It stays inside ``report.metrics`` for anyone
+    who raises the tolerance.
+    """
+    noise = dataset.ground_truth.noise_level
+    if noise is None:
+        raise ValueError(
+            f"dataset {dataset.ground_truth.generator!r} carries no noise_level; "
+            "degradation is measured on family 4, against the truth of its base"
+        )
+    report = analyse(dataset, config=config, truth=truth, with_fine_path=with_fine_path)
+    ceiling = config.zigzag.max_homology_dim
+    diagram = zigzag_complexes(
+        dataset,
+        max_homology_dim=ceiling,
+        max_nodes=config.topology_check.reference_max_nodes,
+    )
+    indices = index_set(len(dataset.snapshots))
+    barcodes = dionysus_barcode([diagram[index] for index in indices],
+                                max_homology_dim=ceiling)
+    return DegradationRow(
+        base=noise["base"],
+        kind=noise["kind"],
+        level=float(noise["level"]),
+        bars=sum(len(bars) for bars in barcodes.values()),
+        report=report,
+    )

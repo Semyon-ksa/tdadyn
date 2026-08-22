@@ -9,8 +9,10 @@ through :mod:`tdadyn.core` and the complexes are built by :mod:`tdadyn.reference
 
 from .analysis import (
     FalsePositiveRate,
+    DegradationRow,
     NullMeasurement,
     analyse,
+    degradation_row,
     ephemeral_counts,
     measure_null,
     wilson_interval,
@@ -45,6 +47,7 @@ __all__ = [
     "UNION_RULE",
     "CoarseIndex",
     "CoarseSpan",
+    "DegradationRow",
     "DimensionMetrics",
     "EventLog",
     "EventMetrics",
@@ -62,6 +65,7 @@ __all__ = [
     "event_log",
     "event_metrics",
     "event_report",
+    "degradation_row",
     "ephemeral_counts",
     "events_from_barcode",
     "match_events",
