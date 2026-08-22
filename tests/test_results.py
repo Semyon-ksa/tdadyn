@@ -36,9 +36,17 @@ REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
 
 @pytest.fixture(scope="session")
 def artefact(config):
-    if not (config.output_root / "noisy").is_dir():
-        pytest.skip("the datasets are not built; run python -m tdadyn.synthetic.build")
-    return build_artefact(config)
+    """The artefact **as committed**, not a fresh build.
+
+    Reading it keeps most of these tests instant and makes them check the file the
+    repository actually carries.  Whether that file is current is a separate question, and
+    :func:`test_a_rebuild_reproduces_the_same_digest` is where it is asked — with one
+    rebuild rather than one per test.
+    """
+    path = config.output_root / RESULTS_DIR / ARTEFACT_FILE
+    if not path.exists():
+        pytest.skip("the artefact is not built; run make results")
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 # --- the digest ---------------------------------------------------------------------
@@ -47,12 +55,18 @@ def artefact(config):
 def test_a_rebuild_reproduces_the_same_digest(artefact, config):
     """Within one environment, as ``docs/data.md`` §5 promises for the manifest.
 
-    The whole point of the artefact is that its numbers can be compared against a later run.
-    A digest that moved on every rebuild would make that comparison impossible and would be
-    noticed only when someone tried it.
+    Two things at once, and both matter.  The digest must not move between runs, or the
+    numbers of one run could never be compared with another's.  And the committed file must
+    be the one this code produces, or the repository carries a report of something else.
+
+    This is the expensive test of the target — one full rebuild, most of it the oracle
+    cross-check — and it is the price of the artefact being reproducible rather than merely
+    present.
     """
-    again = build_artefact(config)
-    assert again["content_sha256"] == artefact["content_sha256"]
+    if not (config.output_root / "noisy").is_dir():
+        pytest.skip("the datasets are not built; run python -m tdadyn.synthetic.build")
+    rebuilt = build_artefact(config)
+    assert rebuilt["content_sha256"] == artefact["content_sha256"]
 
 
 def test_the_digest_ignores_the_fields_that_cannot_be_reproduced(artefact):
@@ -125,8 +139,14 @@ def test_the_agreement_section_counts_bars_rather_than_saying_ok(artefact):
     """
     agreement = artefact["agreement"]
     assert agreement["discrepancies"] == 0
-    assert agreement["bars_compared"] > 0
-    assert len(agreement["datasets"]) == 2
+    assert agreement["datasets"] == len(artefact["datasets"])
+
+    # Checked on every dataset, not only where the barcode has four bars: an adapter error
+    # is likelier to show where a noisy set produces nine hundred.
+    assert agreement["bars_compared"] > 3000
+    for entry in artefact["datasets"]:
+        assert entry["oracle_agreement"]["discrepancies"] == 0, entry["dataset_id"]
+        assert entry["oracle_agreement"]["bars"] >= 0
 
 
 def test_the_metrics_are_broken_down_by_dimension(artefact):
@@ -180,14 +200,19 @@ def test_the_format_version_is_recorded(artefact):
 # --- the command line ---------------------------------------------------------------
 
 
-def test_the_flag_decides_whether_a_file_is_written(config, tmp_path, capsys):
+def test_the_flag_decides_whether_a_file_is_written(artefact, tmp_path, capsys, monkeypatch):
     """As in ``synthetic.build``: the run prints, the flag writes.
 
     The artefact must be produced by the build and never as a side effect of the tests
     (rule of S9), so the writing has to be something one asks for.
+
+    The computation is stubbed out with the committed artefact: what is under test here is
+    the plumbing of the flag, and rebuilding for it would add five minutes to a check that
+    does not look at a single number.
     """
-    if not (config.output_root / "noisy").is_dir():
-        pytest.skip("the datasets are not built")
+    import tdadyn.results as module
+
+    monkeypatch.setattr(module, "build_artefact", lambda config: artefact)
     arguments = ["--config", str(REPO_ROOT / "config.yaml"), "--output-root", str(tmp_path)]
 
     main(arguments)

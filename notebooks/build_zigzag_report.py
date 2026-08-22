@@ -88,10 +88,20 @@ md("""---
 
 code('''a = ART["agreement"]
 print("сверка оракул <-> Dionysus, бар в бар с кратностями:")
-for name in a["datasets"]:
-    print(f"  {name.split('_N')[0]}")
+print(f"  наборов      : {a['datasets']}")
 print(f"  сверено баров: {a['bars_compared']}")
-print(f"  расхождений  : {a['discrepancies']}")'''),
+print(f"  расхождений  : {a['discrepancies']}")
+print()
+worst = max(ART["datasets"], key=lambda e: e["oracle_agreement"]["bars"])
+print(f"самый плотный барштрих-код: {worst['dataset_id'].split('_seed')[0][:52]}")
+print(f"  {worst['oracle_agreement']['bars']} баров, "
+      f"{worst['oracle_agreement']['discrepancies']} расхождений")'''),
+
+md("""Сверка идёт по **всем** наборам, а не только по двум чистым. Проверять согласие там,
+где в барштрих-коде четыре бара, — слабейшая версия утверждения: ошибка адаптера (порядок,
+интервалы присутствия, перевод полуоткрытого конца) вероятнее проявится там, где зашумлённый
+набор даёт девятьсот. Это большая часть цены `make results` — 265 с из примерно пяти минут —
+и та часть, которую стоит платить."""),
 
 md("""### 2.1. Пара 12↔41
 
@@ -217,16 +227,20 @@ md("""---
 ## 6. Деградация под шумом"""),
 
 code('''rows = sorted(NOISY, key=lambda e: (e["noise"]["kind"], e["base"], e["noise"]["level"]))
-print(f"{'механизм':<10}{'база':<17}{'ур.':<7}{'баров':<8}{'recall':<9}"
-      f"{'precision':<12}{'невид.':<8}{'эфем. вне пролога'}")
+print(f"{'механизм':<10}{'база':<17}{'ур.':<6}{'баров':<7}{'recall':<8}{'precision':<11}"
+      f"{'невид.':<8}{'цензур.':<9}{'полуцел.':<10}{'эфем. вне пролога'}")
 for e in rows:
     m, k = e["metrics"], e["counters"]
     bars = sum(len(v) for v in e["barcode"].values())
     print(f"{e['noise']['kind'][:9]:<10}{e['base'].split('_N')[0]:<17}"
-          f"{e['noise']['level']:<7}{bars:<8}{m['recall']:<9.3f}{m['precision']:<12.4f}"
-          f"{k['invisible_bars']:<8}{k['ephemeral_outside_prologue']}")'''),
+          f"{e['noise']['level']:<6}{bars:<7}{m['recall']:<8.3f}{m['precision']:<11.4f}"
+          f"{k['invisible_bars']:<8}{k['censored_ends']:<9}"
+          f"{k['events_from_half_integer_ends']:<10}{k['ephemeral_outside_prologue']}")'''),
 
-md("""Три наблюдения.
+md("""Все четыре счётчика раздела 4 приведены и для зашумлённых наборов, включая нулевые:
+величина, которой нет в таблице, неотличима от величины, которую не смотрели.
+
+Три наблюдения.
 
 **recall падает медленно, precision обваливается.** У `cycle_lifecycle` точность доходит до
 0.17%: алгоритм не теряет события так быстро, как наводняет лог ложными.

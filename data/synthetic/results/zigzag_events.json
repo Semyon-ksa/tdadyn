@@ -1,13 +1,10 @@
 {
   "agreement": {
-    "bars_compared": 7,
-    "datasets": [
-      "cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201",
-      "geometric_loop_N24_T60_eps0.8_gap1.2_R1-1.4-1_sched20-45_seed20260201"
-    ],
+    "bars_compared": 3192,
+    "datasets": 18,
     "discrepancies": 0
   },
-  "content_sha256": "113f44db8e18e41bf60559beea4bf795377979b886ad17b569773b4abdbe2f07",
+  "content_sha256": "6be89481b849170e5db7e22ea0d17e9a2143f7c8950cf27cde006a6c1a25d145",
   "convention": {
     "backend": "dionysus",
     "coeff_field": 2,
@@ -129,7 +126,11 @@
         "recall": 1.0
       },
       "n_events": 6,
-      "noise": null
+      "noise": null,
+      "oracle_agreement": {
+        "bars": 4,
+        "discrepancies": 0
+      }
     },
     {
       "barcode": {
@@ -212,7 +213,11 @@
         "recall": 1.0
       },
       "n_events": 4,
-      "noise": null
+      "noise": null,
+      "oracle_agreement": {
+        "bars": 3,
+        "discrepancies": 0
+      }
     },
     {
       "barcode": {
@@ -282,6 +287,10 @@
       "noise": {
         "kind": "missing_edges",
         "level": 0.02
+      },
+      "oracle_agreement": {
+        "bars": 4,
+        "discrepancies": 0
       }
     },
     {
@@ -580,6 +589,10 @@
       "noise": {
         "kind": "missing_edges",
         "level": 0.05
+      },
+      "oracle_agreement": {
+        "bars": 61,
+        "discrepancies": 0
       }
     },
     {
@@ -1086,6 +1099,10 @@
       "noise": {
         "kind": "missing_edges",
         "level": 0.1
+      },
+      "oracle_agreement": {
+        "bars": 113,
+        "discrepancies": 0
       }
     },
     {
@@ -1156,6 +1173,10 @@
       "noise": {
         "kind": "missing_edges",
         "level": 0.0
+      },
+      "oracle_agreement": {
+        "bars": 4,
+        "discrepancies": 0
       }
     },
     {
@@ -1313,6 +1334,10 @@
       "noise": {
         "kind": "missing_edges",
         "level": 0.02
+      },
+      "oracle_agreement": {
+        "bars": 28,
+        "discrepancies": 0
       }
     },
     {
@@ -1558,6 +1583,10 @@
       "noise": {
         "kind": "missing_edges",
         "level": 0.05
+      },
+      "oracle_agreement": {
+        "bars": 50,
+        "discrepancies": 0
       }
     },
     {
@@ -1991,6 +2020,10 @@
       "noise": {
         "kind": "missing_edges",
         "level": 0.1
+      },
+      "oracle_agreement": {
+        "bars": 97,
+        "discrepancies": 0
       }
     },
     {
@@ -2048,6 +2081,10 @@
       "noise": {
         "kind": "missing_edges",
         "level": 0.0
+      },
+      "oracle_agreement": {
+        "bars": 3,
+        "discrepancies": 0
       }
     },
     {
@@ -3178,6 +3215,10 @@
       "noise": {
         "kind": "spurious_edges",
         "level": 0.02
+      },
+      "oracle_agreement": {
+        "bars": 269,
+        "discrepancies": 0
       }
     },
     {
@@ -5500,6 +5541,10 @@
       "noise": {
         "kind": "spurious_edges",
         "level": 0.05
+      },
+      "oracle_agreement": {
+        "bars": 567,
+        "discrepancies": 0
       }
     },
     {
@@ -9214,6 +9259,10 @@
       "noise": {
         "kind": "spurious_edges",
         "level": 0.1
+      },
+      "oracle_agreement": {
+        "bars": 915,
+        "discrepancies": 0
       }
     },
     {
@@ -9284,6 +9333,10 @@
       "noise": {
         "kind": "spurious_edges",
         "level": 0.0
+      },
+      "oracle_agreement": {
+        "bars": 4,
+        "discrepancies": 0
       }
     },
     {
@@ -10125,6 +10178,10 @@
       "noise": {
         "kind": "spurious_edges",
         "level": 0.02
+      },
+      "oracle_agreement": {
+        "bars": 199,
+        "discrepancies": 0
       }
     },
     {
@@ -11750,6 +11807,10 @@
       "noise": {
         "kind": "spurious_edges",
         "level": 0.05
+      },
+      "oracle_agreement": {
+        "bars": 395,
+        "discrepancies": 0
       }
     },
     {
@@ -13687,6 +13748,10 @@
       "noise": {
         "kind": "spurious_edges",
         "level": 0.1
+      },
+      "oracle_agreement": {
+        "bars": 473,
+        "discrepancies": 0
       }
     },
     {
@@ -13744,11 +13809,15 @@
       "noise": {
         "kind": "spurious_edges",
         "level": 0.0
+      },
+      "oracle_agreement": {
+        "bars": 3,
+        "discrepancies": 0
       }
     }
   ],
   "format_version": 1,
-  "generated_at": "2026-08-22T22:06:18Z",
+  "generated_at": "2026-08-22T22:34:06Z",
   "null_model": {
     "events": 46323,
     "events_by_dimension": {

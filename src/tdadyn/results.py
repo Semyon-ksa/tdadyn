@@ -118,7 +118,11 @@ def build_artefact(config: Config) -> dict:
         },
         "datasets": datasets,
         "null_model": _null_entry(config),
-        "agreement": _agreement_entry(clean, config),
+        "agreement": {
+            "datasets": len(datasets),
+            "bars_compared": sum(e["oracle_agreement"]["bars"] for e in datasets),
+            "discrepancies": sum(e["oracle_agreement"]["discrepancies"] for e in datasets),
+        },
     }
     payload = jsonify("artefact", payload)
     payload["content_sha256"] = artefact_digest(payload)
@@ -199,8 +203,8 @@ def _common(dataset, report, config: Config, *, with_events: bool) -> dict:
         max_nodes=config.topology_check.reference_max_nodes,
     )
     indices = index_set(len(dataset.snapshots))
-    barcodes = dionysus_barcode([diagram[index] for index in indices],
-                                max_homology_dim=ceiling)
+    complexes = [diagram[index] for index in indices]
+    barcodes = dionysus_barcode(complexes, max_homology_dim=ceiling)
     events = [
         {
             "snapshot": event.snapshot,
@@ -219,6 +223,7 @@ def _common(dataset, report, config: Config, *, with_events: bool) -> dict:
             str(dim): [[birth, death] for birth, death in bars]
             for dim, bars in barcodes.items()
         },
+        "oracle_agreement": _agreement(complexes, barcodes, ceiling),
         "n_events": len(events),
         "events": events if with_events else None,
         "metrics": _metrics(report.metrics),
@@ -231,6 +236,29 @@ def _common(dataset, report, config: Config, *, with_events: bool) -> dict:
             "ephemeral_outside_prologue": report.ephemeral_outside_prologue(),
         },
     }
+
+
+def _agreement(complexes, barcodes, ceiling: int) -> dict:
+    """Oracle against backend, bar for bar, on **every** dataset — not only the clean ones.
+
+    The claim of Result 2 is that two independent computations agree, so the evidence belongs
+    in the artefact rather than in the test suite's word for it.  Checking it only where the
+    barcode has four bars would be the weakest available version of that claim: an error in
+    the adapter — ordering, presence runs, the half-open translation — is far likelier to
+    show where a noisy dataset produces nine hundred.
+
+    Measured: 265 s across the sixteen noisy datasets, 89 s of it on the worst one.  That is
+    most of what ``make results`` costs, and it is the part worth paying for.
+    """
+    from tdadyn.reference import barcode, module_from_complexes
+
+    compared = discrepancies = 0
+    for dim in range(ceiling + 1):
+        oracle = barcode(module_from_complexes(complexes, dim))
+        compared += len(oracle)
+        if tuple(barcodes[dim]) != oracle:
+            discrepancies += 1
+    return {"bars": compared, "discrepancies": discrepancies}
 
 
 def _metrics(metrics) -> dict:
@@ -277,36 +305,6 @@ def _null_entry(config: Config) -> dict:
                                 for dim, count in measurement.events_by_dimension.items()},
         "events_per_snapshot": measurement.events_per_snapshot,
     }
-
-
-def _agreement_entry(clean: dict, config: Config) -> dict:
-    """Oracle against backend, bar for bar, on the datasets that carry a truth.
-
-    Included in the artefact rather than left to the tests: the claim of Result 2 is that two
-    independent computations agree, and an artefact that omits the evidence asks the reader
-    to take the test suite's word for it.
-    """
-    from tdadyn.reference import barcode, module_from_complexes
-
-    ceiling = config.zigzag.max_homology_dim
-    compared = discrepancies = 0
-    names = []
-    for dataset_id, dataset in clean.items():
-        diagram = zigzag_complexes(
-            dataset,
-            max_homology_dim=ceiling,
-            max_nodes=config.topology_check.reference_max_nodes,
-        )
-        complexes = [diagram[index] for index in index_set(len(dataset.snapshots))]
-        backend = dionysus_barcode(complexes, max_homology_dim=ceiling)
-        for dim in range(ceiling + 1):
-            oracle = barcode(module_from_complexes(complexes, dim))
-            compared += len(oracle)
-            if tuple(backend[dim]) != oracle:
-                discrepancies += 1
-        names.append(dataset_id)
-    return {"datasets": sorted(names), "bars_compared": compared,
-            "discrepancies": discrepancies}
 
 
 def _utc_now() -> str:
@@ -372,7 +370,8 @@ def _print_tables(artefact: dict) -> None:
               f"({rate['hits']}/{rate['trials']}, 95% [{low:.4f}, {high:.4f}])")
     print(f"null, events per snapshot: {null['events_per_snapshot']:.1f}")
     agreement = artefact["agreement"]
-    print(f"oracle vs backend: {agreement['bars_compared']} bars, "
+    print(f"oracle vs backend: {agreement['bars_compared']} bars over "
+          f"{agreement['datasets']} datasets, "
           f"{agreement['discrepancies']} discrepancies")
 
 
