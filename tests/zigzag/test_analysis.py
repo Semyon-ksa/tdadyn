@@ -12,6 +12,8 @@ import pytest
 
 from tdadyn.zigzag.analysis import (
     FalsePositiveRate,
+    analyse,
+    ephemeral_counts,
     wilson_interval,
     zero_hits_upper_bound,
 )
@@ -83,3 +85,58 @@ def test_impossible_counts_are_refused():
         FalsePositiveRate(hits=1, trials=0)
     with pytest.raises(ValueError, match="hits"):
         FalsePositiveRate(hits=61, trials=60)
+
+
+# --- the pipeline on one dataset ----------------------------------------------------
+
+DATASETS = pytest.mark.slow_zigzag
+
+
+@DATASETS
+def test_the_pipeline_on_a_clean_dataset_reproduces_result_two(
+    family_two_dataset, config, zigzag_of
+):
+    report = analyse(
+        family_two_dataset, config=config, truth=family_two_dataset.ground_truth.events
+    )
+    assert report.metrics.recall == pytest.approx(1.0)
+    assert report.metrics.precision == pytest.approx(1.0)
+    assert report.invisible_bars == 0
+    assert report.ephemeral_bars is None, "the fine path was not asked for"
+
+
+@DATASETS
+def test_the_fine_path_fills_in_the_ephemeral_count(cycle_lifecycle, config):
+    """Off by default, and ``None`` rather than zero when it was not run.
+
+    Zero for "we did not look" is the class of number this project has spent sessions
+    removing; the report says so instead.
+    """
+    blind = analyse(cycle_lifecycle, config=config,
+                    truth=cycle_lifecycle.ground_truth.events)
+    full = analyse(cycle_lifecycle, config=config,
+                   truth=cycle_lifecycle.ground_truth.events, with_fine_path=True)
+    assert blind.ephemeral_bars is None
+    assert full.ephemeral_bars == 23
+    assert full.ephemeral_outside_prologue() == 0
+
+
+@DATASETS
+def test_the_diagram_is_built_once(cycle_lifecycle, config, monkeypatch):
+    """The mistake made while measuring for this session, pinned so it cannot come back.
+
+    Indexing the diagram inside a comprehension over the indices rebuilds the whole thing
+    per index — 119 times — and turns tenths of a second into seconds.
+    """
+    import tdadyn.zigzag.analysis as module
+
+    calls = []
+    original = module.zigzag_complexes
+
+    def counted(*args, **kwargs):
+        calls.append(1)
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(module, "zigzag_complexes", counted)
+    analyse(cycle_lifecycle, config=config, truth=cycle_lifecycle.ground_truth.events)
+    assert len(calls) == 1

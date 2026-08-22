@@ -156,3 +156,104 @@ def _z_for(confidence: float) -> float:
         else:
             high = middle
     return (low + high) / 2
+
+
+# --- the pipeline on one dataset ----------------------------------------------------
+
+
+def analyse(dataset, *, config, truth, with_fine_path: bool = False) -> EventReport:
+    """Run the whole zigzag on one dataset and report what §6 asks for.
+
+    Parameters
+    ----------
+    dataset : DynamicGraphDataset
+        Any dataset whose truth records ``edge_rule`` and ``edge_threshold``.
+    config : Config
+        Supplies ``zigzag.max_homology_dim``, the matching switches and the node limit.
+    truth : sequence
+        The true event log, passed in rather than read off the dataset: a noisy dataset
+        carries none — its ``truth_kind`` is ``noise_level`` — and its events belong to the
+        base named in ``noise_level["base"]``.  A null dataset's log is empty, which is the
+        whole point of it.
+    with_fine_path : bool, default False
+        Also run the backend over the operation stream, which is the only way ephemeral bars
+        are visible.  Off by default because it doubles the work for a number many callers
+        do not need; left off, the report says ``None`` rather than zero.
+
+    Returns
+    -------
+    EventReport
+        Metrics plus the counters of §6.
+
+    Notes
+    -----
+    The diagram is built **once**.  Writing ``zigzag_complexes(dataset, ...)[index]`` inside
+    a comprehension over the indices rebuilds all of it per index and turns 0.08 s into 8 s;
+    that mistake was made while measuring for this session and is worth naming.
+    """
+    ceiling = config.zigzag.max_homology_dim
+    build = {"max_homology_dim": ceiling,
+             "max_nodes": config.topology_check.reference_max_nodes}
+    diagram = zigzag_complexes(dataset, **build)
+    indices = index_set(len(dataset.snapshots))
+    barcodes = dionysus_barcode([diagram[index] for index in indices],
+                                max_homology_dim=ceiling)
+    log = event_log(barcodes, indices=indices)
+
+    ephemeral = in_prologue = None
+    if with_fine_path:
+        ephemeral, in_prologue = ephemeral_counts(diagram, max_homology_dim=ceiling)
+
+    matching = config.zigzag.event_matching
+    return event_report(
+        log=log,
+        truth=truth,
+        tolerance=matching.tolerance,
+        match_dimension=matching.match_dimension,
+        match_type=matching.match_type,
+        ephemeral_bars=ephemeral,
+        ephemeral_in_prologue=in_prologue,
+    )
+
+
+def ephemeral_counts(diagram, *, max_homology_dim: int) -> tuple[int, int]:
+    """Ephemeral bars of a diagram, and how many of them belong to the prologue.
+
+    Returns
+    -------
+    tuple of int
+        Total, and the part that lies inside the assembly of the first complex.
+
+    Notes
+    -----
+    Ephemeral bars are born and die inside one transition, so no index of the diagram ever
+    sees them and neither the coarse barcode nor the oracle can produce them.  They exist
+    only in the fine indexing, one time per operation.
+
+    The two numbers are returned separately because they mean different things.  The
+    prologue builds :math:`K_0` from nothing, so its ephemeral bars count the order of that
+    assembly — lexicographic, fixed in Z1, arbitrary in substance.  Measured across the
+    noise levels the prologue part drifts by units while the rest grows by orders, so a
+    total would report the assembly order as if it were the signal.
+    """
+    from tdadyn.reference import SimplicialComplex
+
+    stream = operation_stream(diagram)
+    present: set[tuple[int, ...]] = set()
+    states = [SimplicialComplex(faces={})]
+    for operation in stream.operations:
+        if operation.kind == "insert":
+            present.add(operation.simplex)
+        else:
+            present.discard(operation.simplex)
+        states.append(SimplicialComplex.from_simplices(present))
+
+    fine = dionysus_barcode(states, max_homology_dim=max_homology_dim)
+    prologue = len(stream.prologue)
+    ephemeral = [
+        (birth, death)
+        for dim in fine
+        for birth, death in fine[dim]
+        if coarse_bar_of(stream, birth, death) is None
+    ]
+    return len(ephemeral), sum(1 for _, death in ephemeral if death <= prologue)
