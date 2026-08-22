@@ -257,3 +257,97 @@ def ephemeral_counts(diagram, *, max_homology_dim: int) -> tuple[int, int]:
         if coarse_bar_of(stream, birth, death) is None
     ]
     return len(ephemeral), sum(1 for _, death in ephemeral if death <= prologue)
+
+
+# --- null models --------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class NullMeasurement:
+    """What a null model lets you measure: a rate, not an absence.
+
+    The truth of a null dataset is that there is no schedule and the event log is empty
+    (``method.md`` §4.2), so **every** uncensored event is a false positive.  What the
+    dataset cannot do is establish that there are none; it establishes how often there are.
+    """
+
+    per_snapshot: FalsePositiveRate
+    per_realisation: FalsePositiveRate
+    events: int
+    events_by_dimension: dict[int, int]
+
+    @property
+    def events_per_snapshot(self) -> float:
+        """Reported next to the rate because the rate saturates.
+
+        At 0.98 the proportion of snapshots that fire says almost nothing about magnitude;
+        this says the algorithm reports about thirteen events on each of them.
+        """
+        return self.events / self.per_snapshot.trials
+
+
+def measure_null(datasets, *, config) -> NullMeasurement:
+    """Measure the false-positive rate of the event detector on null datasets.
+
+    Parameters
+    ----------
+    datasets : iterable of DynamicGraphDataset
+        Realisations of the null model; more than one, because a rate taken on a single
+        realisation is the estimate S8 showed to be worthless.
+    config : Config
+
+    Returns
+    -------
+    NullMeasurement
+        Rates per snapshot and per realisation, with their denominators attached.
+
+    Notes
+    -----
+    Two denominators, and both are reported because neither alone is honest.
+
+    * **Per snapshot** is what ``docs/zigzag.md`` §6 asks for, and its trials are *not*
+      independent: neighbouring complexes share edges, so an event at one snapshot makes one
+      at the next more likely, and the Wilson interval is narrower than the truth.
+    * **Per realisation** has independent trials — each is its own random stream — but far
+      fewer of them, so the interval is wide.  It is the conservative reading.
+
+    The threshold ``null_models.max_false_positive_rate`` is **not** consulted.  It is
+    calibrated for the significance criterion on family-1 point clouds (``method.md`` §1.2a)
+    — the share of realisations where that criterion invented a feature — and this is the
+    share of snapshots where the zigzag reports an event.  Comparing them would declare a
+    failure by measuring two different things.
+    """
+    fired = snapshots = events = 0
+    realisations = firing_realisations = 0
+    by_dimension: dict[int, int] = {}
+    for dataset in datasets:
+        report_log = _null_log(dataset, config=config)
+        uncensored = report_log.uncensored()
+        events += len(uncensored)
+        for event in uncensored:
+            by_dimension[event.dim] = by_dimension.get(event.dim, 0) + 1
+        firing = {event.snapshot for event in uncensored}
+        fired += len(firing)
+        snapshots += len(dataset.snapshots)
+        realisations += 1
+        firing_realisations += 1 if firing else 0
+
+    return NullMeasurement(
+        per_snapshot=FalsePositiveRate(hits=fired, trials=snapshots),
+        per_realisation=FalsePositiveRate(hits=firing_realisations, trials=realisations),
+        events=events,
+        events_by_dimension=dict(sorted(by_dimension.items())),
+    )
+
+
+def _null_log(dataset, *, config) -> EventLog:
+    ceiling = config.zigzag.max_homology_dim
+    diagram = zigzag_complexes(
+        dataset,
+        max_homology_dim=ceiling,
+        max_nodes=config.topology_check.reference_max_nodes,
+    )
+    indices = index_set(len(dataset.snapshots))
+    barcodes = dionysus_barcode([diagram[index] for index in indices],
+                                max_homology_dim=ceiling)
+    return event_log(barcodes, indices=indices)

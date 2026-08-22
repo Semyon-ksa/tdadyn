@@ -9,8 +9,10 @@ through :mod:`tdadyn.core` and the complexes are built by :mod:`tdadyn.reference
 
 from .analysis import (
     FalsePositiveRate,
+    NullMeasurement,
     analyse,
     ephemeral_counts,
+    measure_null,
     wilson_interval,
     zero_hits_upper_bound,
 )
@@ -49,6 +51,7 @@ __all__ = [
     "EventReport",
     "FalsePositiveRate",
     "Match",
+    "NullMeasurement",
     "PredictedEvent",
     "Operation",
     "OperationStream",
@@ -63,6 +66,7 @@ __all__ = [
     "events_from_barcode",
     "match_events",
     "index_set",
+    "measure_null",
     "presence_runs",
     "wilson_interval",
     "zero_hits_upper_bound",
