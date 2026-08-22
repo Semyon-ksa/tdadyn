@@ -17,6 +17,7 @@ from tdadyn.zigzag.events import (
     PredictedEvent,
     event_log,
     event_metrics,
+    event_report,
     events_from_barcode,
     match_events,
 )
@@ -236,3 +237,178 @@ def test_metrics_of_an_empty_truth_are_not_a_division_by_zero():
     metrics = event_metrics((), (), tolerance=0)
     assert metrics.recall is None
     assert metrics.precision is None
+
+
+# --- on the datasets: this is Result 2 ----------------------------------------------
+
+
+DATASET_TESTS = pytest.mark.slow_zigzag
+
+
+def log_of(dataset, config, zigzag_of):
+    complexes, indices = zigzag_of.complexes(dataset)
+    bars = {
+        dim: zigzag_of.bars(dataset, dim)
+        for dim in range(config.zigzag.max_homology_dim + 1)
+    }
+    return event_log(bars, indices=indices), indices
+
+
+@DATASET_TESTS
+def test_every_event_of_the_truth_log_is_found_and_nothing_else_is(
+    family_two_dataset, config, zigzag_of
+):
+    """recall and precision at :math:`\\tau = 0`, the headline of Result 2.
+
+    Both come out at one, and that is the **expected** outcome rather than an achievement:
+    the datasets are constructed and the algorithm is exact.  What makes the metric worth
+    having is that it stops being one under noise — measured at precision 4/120 on
+    ``spurious_edges`` at level 0.02, which is Z5's number, not this one.
+    """
+    log, _ = log_of(family_two_dataset, config, zigzag_of)
+    metrics = event_metrics(
+        log.uncensored(),
+        family_two_dataset.ground_truth.events,
+        tolerance=config.zigzag.event_matching.tolerance,
+        match_dimension=config.zigzag.event_matching.match_dimension,
+        match_type=config.zigzag.event_matching.match_type,
+    )
+    assert metrics.recall == pytest.approx(1.0)
+    assert metrics.precision == pytest.approx(1.0)
+    assert metrics.max_localisation_error == 0
+
+    for dim, per in metrics.by_dimension.items():
+        if per.n_truth:
+            assert per.recall == pytest.approx(1.0), f"H_{dim}"
+        if per.n_predicted:
+            assert per.precision == pytest.approx(1.0), f"H_{dim}"
+
+
+@DATASET_TESTS
+def test_the_event_log_cannot_tell_the_two_pairings_apart(cycle_lifecycle, config, zigzag_of):
+    """The boundary of Result 2, pinned rather than left to the reader.
+
+    An event does not remember which bar produced it, so a log cannot separate the correct
+    pairing from the crossed one — both give birth 12, birth 27, death 41.  recall and
+    precision therefore do **not** check the 12<->41 pair; the barcode comparison does, in
+    Z2 by algebra and in Z3 against the backend.
+
+    Same blindness as the Betti curve in S6 and the coverings in §3.4, one level further
+    out: curve, then coverings, then the event log.
+    """
+    _, indices = zigzag_of.complexes(cycle_lifecycle)
+    bars = zigzag_of.bars(cycle_lifecycle, 1)
+    births = sorted(birth for birth, _ in bars)
+    deaths = sorted(death for _, death in bars)
+    correct = ((births[0], deaths[0]), (births[1], deaths[1]))
+    crossed = ((births[0], deaths[1]), (births[1], deaths[0]))
+    assert tuple(sorted(bars)) == correct
+
+    def times(pairing):
+        log = events_from_barcode(pairing, indices=indices, dim=1)
+        return sorted((e.snapshot, e.type) for e in log.uncensored())
+
+    assert times(correct) == times(crossed)
+
+
+@DATASET_TESTS
+def test_the_report_lines_of_section_six(family_two_dataset, config, zigzag_of):
+    """Counters that describe the construction, not the accuracy.
+
+    Written as a table so a reader sees which are zero.  Invisible bars are zero on both
+    datasets, and that is a measurement about the union rule rather than an omission.
+    """
+    expected = {
+        "cycle_lifecycle": {"censored": 3, "invisible": 0, "half": 3},
+        "geometric_loop": {"censored": 4, "invisible": 0, "half": 2},
+    }[family_two_dataset.ground_truth.generator]
+
+    log, _ = log_of(family_two_dataset, config, zigzag_of)
+    assert log.censored_ends == expected["censored"]
+    assert log.invisible_bars == expected["invisible"]
+    assert log.from_half_integer_ends() == expected["half"]
+
+
+@DATASET_TESTS
+def test_no_event_lands_on_a_breathing_snapshot(geometric_loop, config, zigzag_of):
+    """``geometric_loop`` 4, 43, 56: the complex changes and nothing is reported.
+
+    Named snapshot by snapshot (``docs/zigzag.md`` §5.4).  A detector that fired on any
+    change of the complex would be caught exactly here.
+    """
+    log, _ = log_of(geometric_loop, config, zigzag_of)
+    assert {event.snapshot for event in log.events}.isdisjoint({4, 43, 56})
+
+
+@DATASET_TESTS
+def test_the_repeated_state_yields_two_separate_events(cycle_lifecycle, config, zigzag_of):
+    """Snapshots 41-47 and 55-59 are byte-identical, and 48 and 55 are still both reported.
+
+    Deduplicating states by graph identity would collapse the birth and the death of
+    :math:`H_0` into nothing (``method.md`` §2.1).
+    """
+    log, _ = log_of(cycle_lifecycle, config, zigzag_of)
+    zero_dim = {(e.snapshot, e.type) for e in log.uncensored() if e.dim == 0}
+    assert zero_dim == {(48, "birth"), (55, "death")}
+
+
+@DATASET_TESTS
+def test_the_whole_report_of_section_six(cycle_lifecycle, config, zigzag_of):
+    """One assembled report, with the ephemeral count coming off the fine path.
+
+    Ephemeral bars cannot be derived from the coarse barcode — no index of the diagram ever
+    sees them — so they are supplied by the caller, and the report says ``None`` rather than
+    zero when nobody ran the fine path.  Reporting zero for "we did not look" is the kind of
+    number this project has spent two sessions removing.
+    """
+    from tdadyn.reference import SimplicialComplex
+    from tdadyn.zigzag import (
+        coarse_bar_of,
+        dionysus_barcode,
+        operation_stream,
+        zigzag_complexes,
+    )
+
+    log, _ = log_of(cycle_lifecycle, config, zigzag_of)
+    blind = event_report(
+        log=log, truth=cycle_lifecycle.ground_truth.events,
+        tolerance=config.zigzag.event_matching.tolerance,
+    )
+    assert blind.ephemeral_bars is None
+    assert blind.ephemeral_outside_prologue() is None
+
+    stream = operation_stream(
+        zigzag_complexes(
+            cycle_lifecycle,
+            max_homology_dim=config.zigzag.max_homology_dim,
+            max_nodes=config.topology_check.reference_max_nodes,
+        )
+    )
+    present, states = set(), [SimplicialComplex(faces={})]
+    for operation in stream.operations:
+        if operation.kind == "insert":
+            present.add(operation.simplex)
+        else:
+            present.discard(operation.simplex)
+        states.append(SimplicialComplex.from_simplices(present))
+    fine = dionysus_barcode(states, max_homology_dim=config.zigzag.max_homology_dim)
+    ephemeral = [
+        (birth, death)
+        for dim in fine
+        for birth, death in fine[dim]
+        if coarse_bar_of(stream, birth, death) is None
+    ]
+    prologue = len(stream.prologue)
+
+    full = event_report(
+        log=log, truth=cycle_lifecycle.ground_truth.events,
+        tolerance=config.zigzag.event_matching.tolerance,
+        ephemeral_bars=len(ephemeral),
+        ephemeral_in_prologue=sum(1 for _, death in ephemeral if death <= prologue),
+    )
+    assert full.metrics.recall == pytest.approx(1.0)
+    assert full.metrics.precision == pytest.approx(1.0)
+    assert full.ephemeral_bars == 23
+    # Every one of them is an artefact of building the first complex, and none is about the
+    # data: the number that matters is the second.
+    assert full.ephemeral_outside_prologue() == 0

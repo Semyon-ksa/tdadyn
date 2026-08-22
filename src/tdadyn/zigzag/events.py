@@ -314,3 +314,81 @@ def _metrics(truth, predicted, matches) -> DimensionMetrics:
         mean_localisation_error=sum(deltas) / len(deltas) if deltas else 0.0,
         max_localisation_error=max(deltas) if deltas else 0,
     )
+
+
+@dataclass(frozen=True)
+class EventReport:
+    """Everything ``docs/zigzag.md`` §6 asks a run to report.
+
+    The counters are separate lines rather than part of the metrics on purpose: they
+    describe the **construction**, not the algorithm's accuracy.  Their value is that they
+    have to be known before any of this reaches a connectome — an invisible bar is a false
+    positive by construction, and the ephemeral count says how much of the answer depends on
+    the arbitrary order inside a transition.
+    """
+
+    metrics: EventMetrics
+    invisible_bars: int
+    censored_ends: int
+    events_from_half_integer_ends: int
+    ephemeral_bars: int | None
+    ephemeral_in_prologue: int | None
+
+    def ephemeral_outside_prologue(self) -> int | None:
+        """Ephemeral bars that are not an artefact of assembling the first complex.
+
+        The prologue builds :math:`K_0` from nothing, so its ephemeral bars count the order
+        of that assembly — lexicographic, fixed in Z1, and arbitrary in substance.
+        Publishing the total as a property of the dataset would report that order as data;
+        this is the half that is about the data.
+        """
+        if self.ephemeral_bars is None or self.ephemeral_in_prologue is None:
+            return None
+        return self.ephemeral_bars - self.ephemeral_in_prologue
+
+
+def event_report(
+    *,
+    log: EventLog,
+    truth,
+    tolerance: int,
+    match_dimension: bool = True,
+    match_type: bool = True,
+    ephemeral_bars: int | None = None,
+    ephemeral_in_prologue: int | None = None,
+) -> EventReport:
+    """Assemble everything §6 asks a run to report.
+
+    Parameters
+    ----------
+    log : EventLog
+        The predicted log; censored events are excluded from the metrics here.
+    truth : sequence
+        The true event log.  Passed in rather than read off a dataset because a noisy
+        dataset carries none: its ``truth_kind`` is ``noise_level`` and the events belong to
+        the base dataset named in ``noise_level["base"]``.  Z5 needs that, and a signature
+        that fetched the truth itself would not allow it.
+    tolerance, match_dimension, match_type : see :func:`match_events`
+    ephemeral_bars, ephemeral_in_prologue : int, optional
+        From the fine path — one time per operation rather than per coarse index.  Ephemeral
+        bars are invisible to the coarse path by construction, so they cannot be derived
+        here and are supplied by whoever ran the backend over the operation stream.  Left
+        as ``None`` the report says so instead of reporting zero.
+
+    Returns
+    -------
+    EventReport
+        Metrics and the counters.
+    """
+    metrics = event_metrics(
+        log.uncensored(), truth, tolerance=tolerance,
+        match_dimension=match_dimension, match_type=match_type,
+    )
+    return EventReport(
+        metrics=metrics,
+        invisible_bars=log.invisible_bars,
+        censored_ends=log.censored_ends,
+        events_from_half_integer_ends=log.from_half_integer_ends(),
+        ephemeral_bars=ephemeral_bars,
+        ephemeral_in_prologue=ephemeral_in_prologue,
+    )
