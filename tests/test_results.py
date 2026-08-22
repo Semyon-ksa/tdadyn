@@ -274,6 +274,24 @@ def test_the_report_notebook_is_executed_and_not_merely_written():
     assert all(cell["outputs"] for cell in code), "some cell was never executed"
 
 
+def test_the_html_export_carries_the_numbers(artefact):
+    """The HTML is the form the report is read and archived in, so it is checked too.
+
+    ``report.html`` of task 5 was produced by nbconvert while nbconvert was in no dependency
+    list at all — the export worked on one machine and nowhere else.  Here it is a step of
+    ``make report-zigzag`` and nbconvert is in the ``notebook`` extra.
+    """
+    html = REPO_ROOT / "notebooks" / "zigzag_report.html"
+    if not html.exists():
+        pytest.skip("the report is not exported; run make report-zigzag")
+    text = html.read_text(encoding="utf-8")
+    null = artefact["null_model"]["per_snapshot"]
+    assert f"{null['rate']:.4f}" in text
+    assert str(artefact["agreement"]["bars_compared"]) in text
+    # Bars are shown the way the documents write them, not as raw positions.
+    assert "11½" in text
+
+
 def test_the_makefile_builds_the_artefact_before_the_report():
     """Order matters: a report built from a stale artefact is the failure it exists to avoid."""
     makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")

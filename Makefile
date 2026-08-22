@@ -26,8 +26,9 @@ all: fast slow zigzag
 results:
 	$(PYTHON) -m tdadyn.results --config config.yaml --results
 
-## Отчёт Результата 2: собрать И ВЫПОЛНИТЬ. Без выполнения утверждение «каждое число —
-## вывод исполненной ячейки» не проверяемо, а отчёт Задачи 5 именно в таком состоянии.
+## Отчёт Результата 2: собрать, ВЫПОЛНИТЬ и выгрузить в HTML. Без выполнения утверждение
+## «каждое число — вывод исполненной ячейки» не проверяемо, а отчёт Задачи 5 именно в таком
+## состоянии: его html собран nbconvert'ом, которого не было в зависимостях.
 report-zigzag: results
 	$(PYTHON) notebooks/build_zigzag_report.py
 	cd notebooks && ../$(PYTHON) -c "import nbclient, nbformat; \
@@ -35,6 +36,8 @@ report-zigzag: results
 	  nbclient.NotebookClient(nb, timeout=600, kernel_name='python3').execute(); \
 	  nbformat.write(nb, 'zigzag_report.ipynb'); \
 	  print('выполнено:', sum(1 for c in nb.cells if c.cell_type == 'code'), 'ячеек кода')"
+	$(PYTHON) -m nbconvert --to html --embed-images \
+	  --output zigzag_report.html notebooks/zigzag_report.ipynb
 
 install:
 	$(PYTHON) -m pip install -e ".[dev]"

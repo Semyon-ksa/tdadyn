@@ -35,7 +35,16 @@ dev = ["pytest>=8.0"]
 zigzag = ["dionysus>=2.2"]
 # Отчётный ноутбук: notebooks/report.ipynb. Вынесено отдельно от dev, потому что
 # тестам это не нужно, а CI из-за jupyter тяжелеет заметно.
-notebook = ["matplotlib>=3.8", "nbformat>=5.9", "nbclient>=0.9", "ipykernel>=6.29"]
+# nbconvert добавлен в Z6: notebooks/report.html Задачи 5 им и собран, но в
+# зависимостях его не было — то есть отчёт не пересобирался инструментами
+# репозитория. Теперь `make report-zigzag` производит и ноутбук, и HTML.
+notebook = [
+    "matplotlib>=3.8",
+    "nbformat>=5.9",
+    "nbclient>=0.9",
+    "nbconvert>=7.0",
+    "ipykernel>=6.29",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]

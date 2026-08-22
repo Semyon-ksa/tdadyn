@@ -48,7 +48,7 @@ make zigzag  # зигзаг: оракул и бэкенды, нужен `make in
 ```bash
 make install-zigzag                # Dionysus 2, необязательная зависимость
 make results                       # артефакт Результата 2
-make report-zigzag                 # отчёт: собрать и выполнить
+make report-zigzag                 # отчёт: собрать, выполнить, выгрузить в HTML
 ```
 
 `make results` производит `data/synthetic/results/zigzag_events.json` (около пяти минут):
@@ -59,6 +59,9 @@ make report-zigzag                 # отчёт: собрать и выполн�
 
 **Отчётные числа производит сборка, а не тесты.** Отчёт `notebooks/zigzag_report.ipynb`
 читает артефакт и ничего не вычисляет, поэтому его проза не может разойтись с ним.
+`make report-zigzag` собирает ноутбук, **выполняет** его и выгружает
+`notebooks/zigzag_report.html`. HTML подгружает MathJax с CDN — формулы без сети покажутся
+исходным текстом, числа и таблицы от сети не зависят.
 
 Прямые вызовы — `pytest -q`, `pytest -m slow`, `pytest -m slow_zigzag`. Зигзаг-бэкенды
 необязательны: `pip install -e .` работает без них, и быстрый прогон тоже.
