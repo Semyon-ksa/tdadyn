@@ -139,3 +139,52 @@ def dionysus_barcode(complexes, *, max_homology_dim: int) -> dict[int, Barcode]:
     return barcodes
 
 
+
+
+def barcode_from(complexes, *, backend: str, max_homology_dim: int) -> dict[int, Barcode]:
+    """Compute the barcode with the implementation named by ``config.zigzag.backend``.
+
+    Parameters
+    ----------
+    complexes : sequence of SimplicialComplex
+        The diagram in index order.
+    backend : {'reference', 'dionysus'}
+        Which implementation to use.  ``'fzz'`` is accepted by the config schema but has no
+        adapter: it is not on PyPI and is built from source only if Dionysus fails to fit
+        the budget, which it does not (``docs/plan_task2.md`` §Z3).
+    max_homology_dim : int
+        Highest homology dimension to report.
+
+    Returns
+    -------
+    dict of int to Barcode
+        One barcode per dimension.
+
+    Notes
+    -----
+    ``'reference'`` selects the **oracle**, and the name is worth being careful about: the
+    oracle is path B, the independent check, not an implementation of the pipeline.  Choosing
+    it here means "take the answer from the checker", which is a legitimate thing to want and
+    is not the same as having checked anything.
+
+    For that reason the agreement tests do **not** go through this function.  They call both
+    implementations directly: a comparison routed through a switch would be testing the
+    switch.
+    """
+    if backend == "dionysus":
+        return dionysus_barcode(complexes, max_homology_dim=max_homology_dim)
+    if backend == "reference":
+        from tdadyn.reference import barcode, module_from_complexes
+
+        return {
+            dim: barcode(module_from_complexes(complexes, dim))
+            for dim in range(max_homology_dim + 1)
+        }
+    if backend == "fzz":
+        raise NotImplementedError(
+            "fast-zigzag has no adapter: it is absent from PyPI and is built from source "
+            "only if Dionysus does not fit the time budget, which it does — measured at "
+            "16 ms per dataset against seconds for the oracle. The check here is the "
+            "oracle, not a second backend (docs/zigzag.md 5.3)"
+        )
+    raise ValueError(f"unknown backend {backend!r}")

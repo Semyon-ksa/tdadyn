@@ -7,7 +7,7 @@ and the log there is fixed here until the reference says otherwise (``docs/zigza
 through :mod:`tdadyn.core` and the complexes are built by :mod:`tdadyn.reference`.
 """
 
-from .backend import dionysus_barcode, presence_runs
+from .backend import barcode_from, dionysus_barcode, presence_runs
 from .construction import UNION_RULE, snapshot_complex, union_complex, zigzag_complexes
 from .indices import CoarseIndex, index_set
 from .operations import (
@@ -25,6 +25,7 @@ __all__ = [
     "CoarseSpan",
     "Operation",
     "OperationStream",
+    "barcode_from",
     "coarse_bar_of",
     "dionysus_barcode",
     "index_set",

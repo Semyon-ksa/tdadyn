@@ -23,7 +23,7 @@ from tdadyn.zigzag import (
     presence_runs,
     zigzag_complexes,
 )
-from tdadyn.zigzag.backend import dionysus_barcode
+from tdadyn.zigzag.backend import barcode_from, dionysus_barcode
 
 pytestmark = pytest.mark.slow_zigzag
 
@@ -323,3 +323,39 @@ def test_no_bar_of_either_dataset_is_invisible(family_two_dataset, config, zigza
     for dim in range(config.zigzag.max_homology_dim + 1):
         for birth, death in zigzag_of.bars(family_two_dataset, dim):
             assert any(indices[p].is_snapshot for p in range(birth, death + 1))
+
+
+# --- the dispatcher -----------------------------------------------------------------
+
+
+def test_the_dispatcher_selects_the_implementation_the_config_names(
+    cycle_lifecycle, config, zigzag_of
+):
+    complexes, _ = zigzag_of.complexes(cycle_lifecycle)
+    ceiling = config.zigzag.max_homology_dim
+    through_backend = barcode_from(complexes, backend="dionysus", max_homology_dim=ceiling)
+    through_oracle = barcode_from(complexes, backend="reference", max_homology_dim=ceiling)
+    assert through_backend == through_oracle
+    assert through_oracle[1] == zigzag_of.bars(cycle_lifecycle, 1)
+
+
+def test_the_configured_backend_is_one_the_dispatcher_knows(config):
+    assert config.zigzag.backend in ("reference", "dionysus", "fzz")
+
+
+def test_fzz_says_why_it_is_absent_rather_than_failing_obscurely():
+    """It is accepted by the schema and has no adapter, and the message has to say why.
+
+    The reason is not that it is hard to install — it is that a second backend was never the
+    check.  The oracle computes the answer another way; a second implementation of the same
+    class of algorithm only adds a vote (``docs/zigzag.md`` §5.3).
+    """
+    with pytest.raises(NotImplementedError, match="oracle"):
+        barcode_from(toy(TWO_VERTICES, ONE_EDGE, TWO_VERTICES), backend="fzz",
+                     max_homology_dim=1)
+
+
+def test_an_unknown_backend_is_refused():
+    with pytest.raises(ValueError, match="unknown backend"):
+        barcode_from(toy(TWO_VERTICES, ONE_EDGE, TWO_VERTICES), backend="gudhi",
+                     max_homology_dim=1)
