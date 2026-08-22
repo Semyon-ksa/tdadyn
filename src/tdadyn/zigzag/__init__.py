@@ -7,6 +7,11 @@ and the log there is fixed here until the reference says otherwise (``docs/zigza
 through :mod:`tdadyn.core` and the complexes are built by :mod:`tdadyn.reference`.
 """
 
+from .analysis import (
+    FalsePositiveRate,
+    wilson_interval,
+    zero_hits_upper_bound,
+)
 from .backend import barcode_from, dionysus_barcode, presence_runs
 from .construction import UNION_RULE, snapshot_complex, union_complex, zigzag_complexes
 from .events import (
@@ -40,6 +45,7 @@ __all__ = [
     "EventLog",
     "EventMetrics",
     "EventReport",
+    "FalsePositiveRate",
     "Match",
     "PredictedEvent",
     "Operation",
@@ -54,6 +60,8 @@ __all__ = [
     "match_events",
     "index_set",
     "presence_runs",
+    "wilson_interval",
+    "zero_hits_upper_bound",
     "operation_stream",
     "replay",
     "snapshot_complex",
