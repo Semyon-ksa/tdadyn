@@ -147,6 +147,65 @@ class OperationStream:
         return CoarseSpan(first=self.indices[first], last=self.indices[last])
 
 
+def coarse_bar_of(
+    stream: OperationStream, birth: int, death: int
+) -> tuple[CoarseIndex, CoarseIndex] | None:
+    """Translate a bar given in operation counters into coarse indices.
+
+    Parameters
+    ----------
+    stream : OperationStream
+        The unfolding the counters refer to.
+    birth, death : int
+        Closed interval of operation counters, ``birth <= death``.
+
+    Returns
+    -------
+    tuple of CoarseIndex, or None
+        The first and last coarse index whose state lies inside the bar, or ``None`` when
+        no index does — an **ephemeral** bar, born and dead inside a single transition
+        (``docs/zigzag.md`` §2.3).
+
+    Notes
+    -----
+    The two ends are found by different rules, and the asymmetry is not an oversight: the
+    left end is the first index whose checkpoint is **at or after** ``birth``, the right end
+    the last whose checkpoint is **at or before** ``death``.  An index whose state is
+    reached before the class exists is not part of the bar, and neither is one reached after
+    it is gone.
+
+    :meth:`OperationStream.coarse_span_of` already gave the right end exactly; this is the
+    half it was missing.  The same asymmetry appears when a bar becomes an event
+    (``docs/zigzag.md`` §4.2) — both are asking where an interval is first and last visible
+    in the data.
+
+    Ephemeral bars are defined here and nowhere else.  Their number depends on the order of
+    operations within a dimension, which is fixed but arbitrary (§2.3), so it is a property
+    of the unfolding rather than of the data and has to be reported as such.
+    """
+    for name, value in (("birth", birth), ("death", death)):
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise TypeError(f"{name} must be an int, got {type(value).__name__}")
+        if value < 0:
+            raise ValueError(f"{name} must not be negative, got {value}")
+        if value > len(stream.operations):
+            raise ValueError(
+                f"{name} {value} lies beyond the stream of {len(stream.operations)} "
+                "operations"
+            )
+    if birth > death:
+        raise ValueError(f"birth {birth} lies after death {death}")
+
+    covered = [
+        position
+        for position, checkpoint in enumerate(stream.checkpoints)
+        if birth <= checkpoint <= death
+    ]
+    if not covered:
+        return None
+    return stream.indices[covered[0]], stream.indices[covered[-1]]
+
+
 def operation_stream(diagram: dict[CoarseIndex, SimplicialComplex]) -> OperationStream:
     """Unfold a diagram of complexes into elementary operations.
 

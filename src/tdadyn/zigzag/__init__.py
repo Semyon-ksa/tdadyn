@@ -13,6 +13,7 @@ from .operations import (
     CoarseSpan,
     Operation,
     OperationStream,
+    coarse_bar_of,
     operation_stream,
     replay,
 )
@@ -23,6 +24,7 @@ __all__ = [
     "CoarseSpan",
     "Operation",
     "OperationStream",
+    "coarse_bar_of",
     "index_set",
     "operation_stream",
     "replay",

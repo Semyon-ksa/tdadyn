@@ -14,6 +14,7 @@ import pytest
 from tdadyn.reference import SimplicialComplex
 from tdadyn.zigzag import (
     CoarseIndex,
+    coarse_bar_of,
     index_set,
     operation_stream,
     replay,
@@ -233,3 +234,57 @@ def test_a_counter_beyond_the_stream_is_refused(cycle_lifecycle, config):
         stream.coarse_span_of(len(stream.operations) + 1)
     with pytest.raises(ValueError, match="negative"):
         stream.coarse_span_of(-1)
+
+
+# --- fine bar to coarse bar ---------------------------------------------------------
+
+
+def test_a_bar_spanning_checkpoints_translates_to_the_indices_it_covers(
+    family_two_dataset, config
+):
+    """The other half of the counter translation, and the half Z1 did not build.
+
+    ``coarse_span_of(d).last`` was already the exact right end.  A bar needs a left end too
+    — the first index whose state has been reached at or after ``b`` — and the asymmetry
+    ("first at or after" on the left, "last at or before" on the right) is the same one the
+    event rule of ``docs/zigzag.md`` §4.2 has, for the same reason.
+    """
+    diagram = zigzag_complexes(family_two_dataset, **build_args(config))
+    stream = operation_stream(diagram)
+    indices = index_set(len(family_two_dataset.snapshots))
+
+    whole = coarse_bar_of(stream, 0, len(stream.operations))
+    assert whole == (indices[0], indices[-1])
+
+
+def test_a_bar_inside_one_block_is_ephemeral(cycle_lifecycle, config):
+    """No checkpoint inside the support means the class exists in no complex of the diagram.
+
+    That is the definition of ephemeral (``docs/zigzag.md`` §2.3), and it is stated here
+    once rather than re-derived wherever bars are counted.
+    """
+    diagram = zigzag_complexes(cycle_lifecycle, **build_args(config))
+    stream = operation_stream(diagram)
+    prologue = len(stream.prologue)
+    assert prologue > 2
+
+    assert coarse_bar_of(stream, 1, 2) is None
+    assert coarse_bar_of(stream, 0, prologue) is not None
+
+
+def test_the_translation_agrees_with_the_span_on_the_right_end(cycle_lifecycle, config):
+    diagram = zigzag_complexes(cycle_lifecycle, **build_args(config))
+    stream = operation_stream(diagram)
+    for counter in stream.checkpoints:
+        translated = coarse_bar_of(stream, 0, counter)
+        assert translated is not None
+        assert translated[1] == stream.coarse_span_of(counter).last
+
+
+def test_the_translation_refuses_a_backwards_or_out_of_range_bar(cycle_lifecycle, config):
+    diagram = zigzag_complexes(cycle_lifecycle, **build_args(config))
+    stream = operation_stream(diagram)
+    with pytest.raises(ValueError, match="birth"):
+        coarse_bar_of(stream, 5, 4)
+    with pytest.raises(ValueError, match="beyond"):
+        coarse_bar_of(stream, 0, len(stream.operations) + 1)
