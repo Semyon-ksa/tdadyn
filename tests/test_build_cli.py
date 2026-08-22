@@ -15,7 +15,8 @@ import json
 import pytest
 
 from tdadyn.core import entry_payload, read_manifest, truth_digest
-from tdadyn.synthetic.build import FAMILY_CHOICES, build_all, replace_output_root
+from tdadyn.core.config import replace_output_root
+from tdadyn.synthetic.build import FAMILY_CHOICES, build_all
 from tdadyn.core.io import GROUND_TRUTH_FILE, read_json
 from tdadyn.core.manifest import write_manifest
 

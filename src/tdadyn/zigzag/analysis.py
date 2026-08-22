@@ -64,7 +64,15 @@ def wilson_interval(
     half = z * math.sqrt(
         proportion * (1 - proportion) / trials + z * z / (4 * trials * trials)
     ) / denominator
-    return max(0.0, centre - half), min(1.0, centre + half)
+    lower, upper = max(0.0, centre - half), min(1.0, centre + half)
+    # At the ends the interval touches 0 and 1 exactly; floating point lands a couple of
+    # ulps short, and a bound that does not contain the rate it was computed from reads as
+    # a defect wherever it is printed.
+    if hits == 0:
+        lower = 0.0
+    if hits == trials:
+        upper = 1.0
+    return lower, upper
 
 
 def zero_hits_upper_bound(trials: int, *, confidence: float = DEFAULT_CONFIDENCE) -> float:

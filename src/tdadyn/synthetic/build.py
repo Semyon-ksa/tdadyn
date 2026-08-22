@@ -33,7 +33,7 @@ from .builders import (
     build_static_cloud,
     noise_stream,
 )
-from tdadyn.core.config import Config, load_config
+from tdadyn.core.config import Config, load_config, replace_output_root
 from tdadyn.core.contracts import Dataset
 from tdadyn.core.io import save_dataset
 from tdadyn.core.manifest import ManifestEntry, make_entry, write_manifest
@@ -288,18 +288,3 @@ def main(argv: list[str] | None = None) -> None:
     print(f"manifest -> {path}")
     if args.results:
         print(f"stability curve -> {write_stability(config)}")
-
-
-def replace_output_root(config: Config, output_root: Path) -> Config:
-    """Return the configuration with a different output root.
-
-    Used by ``--output-root`` and by the reproducibility test, which builds twice into
-    temporary directories rather than over the working data.
-    """
-    import dataclasses
-
-    return dataclasses.replace(config, output_root=output_root)
-
-
-if __name__ == "__main__":
-    main()

@@ -18,6 +18,14 @@ Two consequences the arrows encode, both of them load-bearing:
 The check parses the sources rather than inspecting ``sys.modules``: an imported module
 pulls in its own dependencies, so a runtime check would show every layer importing every
 other and prove nothing.
+
+**One module is deliberately outside the rule.**  :mod:`tdadyn.results` builds the artefact
+of Result 2, which needs the generators (to draw null realisations) and the algorithm (to
+measure them) at once.  It began inside ``zigzag`` and this guard rejected it, correctly: a
+zigzag that calls the generators is a zigzag making its own data.  A thing that needs both
+layers belongs above both, so it is a top-level module and not a layer — and the rule below
+names layers, which is why it is not caught.  That is the intended arrangement, not an
+oversight, and :func:`test_the_composition_root_is_the_only_module_above_the_layers` pins it.
 """
 
 from __future__ import annotations
@@ -96,6 +104,27 @@ def test_the_moved_names_are_not_reachable_through_synthetic():
         f"tdadyn.synthetic re-exports {leaked}; these live in tdadyn.core and a re-export "
         "hides the one direction of dependency the layering forbids"
     )
+
+
+def test_the_composition_root_is_the_only_module_above_the_layers():
+    """Exactly one module may know the generators and the algorithm at once.
+
+    A second one would mean the boundary is being routed around rather than crossed in a
+    named place, and the guard above would go on passing while it happened.
+    """
+    tops = sorted(
+        path.stem
+        for path in PACKAGE_ROOT.glob("*.py")
+        if path.name != "__init__.py"
+    )
+    assert tops == ["results"], (
+        f"top-level modules beside the layers: {tops}. Only the composition root belongs "
+        "here; anything else is a layer that was never declared"
+    )
+
+    imported = {module for _, module in imported_modules(PACKAGE_ROOT / "results.py")}
+    assert any(module.startswith("tdadyn.synthetic") for module in imported)
+    assert any(module.startswith("tdadyn.zigzag") for module in imported)
 
 
 def test_every_layer_named_in_the_rule_exists():

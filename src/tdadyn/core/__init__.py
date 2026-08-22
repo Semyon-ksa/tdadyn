@@ -15,7 +15,13 @@ family-1 point clouds and ``docs/zigzag.md`` §7 forbids inheriting them; leavin
 one layer up makes that ban structural rather than textual.
 """
 
-from .config import Config, ConfigError, load_config, parse_config
+from .config import (
+    Config,
+    ConfigError,
+    load_config,
+    parse_config,
+    replace_output_root,
+)
 from .contracts import (
     EDGE_RULES,
     EVENT_TYPES,
@@ -79,6 +85,7 @@ __all__ = [
     "make_entry",
     "parse_config",
     "read_json",
+    "replace_output_root",
     "read_manifest",
     "register_name_order",
     "rng_for",

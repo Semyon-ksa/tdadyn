@@ -11,6 +11,10 @@ data/synthetic/*
 !data/synthetic/results/
 data/synthetic/results/*
 !data/synthetic/results/stability.json
+# Отчётные числа Результата 2: производятся сборкой (tdadyn.zigzag.run --results).
+# Исключения здесь пофайловые, поэтому каждый новый артефакт надо открывать отдельно —
+# иначе он игнорируется молча, как это уже случилось с manifest.json.
+!data/synthetic/results/zigzag_events.json
 
 .venv/
 __pycache__/

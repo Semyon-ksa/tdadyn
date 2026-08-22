@@ -328,6 +328,7 @@ class EventReport:
     """
 
     metrics: EventMetrics
+    events: tuple[PredictedEvent, ...]
     invisible_bars: int
     censored_ends: int
     events_from_half_integer_ends: int
@@ -386,6 +387,7 @@ def event_report(
     )
     return EventReport(
         metrics=metrics,
+        events=log.events,
         invisible_bars=log.invisible_bars,
         censored_ends=log.censored_ends,
         events_from_half_integer_ends=log.from_half_integer_ends(),

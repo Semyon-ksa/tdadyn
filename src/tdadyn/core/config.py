@@ -461,6 +461,24 @@ def parse_config(raw: Mapping[str, Any], *, config_path: Path | str) -> Config:
     return config
 
 
+def replace_output_root(config: Config, output_root: Path) -> Config:
+    """Return the configuration with a different output root.
+
+    Used by ``--output-root`` in both command-line entry points and by the reproducibility
+    tests, which build twice into temporary directories rather than over the working data.
+    It lives here rather than beside one of them because it belongs to neither: it is a
+    property of the configuration, and two consumers of a helper in one layer is how a
+    layer starts importing another.
+    """
+    import dataclasses
+
+    return dataclasses.replace(config, output_root=output_root)
+
+
+if __name__ == "__main__":
+    main()
+
+
 def _topology_check(reader: _Reader) -> TopologyCheck:
     section = TopologyCheck(
         # docs/task.md fixes the maximum homology dimension at 2.
