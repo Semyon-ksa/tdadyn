@@ -245,17 +245,30 @@ def test_git_does_not_ignore_the_artefact():
 # --- the report ---------------------------------------------------------------------
 
 
-def test_the_report_reads_the_artefact_and_computes_nothing():
-    """Why the report cannot disagree with the artefact.
+def test_the_report_takes_its_numbers_from_the_artefact_and_its_pictures_from_the_data():
+    """The boundary the report is built on, stated so that it cannot erode quietly.
 
-    S9 caught the same quantity printed with two different values in three places.  Here the
-    report has no second source: it opens the file the build wrote and prints from it.  A
-    generator that called the pipeline itself could drift from the artefact between runs, and
-    nothing would say which number was right.
+    S9 caught the same quantity printed with two different values in three places.  The cure
+    is that the report has no second source for a number: it opens the file the build wrote
+    and prints from it.  A generator that called the pipeline itself could drift from the
+    artefact between runs, and nothing would say which number was right.
+
+    Illustrations are the deliberate exception, and they are safe for a reason that has to be
+    named rather than assumed: a picture of a snapshot is drawn from the snapshot itself,
+    through ``core`` alone.  The report therefore never imports ``zigzag`` or ``reference`` —
+    every barcode, metric and count it shows came out of the artefact, and every graph it
+    draws came off the disk.  An import from either computing layer would mean some number on
+    the page was recomputed, which is exactly what this test exists to forbid.  Naming those
+    layers in the prose is not an import and is not forbidden — the report has to say what it
+    is a report of.
     """
     source = (REPO_ROOT / "notebooks" / "build_zigzag_report.py").read_text(encoding="utf-8")
-    assert "zigzag_events.json" in source
-    for computing in ("analyse(", "measure_null(", "degradation_row(", "dionysus_barcode("):
+    assert "zigzag_events.json" in source, "the report does not open the artefact at all"
+    for layer in ("tdadyn.zigzag", "tdadyn.reference"):
+        for form in (f"from {layer}", f"import {layer}"):
+            assert form not in source, f"the report reaches into {layer} instead of reading"
+    for computing in ("analyse(", "measure_null(", "degradation_row(", "dionysus_barcode(",
+                      "event_report(", "event_metrics("):
         assert computing not in source, f"the report computes {computing} instead of reading"
 
 
