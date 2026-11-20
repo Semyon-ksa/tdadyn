@@ -1,0 +1,29 @@
+# Вызывает ту же цель, что и локальный прогон, и ничего сверх неё.
+#
+# Только `fast`, и намеренно без [zigzag]: это то, что `pyproject.toml` обещает
+# пользователю — `pip install -e .` работает и тесты проходят без необязательных
+# бэкендов. Чистая машина ловит то, чего не видит рабочая: забытую зависимость,
+# тест, опирающийся на файл, который есть только на одном диске.
+#
+# `slow` (около 11 минут) и `zigzag` (около 6) остаются локальными целями.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  fast:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install without optional backends
+        run: |
+          python -m venv .venv
+          .venv/bin/pip install -e ".[dev]"
+      - name: make fast
+        run: make fast
