@@ -1,14 +1,14 @@
-"""Собрать notebooks/report.ipynb.
+"""Build notebooks/report.ipynb.
 
-Ячейки собираются здесь, чтобы ноутбук можно было целиком выполнить и проверить одним
-прогоном, а не править руками в JSON.  Переиспользуемого кода в самом ноутбуке нет: он
-только вызывает пакет.
+The cells are assembled here so that the notebook can be executed and checked in one run rather
+than edited by hand in JSON.  There is no reusable code in the notebook itself: it only calls the
+package.
 
-    .venv/bin/python notebooks/build_report.py     # собрать
-    cd notebooks && ../.venv/bin/python -c "..."   # выполнить, см. README
+    .venv/bin/python notebooks/build_report.py     # build
+    cd notebooks && ../.venv/bin/python -c "..."   # execute, see README
 
-Исполнение занимает около двух с половиной минут: самое дорогое — критерий значимости
-против таблицы ожиданий (ripser на 900 точках при max_homology_dim 2).
+Execution takes about two and a half minutes: the most expensive part is the significance
+criterion against the table of expectations (ripser on 900 points at max_homology_dim 2).
 """
 
 from __future__ import annotations
@@ -21,101 +21,99 @@ md, code = nbf.v4.new_markdown_cell, nbf.v4.new_code_cell
 cells = []
 
 # ---------------------------------------------------------------- title
-cells += [md("""# Синтетические данные с известной топологией — отчёт
+cells += [md("""# Synthetic data with known topology — report
 
-**Задача 5 первого этапа.** Библиотека `tdadyn.synthetic`: генераторы наборов данных,
-у которых правильный ответ известен **заранее**, а не получен из прогона алгоритма.
+**Task 5 of the first stage.** The library `tdadyn.synthetic`: generators of datasets whose
+correct answer is known **in advance** rather than obtained from a run of an algorithm.
 
-Отчёт рассчитан на читателя, не знакомого с проектом, и потому начинается с предметного
-введения. Дальше он идёт по сессиям S1–S9: что построено, какие решения приняты на
-развилках, что измерено и чего эти данные не делают.
+The report is written for a reader who does not know the project, and so it begins with an
+introduction to the subject. Then it goes through sessions S1–S9: what was built, which decisions
+were made at the forks, what was measured, and what these data do not do.
 
 ---
 
-## 0.1. Что такое топологический анализ данных, коротко
+## 0.1. Topological data analysis, briefly
 
-Задача, которую решает этот раздел математики: у нас есть облако точек (или сеть),
-и мы хотим описать его **форму** — не расположение отдельных точек, а то, из скольких
-кусков оно состоит, есть ли в нём сквозные дыры, есть ли внутри пустоты. Эти
-характеристики устойчивы к шуму и не зависят от того, как объект повёрнут или растянут.
+The problem this branch of mathematics solves: we have a point cloud (or a network), and we want
+to describe its **shape** — not the positions of individual points but how many pieces it consists
+of, whether it has holes going through it, whether there are cavities inside. These
+characteristics are robust to noise and do not depend on how the object is rotated or stretched.
 
-Формально они называются **числами Бетти** $\\beta_k$:
+Formally they are called **Betti numbers** $\\beta_k$:
 
-| | Что считает | Пример |
+| | What it counts | Example |
 |---|---|---|
-| $\\beta_0$ | связные компоненты | два отдельных облака → $\\beta_0 = 2$ |
-| $\\beta_1$ | независимые петли (сквозные дыры) | окружность → $\\beta_1 = 1$; тор → 2 |
-| $\\beta_2$ | замкнутые полости | сфера (оболочка, без внутренности) → $\\beta_2 = 1$ |
+| $\\beta_0$ | connected components | two separate clouds → $\\beta_0 = 2$ |
+| $\\beta_1$ | independent loops (holes going through) | circle → $\\beta_1 = 1$; torus → 2 |
+| $\\beta_2$ | closed cavities | sphere (the shell, without the interior) → $\\beta_2 = 1$ |
 
-Запись $\\beta = (1, 2, 1)$ означает: одна компонента, две независимые петли, одна
-полость — это тор, то есть поверхность бублика.
+The record $\\beta = (1, 2, 1)$ means: one component, two independent loops, one cavity — this is
+the torus, the surface of a doughnut.
 
-## 0.2. Главная сложность: у облака точек нет одной топологии
+## 0.2. The main difficulty: a point cloud has no single topology
 
-Конечное множество точек с точки зрения топологии — это просто $N$ разрозненных точек,
-$\\beta_0 = N$ и больше ничего. Форма появляется только когда мы решаем, какие точки
-считать соседями, а это зависит от **масштаба** $\\varepsilon$: соединим все пары ближе
-$\\varepsilon$ и заполним получившиеся клики (полные подграфы) как треугольники,
-тетраэдры и так далее. Получается **симплициальный комплекс** — набор вершин, рёбер,
-треугольных граней и их многомерных аналогов.
+A finite set of points is, topologically, just $N$ scattered points, $\\beta_0 = N$ and nothing
+else. Shape appears only once we decide which points count as neighbours, and that depends on the
+**scale** $\\varepsilon$: connect all pairs closer than $\\varepsilon$ and fill the resulting
+cliques (complete subgraphs) as triangles, tetrahedra and so on. The result is a **simplicial
+complex** — a set of vertices, edges, triangular faces and their higher-dimensional analogues.
 
-Малое $\\varepsilon$ — точки не связаны, видим пыль. Большое — всё слиплось в один ком.
-Правильного значения нет, и потому вместо одного масштаба берут **все сразу**: получается
-вложенное семейство комплексов, **фильтрация**. Каждый топологический признак в ней
-когда-то рождается и когда-то умирает; разность называется **персистентностью**, а весь
-набор пар «рождение — гибель» — **штрихкодом** или диаграммой персистентности.
+Small $\\varepsilon$ — the points are not connected, we see dust. Large — everything sticks into
+one lump. There is no right value, and so instead of one scale **all of them at once** are taken:
+a nested family of complexes, a **filtration**. Each topological feature in it is born at some
+point and dies at some point; the difference is called **persistence**, and the whole set of
+"birth — death" pairs is the **barcode**, or persistence diagram.
 
-Отсюда рабочее правило: **долгоживущие признаки настоящие, короткоживущие — шум
-выборки**. Вопрос о том, где именно проходит граница, оказался в этом проекте самым
-трудным — ему посвящён раздел S3–S4.
+Hence the working rule: **long-lived features are real, short-lived ones are sampling noise.** The
+question of where exactly the line runs turned out to be the hardest one in this project — the
+S3–S4 section is devoted to it.
 
-## 0.3. Зачем нужны синтетические данные
+## 0.3. Why synthetic data are needed
 
-Пайплайн персистентных гомологий — длинная цепочка: облако точек, матрица расстояний,
-фильтрация, штрихкод, отбор значимых баров. Ошибка на любом шаге даёт правдоподобный
-результат, потому что «правдоподобный» здесь означает всего лишь «набор чисел».
+A persistent homology pipeline is a long chain: point cloud, distance matrix, filtration, barcode,
+selection of significant bars. An error at any step gives a plausible result, because "plausible"
+here only means "a set of numbers".
 
-На реальных данных — например на функциональных коннектомах мозга — правильный ответ
-**неизвестен**, и проверить пайплайн нечем. Поэтому нужны наборы, у которых ответ
-известен аналитически: если алгоритм на торе не находит две петли и полость, ошибка
-в алгоритме, а не в торе.
+On real data — for example on functional brain connectomes — the correct answer is **unknown**,
+and there is nothing to check the pipeline against. So datasets are needed whose answer is known
+analytically: if the algorithm does not find two loops and a cavity on a torus, the error is in the
+algorithm, not in the torus.
 
-> **Принцип, из которого следует всё остальное.** Ожидаемые числа Бетти — это **вход**,
-> а не выход. Если тест не сходится, ошибка в генераторе, в сэмплировании или
-> в параметрах проверки, но **не** в таблице ожиданий.
+> **The principle everything else follows from.** Expected Betti numbers are an **input**, not an
+> output. If a test does not agree, the error is in the generator, in the sampling or in the check
+> parameters, but **not** in the table of expectations.
 
-Три следствия, которые видны в каждом разделе ниже:
+Three consequences visible in every section below:
 
-1. **Двойная проверка.** Путь A — основной пайплайн (библиотека `ripser`), путь B —
-   независимая реализация через ранги граничных матриц над полем $\\mathbb{Z}/2$,
-   написанная в проекте с нуля и не использующая никаких библиотек персистентности.
-   Тест требует согласия A, B и таблицы ожиданий из документа. Совпадение двух
-   реализаций и внешнего источника — то, что отличает проверку от самоподтверждения.
-2. **Числа в документах — измерения.** Если в документации проекта стоит значение, оно
-   снято прогоном, и рядом сказано, на чём именно.
-3. **Порядок работ.** Данные делаются раньше алгоритмов (Задача 2 этого же проекта):
-   иначе валидировать нечем, и появляется соблазн объявить истиной то, что выдал
-   алгоритм.
+1. **Double checking.** Path A is the main pipeline (the `ripser` library), path B an independent
+   implementation via ranks of boundary matrices over the field $\\mathbb{Z}/2$, written in the
+   project from scratch and using no persistence library. A test requires agreement of A, B and the
+   table of expectations from the document. Agreement of two implementations and an external
+   source is what tells a check apart from self-confirmation.
+2. **Numbers in the documents are measurements.** If a value appears in the project documentation,
+   it was taken by a run, and next to it is said on what exactly.
+3. **Order of work.** The data are made before the algorithms (Task 2 of the same project):
+   otherwise there is nothing to validate against, and the temptation appears to declare as truth
+   whatever the algorithm produced.
 
-## 0.4. Четыре семейства и зачем каждое
+## 0.4. Four families and why each one
 
-| Семейство | Что это | Какой вопрос проверяет |
+| Family | What it is | Which question it checks |
 |---|---|---|
-| **1. Статические облака** | выборки с многообразий: окружность, тор, сфера, бутылка Клейна… | восстанавливает ли пайплайн известные числа Бетти |
-| **2. Динамические графы** | последовательность снимков графа с запланированными событиями | находит ли алгоритм рождение и гибель признаков там, где они назначены |
-| **3. Ряды осцилляторов и SBM** | синтетический аналог фМРТ: ряды с известным расписанием связи | работает ли вся цепочка «временной ряд → сеть → персистентность» |
-| **4. Шум и нулевые модели** | контролируемое зашумление и данные без структуры | как деградируют ответы при шуме и нет ли ложных срабатываний |
+| **1. Static clouds** | samples from manifolds: circle, torus, sphere, Klein bottle… | does the pipeline recover known Betti numbers |
+| **2. Dynamic graphs** | a sequence of graph snapshots with scheduled events | does the algorithm find the birth and death of features where they were scheduled |
+| **3. Oscillator series and SBM** | a synthetic analogue of fMRI: series with a known coupling schedule | does the whole chain "time series → network → persistence" work |
+| **4. Noise and null models** | controlled corruption and data without structure | how answers degrade under noise and whether there are false positives |
 
-Семейство 2 — основной потребитель: по нему будет валидироваться Задача 2, алгоритмы
-**зигзаг-персистентности**, которые отслеживают появление и исчезновение признаков
-во времени.
+Family 2 is the main consumer: Task 2, the **zigzag persistence** algorithms that track the
+appearance and disappearance of features in time, will be validated against it.
 
-## 0.5. Как устроен этот отчёт
+## 0.5. How this report is organised
 
-Разделы соответствуют рабочим сессиям S1–S9, в порядке их выполнения. В каждом:
-что строилось, как оно выглядит, какие решения пришлось принять и чем они обоснованы.
-Все числа и рисунки получены прогоном кода в этом же ноутбуке — он ничего не считает
-сам, а только вызывает библиотеку."""),
+The sections follow the working sessions S1–S9, in the order they were done. Each says what was
+built, what it looks like, which decisions had to be made and what justifies them. All numbers and
+figures are obtained by running code in this very notebook — it computes nothing itself and only
+calls the library."""),
     code("""import warnings
 
 import matplotlib.pyplot as plt
@@ -124,7 +122,7 @@ import numpy as np
 warnings.filterwarnings("ignore")
 plt.rcParams.update({"figure.dpi": 110, "font.size": 9, "axes.grid": True,
                      "grid.alpha": 0.3, "figure.facecolor": "white"})
-palette = plt.get_cmap("tab10")   # общая раскраска сообществ и блоков
+palette = plt.get_cmap("tab10")   # shared colouring of communities and blocks
 
 from tdadyn import reference
 from tdadyn.core import adjacency_from_snapshot, load_config, rng_for
@@ -138,14 +136,14 @@ from tdadyn.synthetic import sliding_window as sw
 
 CONFIG = load_config("../config.yaml")
 TOPOLOGY = CONFIG.topology_check
-print(f"конфиг загружен, seed {CONFIG.seed}, поле Z/{TOPOLOGY.coeff_field}, "
+print(f"config loaded, seed {CONFIG.seed}, field Z/{TOPOLOGY.coeff_field}, "
       f"max_homology_dim {TOPOLOGY.max_homology_dim}")"""),
-    md("""### Три числа Бетти на трёх простейших примерах
+    md("""### Three Betti numbers on three simplest examples
 
-Прежде чем идти дальше — как выглядит то, о чём шла речь во введении. Слева объект,
-у которого есть только компоненты; в середине — с петлёй; справа — с полостью.
-Под каждым подписано, что выдал **полный пайплайн проекта** на этих точках."""),
-    code("""# Три простейших объекта — по одному на каждое число Бетти.
+Before going further — what the introduction was talking about looks like. On the left an object
+that has only components; in the middle one with a loop; on the right one with a cavity. Under each
+is what **the project's full pipeline** produced on these points."""),
+    code("""# Three simplest objects — one per Betti number.
 demo_rng = rng_for(CONFIG.seed, "intro_demo")
 two_blobs = np.vstack([demo_rng.normal(0, 0.28, size=(120, 2)) + [-2.2, 0],
                        demo_rng.normal(0, 0.28, size=(120, 2)) + [2.2, 0]])
@@ -153,15 +151,15 @@ demo_ring = build_static_cloud("circle", CONFIG, n_points=240, noise_sigma=0.03)
 demo_ball = build_static_cloud("sphere", CONFIG, n_points=300, noise_sigma=0.02).points
 
 fig = plt.figure(figsize=(12, 4.2))
-panels = [(two_blobs, "два облака", r"$\\beta_0 = 2$: две компоненты", None),
-          (demo_ring, "окружность", r"$\\beta_1 = 1$: одна сквозная петля", None),
-          (demo_ball, "сфера", r"$\\beta_2 = 1$: одна полость внутри", (22, -60))]
+panels = [(two_blobs, "two clouds", r"$\\beta_0 = 2$: two components", None),
+          (demo_ring, "circle", r"$\\beta_1 = 1$: one loop through", None),
+          (demo_ball, "sphere", r"$\\beta_2 = 1$: one cavity inside", (22, -60))]
 for i, (pts, name, caption, view) in enumerate(panels, 1):
     if view is None:
         ax = fig.add_subplot(1, 3, i)
         ax.scatter(*pts.T, s=6, alpha=0.75)
-        # Квадратное окно вокруг центра облака: иначе equal-aspect делает панели
-        # несопоставимыми по размеру — плоские две капли против высокой окружности.
+        # A square window around the centre of the cloud: otherwise equal aspect makes the
+        # panels incomparable in size — two flat blobs against a tall circle.
         centre, half = pts.mean(0), np.ptp(pts, axis=0).max() / 2 * 1.15
         ax.set_xlim(centre[0] - half, centre[0] + half)
         ax.set_ylim(centre[1] - half, centre[1] + half)
@@ -176,37 +174,36 @@ for i, (pts, name, caption, view) in enumerate(panels, 1):
                                  gap_noise_floor_ratio=TOPOLOGY.gap_noise_floor_ratio,
                                  gap_min_ratio=TOPOLOGY.gap_min_ratio)
     got = tuple(measured[k] for k in range(3))
-    ax.set_title(f"{name}\\n{caption}\\nпайплайн выдал beta = {got}", fontsize=8.5)
-fig.suptitle("Числа Бетти на трёх простейших примерах", fontsize=11)
+    ax.set_title(f"{name}\\n{caption}\\nthe pipeline gave beta = {got}", fontsize=8.5)
+fig.suptitle("Betti numbers on three simplest examples", fontsize=11)
 fig.tight_layout(rect=(0, 0, 1, 0.93)); plt.show()"""),
-    md("""Это уже двойная проверка в миниатюре: ожидание сформулировано заранее из
-геометрии, число под рисунком получено вычислением, и они обязаны совпасть. Весь
-дальнейший отчёт — то же самое, но на объектах, где совпасть гораздо труднее.""")]
+    md("""This is already double checking in miniature: the expectation is formulated in advance
+from the geometry, the number under the figure is obtained by computation, and they must agree.
+The whole report that follows is the same thing, but on objects where agreeing is much harder.""")]
 
 # ---------------------------------------------------------------- overview
-cells += [md("""## Что построено: 38 наборов
+cells += [md("""## What was built: 38 datasets
 
-Один **набор** — это каталог на диске с двумя вещами: массивом данных (`points.npy`,
-`snapshots.npy` или `series.npy`) и файлом `ground_truth.json`, где записано, какой
-ответ на этих данных считается правильным. Имя каталога — детерминированная функция
-генератора, всех его параметров и seed, поэтому один и тот же конфиг всегда даёт
-то же имя и то же содержимое.
+A **dataset** is a directory on disk with two things: a data array (`points.npy`, `snapshots.npy`
+or `series.npy`) and a file `ground_truth.json` recording which answer on these data is considered
+correct. The directory name is a deterministic function of the generator, all its parameters and
+the seed, so the same config always gives the same name and the same contents.
 
-В таблице ниже два столбца, которые легко спутать:
+The table below has two columns that are easy to confuse:
 
-- **`family`** — это только **раскладка на диске**: в каком подкаталоге лежит набор
-  и какой файл массива в нём ожидается.
-- **`truth_kind`** — **род истины**: что именно гарантировано и какие поля обязаны
-  присутствовать. `expected_betti` — числа Бетти; `betti_curve` — кривая Бетти по
-  времени плюс лог событий; `partition` — разбиение на сообщества и расписание;
-  `noise_level` — механизм и уровень шума; `none` — истина в том, что структуры нет.
+- **`family`** is only **the layout on disk**: which subdirectory holds the dataset and which array
+  file is expected in it.
+- **`truth_kind`** is **the kind of truth**: what exactly is guaranteed and which fields must be
+  present. `expected_betti` — Betti numbers; `betti_curve` — a Betti curve over time plus an event
+  log; `partition` — a community partition and a schedule; `noise_level` — the noise mechanism and
+  level; `none` — the truth is that there is no structure.
 
-До семейства 3 эти две вещи совпадали, и одного поля хватало. Динамическая SBM — первый
-объект, где они разошлись: на диске это динамический граф, а истина у неё разбиение,
-и баркода среди неё нет вовсе. Требовать от неё кривую Бетти только потому, что на диске
-лежат снимки, значило бы закодировать ложное «динамический граф ⇒ у него есть
-топологическая истина»."""),
-    code("""from tdadyn.synthetic.build import FAMILY_CHOICES, build_all, replace_output_root
+Up to family 3 the two coincided, and one field was enough. The dynamic SBM is the first object
+where they diverged: on disk it is a dynamic graph, while its truth is a partition, with no barcode
+in it at all. Requiring a Betti curve of it merely because snapshots lie on disk would encode the
+false "dynamic graph ⇒ it has topological truth"."""),
+    code("""from tdadyn.core import replace_output_root
+from tdadyn.synthetic.build import FAMILY_CHOICES, build_all
 import tempfile, pathlib, time
 
 with tempfile.TemporaryDirectory() as tmp:
@@ -219,65 +216,63 @@ for e in ENTRIES:
     rows.setdefault((e.family, e.generator), 0)
     rows[(e.family, e.generator)] += 1
 
-print(f"{'family':<15}{'generator':<20}{'наборов':>8}")
-print("-" * 43)
+print(f"{'family':<15}{'generator':<20}{'datasets':>9}")
+print("-" * 44)
 for (family, generator), n in sorted(rows.items()):
-    print(f"{family:<15}{generator:<20}{n:>8}")
-print("-" * 43)
-print(f"{'ИТОГО':<35}{len(ENTRIES):>8}")
-print(f"\\nполная сборка: {elapsed:.1f} с")""")]
+    print(f"{family:<15}{generator:<20}{n:>9}")
+print("-" * 44)
+print(f"{'TOTAL':<35}{len(ENTRIES):>9}")
+print(f"\\nfull build: {elapsed:.1f} s")""")]
 
 # ---------------------------------------------------------------- S1-S2
 cells += [md("""---
-# S1–S2. Каркас и эталонная реализация
+# S1–S2. Skeleton and the reference implementation
 
-**S1** — инфраструктура: датаклассы истины, детерминированные имена каталогов, запись и
-чтение наборов, производные потоки случайности (из одного базового seed получается
-независимый генератор на каждый набор и каждый повтор). Ни один генератор не использует
-глобальный `np.random.seed` — только явно переданный `rng`, иначе воспроизводимость
-зависела бы от порядка вызовов.
+**S1** is infrastructure: truth dataclasses, deterministic directory names, writing and reading
+datasets, derived random streams (one base seed yields an independent generator for each dataset
+and each repeat). No generator uses the global `np.random.seed` — only an explicitly passed `rng`,
+otherwise reproducibility would depend on the order of calls.
 
-**S2** — эталонная реализация чисел Бетти, и она сделана **раньше генераторов**, потому
-что без неё нечем проверять. Дальше по тексту она называется «путь B».
+**S2** is the reference implementation of Betti numbers, and it was made **before the
+generators**, because without it there is nothing to check them with. Below it is called "path B".
 
-## Зачем нужна вторая реализация
+## Why a second implementation is needed
 
-Основной пайплайн (путь A) считает персистентные гомологии библиотекой `ripser` — быстрым
-кодом на C++. Если проверять генераторы только им, то при расхождении с ожиданием
-непонятно, где ошибка: в генераторе или в том, как мы вызываем библиотеку. Поэтому рядом
-написана вторая, полностью независимая реализация — «путь B»:
+The main pipeline (path A) computes persistent homology with the `ripser` library — fast C++ code.
+If the generators were checked only with it, then on a mismatch with the expectation it would be
+unclear where the error is: in the generator or in how we call the library. So a second, fully
+independent implementation — "path B" — is written next to it:
 
-- она **не использует** ни одной библиотеки персистентности;
-- она считает числа Бетти напрямую по определению: строит **граничные матрицы**
-  $\\partial_k$ (какие $(k{-}1)$-грани входят в границу каждого $k$-симплекса), берёт их
-  ранги над полем $\\mathbb{Z}/2$ и применяет
+- it uses **no** persistence library;
+- it computes Betti numbers directly from the definition: it builds **boundary matrices**
+  $\\partial_k$ (which $(k{-}1)$-faces enter the boundary of each $k$-simplex), takes their ranks
+  over the field $\\mathbb{Z}/2$ and applies
   $\\beta_k = \\dim\\ker\\partial_k - \\operatorname{rank}\\partial_{k+1}$;
-- она намеренно **медленная**: над $\\mathbb{Z}/2$ сложение строк — это XOR, деление
-  не нужно вовсе, код остаётся коротким и читаемым. Применима только к малым комплексам
-  (до 30 узлов) — именно поэтому динамические сценарии проектируются на 24 узла.
+- it is deliberately **slow**: over $\\mathbb{Z}/2$ row addition is XOR, no division is needed at
+  all, and the code stays short and readable. It applies only to small complexes (up to 30 nodes) —
+  which is exactly why the dynamic scenarios are designed on 24 nodes.
 
-Единственное назначение пути B — прозрачность. Тест требует согласия A, B и таблицы
-ожиданий из документа.
+The only purpose of path B is transparency. A test requires agreement of A, B and the table of
+expectations from the document.
 
-## Два слоя, и почему их именно два
+## Two layers, and why exactly two
 
-**Слой 1, движок гомологий** — принимает явный список симплексов. Вопроса «до какой
-размерности строить» здесь не возникает вовсе: что дали, то и посчитал.
+**Layer 1, the homology engine** — takes an explicit list of simplices. The question "up to which
+dimension to build" does not arise here at all: it computes what it is given.
 
-**Слой 2, построитель флаг-комплекса** — принимает граф и превращает его в комплекс.
-**Флаг-комплекс** (он же клик-комплекс): каждая клика графа, то есть каждое полностью
-связанное между собой множество вершин, объявляется симплексом. Треугольник из трёх
-рёбер становится заполненной гранью, $K_4$ — сплошным тетраэдром.
+**Layer 2, the flag complex builder** — takes a graph and turns it into a complex. A **flag
+complex** (also clique complex): every clique of the graph, i.e. every set of vertices all
+connected to each other, is declared a simplex. A triangle of three edges becomes a filled face,
+$K_4$ a solid tetrahedron.
 
-Два места, где здесь легко ошибиться, и оба проверяются ниже:
+Two places where it is easy to go wrong here, both checked below:
 
-1. **Строить надо до размерности $k_{\\max}+1$.** Для $\\beta_2$ нужны 3-симплексы:
-   $\\beta_2 = \\dim\\ker\\partial_2 - \\operatorname{rank}\\partial_3$, и если оборвать
-   на размерности 2, слагаемое $\\operatorname{rank}\\partial_3$ обнуляется, а каждая
-   замкнутая двумерная поверхность ошибочно засчитывается как полость.
-2. **Перечислять надо все клики, а не только максимальные.** `networkx.find_cliques`
-   возвращает только максимальные, и на $K_4$ выдал бы один тетраэдр без рёбер
-   и треугольников."""),
+1. **It must be built up to dimension $k_{\\max}+1$.** $\\beta_2$ needs 3-simplices:
+   $\\beta_2 = \\dim\\ker\\partial_2 - \\operatorname{rank}\\partial_3$, and with a cut-off at
+   dimension 2 the term $\\operatorname{rank}\\partial_3$ vanishes, and every closed
+   two-dimensional surface is wrongly counted as a cavity.
+2. **All cliques must be enumerated, not only maximal ones.** `networkx.find_cliques` returns only
+   maximal ones and on $K_4$ would give one tetrahedron without edges and triangles."""),
     code("""def flag_faces(adjacency):
     complex_ = reference.flag_complex(adjacency, max_homology_dim=2, max_nodes=30)
     betti = reference.betti_numbers_of_graph(adjacency, max_homology_dim=2, max_nodes=30)
@@ -291,25 +286,25 @@ def multipartite(sizes):
     a = (labels[:, None] != labels[None, :]).astype(float)
     return a
 
-cases = [("K3 (треугольник)", complete(3), "заполнен: beta_1 = 0, а цикломатическое 1"),
-         ("K4", complete(4), "сплошной тетраэдр; обрыв на dim 2 дал бы beta_2 = 1"),
-         ("K_{2,2,2} (октаэдр)", multipartite([2, 2, 2]), "настоящая полость без 3-симплексов")]
+cases = [("K3 (triangle)", complete(3), "filled: beta_1 = 0, while the cyclomatic number is 1"),
+         ("K4", complete(4), "solid tetrahedron; a cut-off at dim 2 would give beta_2 = 1"),
+         ("K_{2,2,2} (octahedron)", multipartite([2, 2, 2]), "a real cavity without 3-simplices")]
 
-print(f"{'граф':<22}{'грани по размерностям':<26}{'beta':<12}что ловит")
-print("-" * 96)
+print(f"{'graph':<24}{'faces by dimension':<24}{'beta':<12}what it catches")
+print("-" * 98)
 for name, adjacency, why in cases:
     faces, betti = flag_faces(adjacency)
-    print(f"{name:<22}{str(faces):<26}{str(betti):<12}{why}")"""),
-    md("""Счёт граней $K_4$ равен (4, 6, 4, 1) — это и есть проверка на то, что перечисляются
-**все** клики, а не только максимальные: `networkx.find_cliques` вернул бы один тетраэдр
-без рёбер и треугольников, граничные матрицы не сошлись бы по размерностям,
-а $\\beta_1$ вырос бы с 0 до 3.
+    print(f"{name:<24}{str(faces):<24}{str(betti):<12}{why}")"""),
+    md("""The face count of $K_4$ is (4, 6, 4, 1) — this is exactly the check that **all** cliques
+are enumerated, not only maximal ones: `networkx.find_cliques` would return one tetrahedron
+without edges and triangles, the boundary matrices would not match in dimensions, and $\\beta_1$
+would grow from 0 to 3.
 
-### Сами объекты
+### The objects themselves
 
-Слева направо: треугольник, у которого флаг-комплекс заполняет грань; полный граф на
-четырёх вершинах, дающий сплошной тетраэдр; октаэдр, у которого максимальная клика равна
-трём, 3-симплексов нет — и потому остаётся настоящая полость."""),
+From left to right: a triangle, whose flag complex fills the face; the complete graph on four
+vertices, giving a solid tetrahedron; the octahedron, whose maximal clique is three, has no
+3-simplices — and therefore keeps a real cavity."""),
     code("""from matplotlib.patches import Polygon
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
@@ -319,9 +314,9 @@ def triangles_of(adjacency):
 
 fig = plt.figure(figsize=(12, 3.6))
 
-# K3 и K4 — плоские схемы с заполненными гранями
-for panel, (n, title) in enumerate([(3, "$K_3$: грань заполнена"),
-                                    (4, "$K_4$: сплошной тетраэдр")], start=1):
+# K3 and K4 — flat diagrams with filled faces
+for panel, (n, title) in enumerate([(3, "$K_3$: the face is filled"),
+                                    (4, "$K_4$: a solid tetrahedron")], start=1):
     ax = fig.add_subplot(1, 3, panel)
     a = complete(n)
     ang = np.linspace(0, 2 * np.pi, n, endpoint=False) + np.pi / 2
@@ -334,10 +329,10 @@ for panel, (n, title) in enumerate([(3, "$K_3$: грань заполнена"),
             ax.plot(*pos[[i, j]].T, color="tab:blue", lw=1.4, zorder=2)
     ax.scatter(*pos.T, s=70, color="tab:blue", zorder=3, edgecolor="white")
     faces, betti = flag_faces(a)
-    ax.set_title(f"{title}\\nграни {faces}, beta = {betti}", fontsize=8.5)
+    ax.set_title(f"{title}\\nfaces {faces}, beta = {betti}", fontsize=8.5)
     ax.set_aspect("equal"); ax.axis("off")
 
-# Октаэдр — в 3D, чтобы полость была видна
+# The octahedron — in 3D so that the cavity is visible
 ax = fig.add_subplot(1, 3, 3, projection="3d")
 oct_pos = np.array([[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]],
                    dtype=float)
@@ -347,54 +342,55 @@ ax.add_collection3d(Poly3DCollection([oct_pos[list(t)] for t in tris], alpha=0.2
                                      facecolor="tab:orange", edgecolor="tab:orange", lw=0.8))
 ax.scatter(*oct_pos.T, s=45, color="tab:orange", depthshade=False)
 faces, betti = flag_faces(oct_adj)
-ax.set_title(f"$K_{{2,2,2}}$ (октаэдр): оболочка $S^2$\\nграни {faces}, beta = {betti}",
+ax.set_title(f"$K_{{2,2,2}}$ (octahedron): the shell $S^2$\\nfaces {faces}, beta = {betti}",
              fontsize=8.5)
 ax.set_xlim(-1.2, 1.2); ax.set_ylim(-1.2, 1.2); ax.set_zlim(-1.2, 1.2)
 ax.set_xticks([]); ax.set_yticks([]); ax.set_zticks([]); ax.grid(False)
 
-fig.suptitle("Флаг-комплексы, на которых проверяется эталон", fontsize=10)
+fig.suptitle("Flag complexes on which the reference is checked", fontsize=10)
 fig.tight_layout(); plt.show()"""),
-    md("""У октаэдра 8 треугольников и ни одного 3-симплекса — поэтому двумерные грани
-образуют замкнутую поверхность, которую нечем заполнить, и $\\beta_2 = 1$. У $K_4$
-треугольников тоже 4, но есть тетраэдр, который их заполняет, и полость исчезает. Ровно
-это различие и ловит счёт граней по размерностям.""")]
+    md("""The octahedron has 8 triangles and not a single 3-simplex — so its two-dimensional faces
+form a closed surface that nothing fills, and $\\beta_2 = 1$. $K_4$ also has 4 triangles, but there
+is a tetrahedron that fills them, and the cavity disappears. Exactly this difference is caught by
+the face count by dimension.""")]
 
 # ---------------------------------------------------------------- S3-S4
 cells += [md("""---
-# S3–S4. Статические облака: семейство 1
+# S3–S4. Static clouds: family 1
 
-Семейство 1 отвечает на вопрос: **восстанавливает ли пайплайн числа Бетти там, где они
-известны?** Схема одна на все объекты:
+Family 1 answers the question: **does the pipeline recover Betti numbers where they are known?**
+The scheme is the same for all objects:
 
-1. выбрать $N$ точек с многообразия $M$ (по возможности равномерно **по площади**,
-   а не по параметрам — об этом ниже);
-2. добавить гауссов шум $\\mathcal{N}(0,\\sigma^2 I)$ в объемлющем пространстве;
-3. посчитать матрицу попарных расстояний, построить фильтрацию Вьеториса–Рипса,
-   получить диаграмму персистентности;
-4. сравнить число значимых баров в каждой размерности с таблицей ожиданий.
+1. choose $N$ points on a manifold $M$ (as uniformly **by area** as possible, not by parameters —
+   more on this below);
+2. add Gaussian noise $\\mathcal{N}(0,\\sigma^2 I)$ in the ambient space;
+3. compute the pairwise distance matrix, build the Vietoris–Rips filtration, get the persistence
+   diagram;
+4. compare the number of significant bars in each dimension with the table of expectations.
 
-Объектов семь, и подобраны они так, чтобы каждый ломал пайплайн по-своему:
+There are seven objects, chosen so that each breaks the pipeline in its own way:
 
-| Объект | $\\beta$ | Чем труден |
+| Object | $\\beta$ | What makes it hard |
 |---|---|---|
-| Окружность $S^1$ | (1,1,0) | базовый тест |
-| Две окружности | (2,2,0) | проверка $H_0$: компоненты не должны слипнуться |
-| Восьмёрка | (1,2,0) | плотность точек падает у самопересечения |
-| Тор $T^2$ | (1,2,1) | $H_2$ живёт на масштабе малого радиуса — легко потерять |
-| Сфера $S^2$ | (1,0,1) | $\\beta_1 = 0$: проверка на **ложные** срабатывания |
-| Бутылка Клейна | (1,2,1) над $\\mathbb{Z}/2$ | ответ зависит от поля коэффициентов |
-| Зацепление Хопфа | (2,2,0) | компоненты проходят вплотную, но не пересекаются |
+| Circle $S^1$ | (1,1,0) | basic test |
+| Two circles | (2,2,0) | a check of $H_0$: the components must not stick together |
+| Figure eight | (1,2,0) | point density drops near the self-intersection |
+| Torus $T^2$ | (1,2,1) | $H_2$ lives at the scale of the small radius — easy to lose |
+| Sphere $S^2$ | (1,0,1) | $\\beta_1 = 0$: a check for **false** positives |
+| Klein bottle | (1,2,1) over $\\mathbb{Z}/2$ | the answer depends on the coefficient field |
+| Hopf link | (2,2,0) | the components pass right next to each other but do not intersect |
 
-Обозначение: индекс у $S^n$ — размерность **поверхности**, не объемлющего пространства.
-$S^1$ — окружность на плоскости, $S^2$ — сферическая оболочка в пространстве, без
-внутренности: отсюда $\\beta_2 = 1$.
+Notation: the index of $S^n$ is the dimension of the **surface**, not of the ambient space. $S^1$
+is a circle in the plane, $S^2$ a spherical shell in space, without the interior: hence
+$\\beta_2 = 1$.
 
-Числа в таблице получены аналитически и взяты из `docs/method.md` §1.2. Они **вход**,
-а не результат: если прогон их не воспроизводит, чинится генератор, а не таблица."""),
+The numbers in the table are obtained analytically and taken from `docs/method.md` §1.2. They are
+an **input**, not a result: if a run does not reproduce them, the generator is fixed, not the
+table."""),
     code("""clouds = {name: build_static_cloud(name, CONFIG) for name in STATIC_GENERATORS}
 
-# Ракурс подбирается по объекту: у тора дырка видна только сверху, а у зацепления
-# Хопфа — сбоку, иначе две окружности накладываются друг на друга.
+# The view angle is chosen per object: the torus's hole is visible only from above, while the
+# Hopf link needs a side view, otherwise the two circles overlap.
 VIEW = {"torus": (62, -60), "sphere": (22, -60), "klein_bottle": (26, -55),
         "hopf_link": (16, -72)}
 
@@ -409,8 +405,8 @@ for i, (name, dataset) in enumerate(clouds.items(), 1):
     else:
         ax = fig.add_subplot(2, 4, i, projection="3d")
         ax.scatter(pts[:, 0], pts[:, 1], pts[:, 2], s=2.5, alpha=0.55, depthshade=True)
-        # Пропорции коробки — по фактическим габаритам: иначе matplotlib растягивает
-        # каждую ось независимо, и тор (5.6 x 5.6 x 1.6) перестаёт быть бубликом.
+        # Box proportions follow the actual extent: otherwise matplotlib stretches every axis
+        # independently, and the torus (5.6 x 5.6 x 1.6) stops looking like a doughnut.
         ax.set_box_aspect(np.ptp(pts[:, :3], axis=0))
         elev, azim = VIEW[name]
         ax.view_init(elev=elev, azim=azim)
@@ -418,28 +414,28 @@ for i, (name, dataset) in enumerate(clouds.items(), 1):
         ax.grid(False)
     ax.set_title(f"{name}\\nbeta = {tuple(betti[k] for k in range(3))}, N={len(pts)}",
                  fontsize=8)
-fig.suptitle("Семейство 1: объекты и ожидаемые числа Бетти (Z/2)", fontsize=11)
+fig.suptitle("Family 1: objects and expected Betti numbers (Z/2)", fontsize=11)
 fig.tight_layout(); plt.show()"""),
-    md("""Тор показан сверху — под другим углом дырка в середине не читается, а
-пропорции коробки заданы по габаритам облака: по умолчанию matplotlib масштабирует
-каждую ось независимо, и тор $5.6 \\times 5.6 \\times 1.6$ выглядит сплющенным блином.
-Зацепление Хопфа, наоборот, показано сбоку — сверху две окружности накладываются."""),
-    md("""### Что видит персистентность: фильтрация Вьеториса–Рипса
+    md("""The torus is shown from above — from other angles the hole in the middle does not read —
+and the box proportions are set from the extent of the cloud: by default matplotlib scales every
+axis independently, and a $5.6 \\times 5.6 \\times 1.6$ torus looks like a flattened pancake. The
+Hopf link, conversely, is shown from the side — from above the two circles overlap."""),
+    md("""### What persistence sees: the Vietoris–Rips filtration
 
-Облако само по себе алгоритму не даётся — из него строится **вложенное семейство
-комплексов** по растущему масштабу $\\varepsilon$.
+The cloud itself is not given to the algorithm — a **nested family of complexes** is built from it
+by growing scale $\\varepsilon$.
 
-Точки ниже расставлены **равномерно**, как в закрытом состоянии `geometric_loop`
-($\\delta = 2\\pi/n$ даёт шаг ровно $2\\pi/n$). Это дидактический выбор: генераторы
-семейства 1 сэмплируют $\\theta$ случайно, и на полутора десятках точек зазоры между
-соседями различаются в сотни раз — картинка получилась бы клочковатой и про механизм
-фильтрации не сказала бы ничего. Именно из-за случайности выборки восстановление чисел
-Бетти на настоящих наборах требует сотен точек, а не полутора десятков."""),
+The points below are placed **uniformly**, as in the closed state of `geometric_loop`
+($\\delta = 2\\pi/n$ gives a step of exactly $2\\pi/n$). This is a didactic choice: the family-1
+generators sample $\\theta$ randomly, and on fifteen-odd points the gaps between neighbours differ
+by a factor of hundreds — the picture would come out ragged and would say nothing about the
+mechanism of the filtration. It is precisely because of random sampling that recovering Betti
+numbers on the real datasets takes hundreds of points, not fifteen."""),
     code("""n_demo = 16
 a_demo = np.arange(n_demo) * 2 * np.pi / n_demo
 demo = np.c_[np.cos(a_demo), np.sin(a_demo)]
 demo_d = pairwise_distances(demo)
-print(f"шаг по дуге {2*np.pi/n_demo:.3f}, хорда соседей {2*np.sin(np.pi/n_demo):.3f}")
+print(f"arc step {2*np.pi/n_demo:.3f}, neighbour chord {2*np.sin(np.pi/n_demo):.3f}")
 
 fig, axes = plt.subplots(1, 5, figsize=(13.5, 3.0))
 for ax, eps in zip(axes, [0.30, 0.45, 0.80, 1.50, 1.95]):
@@ -453,25 +449,23 @@ for ax, eps in zip(axes, [0.30, 0.45, 0.80, 1.50, 1.95]):
     ax.scatter(*demo.T, s=24, color="tab:blue", zorder=3, edgecolor="white", lw=0.5)
     b = reference.betti_numbers_of_graph(adj, max_homology_dim=2, max_nodes=30)
     neighbours = int(round(np.arcsin(min(eps, 2) / 2) / (np.pi / n_demo)))
-    ax.set_title(f"$\\\\varepsilon$ = {eps}   (до {neighbours} соседей)\\n"
+    ax.set_title(f"$\\\\varepsilon$ = {eps}   (up to {neighbours} neighbours)\\n"
                  f"beta = {(b[0], b[1], b[2])}", fontsize=8)
     ax.set_aspect("equal"); ax.axis("off"); ax.set_xlim(-1.3, 1.3); ax.set_ylim(-1.3, 1.3)
-fig.suptitle("Фильтрация Рипса на равномерной окружности", fontsize=10)
-fig.tight_layout(); plt.show()"""),
-    md("""Слева направо: изолированные вершины, рождение петли, петля живёт при растущей
-плотности рёбер и треугольников, и наконец $\\beta_1$ пропадает.
+fig.suptitle("Rips filtration on a uniform circle", fontsize=10)
+fig.tight_layout(rect=(0, 0, 1, 0.9)); plt.show()"""),
+    md("""From left to right: isolated vertices, the birth of a loop, the loop living on as edges and
+triangles grow denser, and finally $\\beta_1$ disappears.
 
-**Последняя панель — не «петля заполнилась».** По Адамашеку–Адамсу комплекс Рипса
-окружности с ростом относительного масштаба последовательно эквивалентен
-$S^1, S^3, S^5, \\dots$ — он не стягивается. При $\\varepsilon = 1.95$ каждая вершина
-соединена с семью соседями с каждой стороны, комплекс покинул режим $S^1$, и родившийся
-класс живёт в размерности выше `max_homology_dim = 2`, то есть **не виден**. Гибель
-$\\beta_1$ без видимой причины здесь — это ровно тот известный артефакт, который
-`method.md` §5 перечисляет среди «не багов»: чинить его не нужно, достаточно ограничивать
-диапазон значимости."""),
-    md("""То же на полном облаке, в виде штрихкода: каждый бар — класс, который живёт от
-своего рождения до гибели. Длинный бар в $H_1$ — это и есть петля окружности; короткие —
-шум выборки."""),
+**The last panel is not "the loop got filled".** By Adamaszek–Adams the Rips complex of a circle
+is, as the relative scale grows, successively equivalent to $S^1, S^3, S^5, \\dots$ — it does not
+contract. At $\\varepsilon = 1.95$ every vertex is connected to seven neighbours on each side, the
+complex has left the $S^1$ regime, and the class born lives in a dimension above
+`max_homology_dim = 2`, i.e. it is **not visible**. The death of $\\beta_1$ for no visible reason
+here is exactly the known artefact that `method.md` §5 lists among "not bugs": it does not need
+fixing, it is enough to limit the range of significance."""),
+    md("""The same on a full cloud, as a barcode: each bar is a class that lives from its birth to its
+death. The long bar in $H_1$ is the loop of the circle; the short ones are sampling noise."""),
     code("""fig, axes = plt.subplots(1, 2, figsize=(12, 3.4))
 for ax, name in zip(axes, ("circle", "torus")):
     pts = clouds[name].points
@@ -489,41 +483,40 @@ for ax, name in zip(axes, ("circle", "torus")):
             y += 1
         y += 2
     expected = clouds[name].ground_truth.expected_betti
-    ax.set_title(f"{name}: штрихкод (снизу вверх $H_0$, $H_1$, $H_2$)\\n"
-                 f"ожидание {tuple(expected[k] for k in range(3))}", fontsize=9)
+    ax.set_title(f"{name}: barcode (bottom to top $H_0$, $H_1$, $H_2$)\\n"
+                 f"expected {tuple(expected[k] for k in range(3))}", fontsize=9)
     ax.set_xlabel(r"$\\varepsilon$"); ax.set_yticks([]); ax.set_xlim(0, diam * 0.62)
 fig.tight_layout(); plt.show()"""),
-    md("""Бутылка Клейна вложена в $\\mathbb{R}^4$ и показана проекцией на первые три
-координаты. На картинке она **похожа на тор** — и это не дефект рисунка: проекция
-теряет ровно ту склейку, которая их различает. В $\\mathbb{R}^3$ существует лишь
-погружение с самопересечением, которое испортило бы ground-truth, поэтому вложение
-взято четырёхмерное. Отличить эти два объекта здесь может не глаз, а поле
-коэффициентов: над $\\mathbb{Z}/2$ бутылка Клейна даёт $(1,2,1)$, над $\\mathbb{Z}/3$ —
-$(1,1,0)$, тогда как у тора ответ от поля не зависит.
+    md("""The Klein bottle is embedded in $\\mathbb{R}^4$ and shown as a projection onto the first
+three coordinates. In the picture it **looks like a torus** — and this is not a defect of the
+figure: the projection loses exactly the gluing that tells them apart. In $\\mathbb{R}^3$ there is
+only an immersion with self-intersection, which would spoil the ground truth, so a
+four-dimensional embedding is used. What can tell these two objects apart here is not the eye but
+the coefficient field: over $\\mathbb{Z}/2$ the Klein bottle gives $(1,2,1)$, over $\\mathbb{Z}/3$
+$(1,1,0)$, while the torus's answer does not depend on the field.
 
-### Равномерность выборки: место, где наивная реализация выглядит правдоподобно
+### Sampling uniformity: where a naive implementation looks plausible
 
-Тор параметризуется двумя углами, $\\theta$ вдоль большого круга и $\\varphi$ вдоль
-малого. Напрашивается взять оба равномерно из $U(0, 2\\pi)$ — и это **неверно**: элемент
-площади поверхности пропорционален $(R + r\\cos\\varphi)$, то есть внешний обод бублика
-шире внутреннего. Равномерная выборка углов кладёт на них одинаковое число точек,
-и внутренний обод оказывается пересэмплирован в несколько раз.
+The torus is parametrised by two angles, $\\theta$ along the large circle and $\\varphi$ along the
+small one. It is tempting to take both uniformly from $U(0, 2\\pi)$ — and that is **wrong**: the
+surface area element is proportional to $(R + r\\cos\\varphi)$, i.e. the outer rim of the doughnut
+is wider than the inner one. Uniform sampling of the angles puts the same number of points on both,
+and the inner rim ends up oversampled several times.
 
-Лечится **выборкой с отклонением** (rejection sampling): предложенное $\\varphi$
-принимается с вероятностью, пропорциональной элементу площади, иначе разыгрывается
-заново. То же самое и по той же причине делается для бутылки Клейна; для сферы роль
-такого приёма играет метод Мюллера — взять $g \\sim \\mathcal{N}(0, I_3)$ и нормировать
-$g/\\lVert g\\rVert$, тогда как наивная выборка сферических углов сгущает точки у полюсов.
+The cure is **rejection sampling**: a proposed $\\varphi$ is accepted with probability proportional
+to the area element, otherwise it is redrawn. The same is done for the Klein bottle for the same
+reason; for the sphere the role of such a technique is played by Muller's method — take
+$g \\sim \\mathcal{N}(0, I_3)$ and normalise $g/\\lVert g\\rVert$, whereas naive sampling of
+spherical angles clusters points at the poles.
 
-Почему это важно: неравномерность искажает фильтрацию и **способна съесть бар**
-$\\beta_2$. При этом облако выглядит совершенно нормально, и ошибка не проявится нигде,
-кроме итогового числа. Поэтому на равномерность стоит отдельный тест — критерий
-Колмогорова–Смирнова против теоретической плотности.
+Why it matters: non-uniformity distorts the filtration and **can eat the bar** $\\beta_2$. Yet the
+cloud looks perfectly normal, and the error shows up nowhere except in the final number. So
+uniformity has its own test — a Kolmogorov–Smirnov test against the theoretical density.
 
-Ниже: слева гистограмма фактически разыгранных $\\varphi$ против кривой
-$\\propto (R + r\\cos\\varphi)$; справа распределение координаты $z$ на сфере, которое
-у равномерной выборки обязано быть **плоским** (это свойство сферы, известное как
-теорема Архимеда)."""),
+Below: on the left a histogram of the actually drawn $\\varphi$ against the curve
+$\\propto (R + r\\cos\\varphi)$; on the right the distribution of the $z$ coordinate on the sphere,
+which for uniform sampling must be **flat** (a property of the sphere known as Archimedes'
+theorem)."""),
     code("""phi = np.linspace(0, 2 * np.pi, 400)
 R, r = CONFIG.static_clouds.torus.R, CONFIG.static_clouds.torus.r
 density = (R + r * np.cos(phi)) / (2 * np.pi * R)
@@ -532,62 +525,63 @@ torus = clouds["torus"].points
 angle = np.arctan2(torus[:, 2], np.hypot(torus[:, 0], torus[:, 1]) - R) % (2 * np.pi)
 
 fig, ax = plt.subplots(1, 2, figsize=(10, 3))
-ax[0].hist(angle, bins=36, density=True, alpha=0.7, label="выборка")
-ax[0].plot(phi, density, lw=2, label=r"плотность $\\propto (R + r\\cos\\varphi)$")
-ax[0].set_title("Тор: rejection sampling по элементу площади"); ax[0].legend(fontsize=7)
+ax[0].hist(angle, bins=36, density=True, alpha=0.7, label="sample")
+ax[0].plot(phi, density, lw=2, label=r"density $\\propto (R + r\\cos\\varphi)$")
+ax[0].set_title("Torus: rejection sampling by the area element"); ax[0].legend(fontsize=7)
 ax[0].set_xlabel(r"$\\varphi$")
 
 sphere = clouds["sphere"].points
 ax[1].hist(sphere[:, 2], bins=30, density=True, alpha=0.7)
-ax[1].axhline(0.5, color="k", lw=1.5, ls="--", label="равномерно по z (метод Мюллера)")
-ax[1].set_title("Сфера: нет сгущения у полюсов"); ax[1].legend(fontsize=7)
+ax[1].axhline(0.5, color="k", lw=1.5, ls="--", label="uniform in z (Muller's method)")
+ax[1].set_title("Sphere: no clustering at the poles"); ax[1].legend(fontsize=7)
 ax[1].set_xlabel("z")
 fig.tight_layout(); plt.show()""")]
 
 # ---------------------------------------------------------------- criterion
-cells += [md("""## Главный результат S4: критерий значимости пришлось заменить
+cells += [md("""## The main result of S4: the significance criterion had to be replaced
 
-### В чём вообще состоит задача
+### What the problem is
 
-Штрихкод зашумлённого облака содержит **сотни** баров: настоящие признаки вперемешку
-с шумом выборки. Чтобы получить из него числа Бетти, нужно правило, отделяющее одно
-от другого. Это правило — не деталь реализации, а то место, где ответ окончательно
-формируется, и ошибка в нём выглядит как ошибка всего пайплайна.
+The barcode of a noisy cloud contains **hundreds** of bars: real features mixed with sampling
+noise. To get Betti numbers from it, a rule is needed that separates one from the other. This rule
+is not an implementation detail but the place where the answer finally takes shape, and an error
+in it looks like an error of the whole pipeline.
 
-Изначально в проекте было записано естественное правило: бар значим, если его
-персистентность не меньше `significance_ratio` × $\\mathrm{diam}(X)$, то есть заданной
-доли диаметра облака. Прогон показал, что оно **непригодно** — и это установлено
-измерением, а не соображениями. Оно ошибается **в обе стороны**:
+Originally the project recorded a natural rule: a bar is significant if its persistence is at
+least `significance_ratio` × $\\mathrm{diam}(X)$, i.e. a given fraction of the cloud's diameter. A
+run showed that it is **unfit** — and this was established by measurement, not by argument. It errs
+**in both directions**:
 
-- на **анизотропных** объектах (тор, бутылка Клейна) теряет $H_2$. У тора $R{=}2.0$,
-  $r{=}0.8$ полость живёт на масштабе малого радиуса $r$, а порог нормирован на диаметр
-  $2(R+r)$: при 400 точках бар 0.257 против порога 0.851 — не проходит, хотя признак есть;
-- на **компактных** объектах (сфера) даёт лишние петли в $H_1$: диаметр мал (2.12), порог
-  вместе с ним (0.32), и шумовые бары длиной 0.260, 0.256, 0.254 стоят вплотную к нему.
-  На части сидов выходит $(1,1,1)$ вместо $(1,0,1)$ — петля там, где её нет.
+- on **anisotropic** objects (torus, Klein bottle) it loses $H_2$. For the torus $R{=}2.0$,
+  $r{=}0.8$ the cavity lives at the scale of the small radius $r$, while the threshold is
+  normalised by the diameter $2(R+r)$: at 400 points the bar is 0.257 against a threshold of 0.851
+  — it fails, although the feature is there;
+- on **compact** objects (sphere) it gives extra loops in $H_1$: the diameter is small (2.12), the
+  threshold with it (0.32), and noise bars of length 0.260, 0.256, 0.254 sit right against it. On
+  some seeds the result is $(1,1,1)$ instead of $(1,0,1)$ — a loop where there is none.
 
-И главное: шумовой бар сферы составляет 0.123 диаметра, а **полезный** бар $H_2$ тора
-при 400 точках — 0.045 диаметра, то есть втрое **меньше** шумового. Диапазоны сигнала
-и шума в долях диаметра перекрываются, поэтому никакой общий порог, нормированный
-на диаметр, не даст верного ответа на обоих объектах сразу. Это не вопрос настройки
-константы.
+And the main point: a noise bar of the sphere is 0.123 of the diameter, while the **useful** $H_2$
+bar of the torus at 400 points is 0.045 of the diameter, i.e. three times **smaller** than the
+noise one. The signal and noise ranges in fractions of the diameter overlap, so no common threshold
+normalised by the diameter will give the right answer on both objects at once. This is not a matter
+of tuning a constant.
 
-### Что разделяет их надёжно
+### What separates them reliably
 
-Разрыв в спектре. Если отсортировать персистентности внутри одной размерности по
-убыванию, то у настоящего признака после него следует **резкий обрыв**, а шум идёт
-ровной лесенкой. На рисунке ниже: столбики — персистентности по убыванию, подписи между
-ними — отношение соседних, красная линия — шумовой пол.
+A gap in the spectrum. If the persistences within one dimension are sorted in decreasing order, a
+real feature is followed by a **sharp drop**, while noise goes in an even staircase. In the figure
+below: bars are persistences in decreasing order, the labels between them the ratio of neighbours,
+the red line the noise floor.
 
-Смотреть надо на то, где стоит **наибольшее отношение**. Тор здесь при 900 точках,
-сфера при 400 — рабочие размеры из конфига:
+What to look at is where **the largest ratio** stands. The torus here at 900 points, the sphere at
+400 — the working sizes from the config:
 
-- тор, $H_1$: 1.813 1.034 0.477 0.431, отношения 1.75x **2.17x** 1.11x — разрыв
-  на позиции 2, то есть $\\beta_1 = 2$;
-- тор, $H_2$: 0.641 0.107 0.095 0.095, отношения **6.01x** 1.12x 1.00x — позиция 1,
+- torus, $H_1$: 1.813 1.034 0.477 0.431, ratios 1.75x **2.17x** 1.11x — the gap at position 2,
+  i.e. $\\beta_1 = 2$;
+- torus, $H_2$: 0.641 0.107 0.095 0.095, ratios **6.01x** 1.12x 1.00x — position 1,
   $\\beta_2 = 1$;
-- сфера, $H_1$: 0.260 0.256 0.254 0.206, отношения 1.02x 1.01x 1.24x — все ниже
-  `gap_min_ratio` = 1.55, выраженного разрыва нет вовсе, и правило честно даёт ноль."""),
+- sphere, $H_1$: 0.260 0.256 0.254 0.206, ratios 1.02x 1.01x 1.24x — all below
+  `gap_min_ratio` = 1.55, there is no pronounced gap at all, and the rule honestly gives zero."""),
     code("""def spectrum(points, dim, n=6):
     d = pairwise_distances(points)
     dgm = persistence_diagrams(d, max_homology_dim=2, coeff_field=TOPOLOGY.coeff_field)[dim]
@@ -596,43 +590,43 @@ cells += [md("""## Главный результат S4: критерий зна
     return pers[:n], d.max()
 
 fig, axes = plt.subplots(1, 3, figsize=(13, 3.2))
-panels = [("torus", 1, 2, "тор, $H_1$ — ожидается 2"),
-          ("torus", 2, 1, "тор, $H_2$ — ожидается 1"),
-          ("sphere", 1, 0, "сфера, $H_1$ — ожидается 0")]
+panels = [("torus", 1, 2, "torus, $H_1$ — 2 expected"),
+          ("torus", 2, 1, "torus, $H_2$ — 1 expected"),
+          ("sphere", 1, 0, "sphere, $H_1$ — 0 expected")]
 for ax, (name, dim, expected, title) in zip(axes, panels):
     pers, diam = spectrum(clouds[name].points, dim)
     floor = TOPOLOGY.gap_noise_floor_ratio * diam
     ax.bar(range(1, len(pers) + 1), pers, color=["tab:blue"] * expected +
            ["lightgray"] * (len(pers) - expected))
     ax.axhline(floor, color="tab:red", ls="--", lw=1.2,
-               label=f"шумовой пол {TOPOLOGY.gap_noise_floor_ratio}·diam")
+               label=f"noise floor {TOPOLOGY.gap_noise_floor_ratio}·diam")
     for i in range(len(pers) - 1):
         if pers[i + 1] > 0:
             ax.text(i + 1.5, pers[i], f"{pers[i] / pers[i + 1]:.2f}x", fontsize=7,
                     ha="center", color="dimgray")
-    ax.set_title(title, fontsize=9); ax.set_xlabel("позиция в спектре"); ax.legend(fontsize=6)
-axes[0].set_ylabel("персистентность")
-fig.suptitle("Принятое правило: разрыв в спектре. Синим — признаки, серым — шум", fontsize=10)
+    ax.set_title(title, fontsize=9); ax.set_xlabel("position in the spectrum"); ax.legend(fontsize=6)
+axes[0].set_ylabel("persistence")
+fig.suptitle("The adopted rule: a gap in the spectrum. Blue — features, grey — noise", fontsize=10)
 fig.tight_layout(); plt.show()"""),
-    md("""**Принятое правило — разрыв в спектре с шагом в пыль.** Внутри каждой размерности:
-персистентности сортируются, бары ниже шумового пола откладываются, ищется наибольшее
-отношение соседних значений **включая шаг от последнего выжившего к первому
-отложенному**, и $\\beta_k$ равно позиции этого разрыва.
+    md("""**The adopted rule is a gap in the spectrum with a step into the dust.** Within each
+dimension: persistences are sorted, bars below the noise floor are set aside, the largest ratio of
+neighbouring values is sought **including the step from the last survivor to the first set-aside
+one**, and $\\beta_k$ equals the position of that gap.
 
-Шаг в пыль введён ради случая $\\beta_k = 0$: без него правило всегда возвращает
-не меньше одного признака. Он же чинит две непересекающиеся окружности, где над полом
-остаются два почти равных бара (1.473 и 1.453, отношение 1.01) и разрыва между ними нет.
+The step into the dust was introduced for the case $\\beta_k = 0$: without it the rule always
+returns at least one feature. It also fixes two disjoint circles, where two nearly equal bars remain
+above the floor (1.473 and 1.453, ratio 1.01) and there is no gap between them.
 
-**Результат калибровки:** правило верно на всех 54 комбинациях (9 случаев × 3 сида ×
-2 уровня шума). Параметры взяты из **центра** области нулевых промахов, а не с края:
-нуль держится при поле 0.05–0.10 и разрыве 1.45–1.62; принято 0.07 и 1.55.
-Старое правило на той же таблице даёт 9 промахов.
+**Calibration result:** the rule is correct on all 54 combinations (9 cases × 3 seeds × 2 noise
+levels). The parameters are taken from the **centre** of the zero-miss region, not from its edge:
+zero holds at floor 0.05–0.10 and gap 1.45–1.62; 0.07 and 1.55 are adopted. The old rule gives 9
+misses on the same table.
 
-*Эти четыре числа — цитата из `docs/method.md` §1.2a, а не вывод ячейки: полная
-калибровочная таблица считается отдельным харнессом (`calibration.py`) и занимает
-десятки минут. Всё остальное в этом разделе посчитано здесь.*"""),
-    code("""print("Проверка: критерий против таблицы ожиданий (путь A, чистые облака)\\n")
-print(f"{'объект':<16}{'ожидание':<12}{'измерено':<12}")
+*These four numbers are a quotation from `docs/method.md` §1.2a, not the output of a cell: the full
+calibration table is computed by a separate harness (`calibration.py`) and takes tens of minutes.
+Everything else in this section is computed here.*"""),
+    code("""print("Check: the criterion against the table of expectations (path A, clean clouds)\\n")
+print(f"{'object':<16}{'expected':<12}{'measured':<12}")
 print("-" * 40)
 for name, dataset in clouds.items():
     expected = dataset.ground_truth.expected_betti
@@ -642,54 +636,51 @@ for name, dataset in clouds.items():
         gap_noise_floor_ratio=TOPOLOGY.gap_noise_floor_ratio,
         gap_min_ratio=TOPOLOGY.gap_min_ratio)
     exp, got = tuple(expected[k] for k in range(3)), tuple(measured[k] for k in range(3))
-    print(f"{name:<16}{str(exp):<12}{str(got):<12}{'' if exp == got else '  <-- РАСХОЖДЕНИЕ'}")"""),
-    md("""**Зацепление Хопфа даёт $\\beta_0 = 2$, и это не ошибка.** Две сцепленные окружности
-имеют ровно те же гомологии, что и две разъединённые: зацепление — свойство вложения,
-а не гомотопического типа. Набор служит геометрическим стресс-тестом (пайплайн не должен
-преждевременно склеивать близко проходящие компоненты), а не источником отдельной
-топологической подписи.""")]
+    print(f"{name:<16}{str(exp):<12}{str(got):<12}{'' if exp == got else '  <-- MISMATCH'}")"""),
+    md("""**The Hopf link gives $\\beta_0 = 2$, and that is not an error.** Two linked circles have
+exactly the same homology as two unlinked ones: linking is a property of the embedding, not of the
+homotopy type. The dataset serves as a geometric stress test (the pipeline must not prematurely glue
+together components passing close to each other), not as a source of a separate topological
+signature.""")]
 
 # ---------------------------------------------------------------- S5
 cells += [md("""---
-# S5. Облако → взвешенная сеть
+# S5. Cloud → weighted network
 
-### Зачем этот шаг
+### Why this step
 
-До сих пор входом были **точки**. Но данные, ради которых всё затевается — функциональные
-коннектомы мозга, — приходят не как облако точек, а как **взвешенная сеть**: матрица
-связности между областями. Чтобы валидационный харнесс работал на том же типе объекта,
-нужен переход «облако → сеть», причём такой, чтобы известная топология облака
-сохранялась.
+So far the input was **points**. But the data for which all this is undertaken — functional brain
+connectomes — arrive not as a point cloud but as a **weighted network**: a connectivity matrix
+between regions. For the validation harness to work on the same type of object, a transition
+"cloud → network" is needed, and one that preserves the known topology of the cloud.
 
-Способов два, и оба нужны:
+There are two ways, and both are needed:
 
-- **Гауссово ядро сходства:** $w_{ij} = \\exp(-d_{ij}^2 / 2\\sigma^2)$. Даёт
-  **полносвязную** взвешенную сеть — то есть ровно тот тип объекта, что коннектом.
-- **Геодезика по $k$-NN-графу:** соединить каждую точку с $k$ ближайшими, а расстоянием
-  считать длину кратчайшего пути по этому графу. Это конструкция Isomap, и она
-  приближает **внутреннюю метрику многообразия**: на искривлённой поверхности путь
-  «по поверхности» отражает её устройство точнее, чем прямая через объемлющее
-  пространство.
+- **Gaussian similarity kernel:** $w_{ij} = \\exp(-d_{ij}^2 / 2\\sigma^2)$. Gives a **fully
+  connected** weighted network — exactly the type of object a connectome is.
+- **Geodesics over a $k$-NN graph:** connect each point to its $k$ nearest, and take as distance
+  the length of the shortest path in that graph. This is the Isomap construction, and it
+  approximates **the intrinsic metric of the manifold**: on a curved surface a path "along the
+  surface" reflects its structure more faithfully than a straight line through the ambient space.
 
-Обратно в расстояния (фильтрация работает с расстояниями, а не со сходствами) переводит
-монотонно убывающая функция: $d = \\sqrt{-2\\sigma^2\\log w}$ или $d = 1-w$. Немонотонное
-преобразование переставило бы рёбра в порядке вхождения и молча изменило бы ответ.
+Back into distances (the filtration works with distances, not similarities) goes a monotonically
+decreasing function: $d = \\sqrt{-2\\sigma^2\\log w}$ or $d = 1-w$. A non-monotone transform would
+permute the order in which edges enter and silently change the answer.
 
-### Две ручки, у каждой рабочее окно
+### Two knobs, each with a working window
 
-**$k$ работает в окне, а не «чем больше, тем лучше».** Снизу граф распадается на
-компоненты, и часть геодезических расстояний становится бесконечной. Сверху наступает
-**короткое замыкание** — известный отказ Isomap: появляются рёбра-хорды, срезающие
-поперёк дырок, и внутренняя метрика вырождается в объемлющую, то есть весь смысл
-конструкции теряется.
+**$k$ works in a window, not "the larger the better".** From below the graph falls apart into
+components, and some geodesic distances become infinite. From above **short-circuiting** sets in —
+a known failure of Isomap: chord edges cutting across the holes appear, and the intrinsic metric
+degenerates into the ambient one, i.e. the whole point of the construction is lost.
 
-Дешёвый сторож, не требующий персистентных вычислений, — отношение геодезического
-диаметра к евклидову $\\mathrm{diam}_{geo}/\\mathrm{diam}_{euclid}$: приближение к
-единице означает, что граф стал практически полным и метрика выродилась.
+A cheap guard that needs no persistent computations is the ratio of the geodesic diameter to the
+Euclidean one, $\\mathrm{diam}_{geo}/\\mathrm{diam}_{euclid}$: approaching one means the graph has
+become practically complete and the metric has degenerated.
 
-**Ширина ядра $\\sigma$** — вторая ручка, и она оказалась главным источником ошибок
-на этом шаге. На левой панели ниже — окно по $k$, на правой — распределение весов при
-двух значениях ширины."""),
+**The kernel width $\\sigma$** is the second knob, and it turned out to be the main source of errors
+at this step. The left panel below shows the window in $k$, the right one the distribution of
+weights at two width values."""),
     code("""from tdadyn.synthetic.network import (collapsed_weight_fraction, gaussian_kernel,
                                       geodesic_diameter_ratio, kernel_width,
                                       knn_geodesic_distances, knn_graph)
@@ -705,32 +696,31 @@ for k in ks:
 fig, ax = plt.subplots(1, 2, figsize=(10, 3))
 ax[0].plot(ks, ratios, "o-")
 ax[0].axhline(net.min_geodesic_diameter_ratio, color="tab:red", ls="--",
-              label=f"сторож {net.min_geodesic_diameter_ratio}")
-ax[0].axvline(net.knn_k, color="tab:green", ls=":", label=f"принято k={net.knn_k}")
+              label=f"guard {net.min_geodesic_diameter_ratio}")
+ax[0].axvline(net.knn_k, color="tab:green", ls=":", label=f"adopted k={net.knn_k}")
 ax[0].set_xscale("log"); ax[0].set_xlabel("k"); ax[0].set_ylabel(r"diam$_{geo}$/diam")
-ax[0].set_title("Окно по k: сверху короткое замыкание"); ax[0].legend(fontsize=7)
+ax[0].set_title("Window in k: short-circuiting from above"); ax[0].legend(fontsize=7)
 
 for fraction, style in ((net.kernel_sigma_median_fraction, "-"), (0.15, "--")):
     sigma = kernel_width(torus_d, median_fraction=fraction)
     w = gaussian_kernel(torus_d, sigma=sigma)
     collapsed = collapsed_weight_fraction(w)
     ax[1].hist(w[np.triu_indices_from(w, 1)], bins=50, histtype="step", ls=style,
-               label=f"доля медианы {fraction}: схлопнуто {collapsed:.0%}")
+               label=f"median fraction {fraction}: collapsed {collapsed:.0%}")
 ax[1].axvline(1e-6, color="k", lw=0.8)
-ax[1].set_yscale("log"); ax[1].set_xlabel("вес"); ax[1].legend(fontsize=7)
-ax[1].set_title("Вырожденное ядро — главный источник ошибок здесь")
+ax[1].set_yscale("log"); ax[1].set_xlabel("weight"); ax[1].legend(fontsize=7)
+ax[1].set_title("A degenerate kernel is the main source of errors here")
 fig.tight_layout(); plt.show()"""),
-    md("""Ширина ядра задаётся **в долях медианного попарного расстояния**, а не абсолютным
-числом: объекты семейства 1 различаются масштабом, и абсолютное значение, подходящее
-одному, схлопывает другой. Измерено: при $\\sigma = 0.5$ и диаметре тора 5.71 доля весов
-ниже $10^{-6}$ составляет 60%, и преобразование $1-w$ работает с уже уничтоженными
-данными.
+    md("""The kernel width is set **as a fraction of the median pairwise distance**, not as an
+absolute number: family-1 objects differ in scale, and an absolute value suiting one collapses
+another. Measured: at $\\sigma = 0.5$ and a torus diameter of 5.71 the fraction of weights below
+$10^{-6}$ is 60%, and the transform $1-w$ works with already destroyed data.
 
-### Как выглядит сама сеть
+### What the network itself looks like
 
-Одно и то же облако — окружность — в трёх видах: рёбра гауссова ядра с прозрачностью
-по весу, та же сеть матрицей, и разреженный $k$-NN-граф, по которому считается
-геодезика."""),
+One and the same cloud — a circle — in three forms: the edges of the Gaussian kernel with
+transparency by weight, the same network as a matrix, and the sparse $k$-NN graph over which the
+geodesics are computed."""),
     code("""ring = build_static_cloud("circle", CONFIG, n_points=90, noise_sigma=0.02).points
 ring_d = pairwise_distances(ring)
 sigma = kernel_width(ring_d, median_fraction=net.kernel_sigma_median_fraction)
@@ -743,12 +733,12 @@ strong = W[iu] > 0.25
 for i, j, w in zip(iu[0][strong], iu[1][strong], W[iu][strong]):
     ax[0].plot(*ring[[i, j]].T, color="tab:blue", lw=0.7, alpha=float(w) ** 2)
 ax[0].scatter(*ring.T, s=14, color="k", zorder=3)
-ax[0].set_title("Гауссово ядро: прозрачность ∝ весу", fontsize=9)
+ax[0].set_title("Gaussian kernel: transparency ∝ weight", fontsize=9)
 ax[0].set_aspect("equal"); ax[0].axis("off")
 
 im = ax[1].imshow(W, cmap="viridis")
-ax[1].set_title("Та же сеть матрицей весов", fontsize=9)
-ax[1].set_xlabel("узел"); ax[1].set_ylabel("узел"); ax[1].grid(False)
+ax[1].set_title("The same network as a weight matrix", fontsize=9)
+ax[1].set_xlabel("node"); ax[1].set_ylabel("node"); ax[1].grid(False)
 fig.colorbar(im, ax=ax[1], fraction=0.046)
 
 knn = knn_graph(ring_d, k=8, symmetrize=net.knn_symmetrize)
@@ -756,88 +746,85 @@ ku = np.triu_indices_from(knn, 1)
 for i, j in zip(ku[0][knn[ku] > 0], ku[1][knn[ku] > 0]):
     ax[2].plot(*ring[[i, j]].T, color="tab:green", lw=0.9, alpha=0.8)
 ax[2].scatter(*ring.T, s=14, color="k", zorder=3)
-ax[2].set_title("$k$-NN-граф ($k$=8): по нему идёт геодезика", fontsize=9)
+ax[2].set_title("$k$-NN graph ($k$=8): the geodesics run over it", fontsize=9)
 ax[2].set_aspect("equal"); ax[2].axis("off")
 fig.tight_layout(); plt.show()"""),
-    md("""Гауссово ядро даёт **полносвязную** взвешенную сеть — тот же тип объекта, что
-функциональный коннектом Задачи 3. $k$-NN-граф разрежен, но матрица кратчайших путей по
-нему снова плотная, поэтому средством контроля сложности он не является: его ценность
-в том, что внутренняя метрика на искривлённом многообразии отражает устройство точнее
-объемлющей.""")]
+    md("""The Gaussian kernel gives a **fully connected** weighted network — the same type of object
+as the functional connectome of Task 3. The $k$-NN graph is sparse, but the matrix of shortest
+paths over it is dense again, so it is not a means of controlling complexity: its value is that the
+intrinsic metric on a curved manifold reflects the structure more faithfully than the ambient
+one.""")]
 
 # ---------------------------------------------------------------- S6
 cells += [md("""---
-# S6. Динамические графы с запланированными событиями
+# S6. Dynamic graphs with scheduled events
 
-### Что здесь появляется нового
+### What is new here
 
-До сих пор объект был статическим: одно облако, один ответ. Семейство 2 вводит **время**:
-последовательность снимков графа $G_0, \\dots, G_{59}$, в которой в заранее назначенные
-моменты происходят рождение и гибель топологических признаков.
+So far the object was static: one cloud, one answer. Family 2 introduces **time**: a sequence of
+graph snapshots $G_0, \\dots, G_{59}$ in which topological features are born and die at moments
+scheduled in advance.
 
-Это основной набор для **Задачи 2** — алгоритмов зигзаг-персистентности. «Зигзаг» здесь
-означает, что соседние снимки связываются через объединение,
-$K_i \\hookrightarrow K_i \\cup K_{i+1} \\hookleftarrow K_{i+1}$, то есть включения идут
-с чередованием направления: граф не только растёт, но и теряет рёбра. Алгоритм должен
-по такой последовательности сказать, какой класс когда родился и когда умер.
+This is the main dataset for **Task 2** — zigzag persistence algorithms. "Zigzag" here means that
+neighbouring snapshots are linked through their union,
+$K_i \\hookrightarrow K_i \\cup K_{i+1} \\hookleftarrow K_{i+1}$, i.e. the inclusions alternate in
+direction: the graph not only grows but also loses edges. From such a sequence the algorithm must
+say which class was born when and when it died.
 
-### Как переводятся события: слова и гомологии — не одно и то же
+### How events translate: words and homology are not the same
 
-Место, где ошибаются чаще всего. Интуитивные формулировки на языке графов и события на
-языке гомологий не совпадают:
+The place where mistakes are most frequent. Intuitive wordings in the language of graphs and events
+in the language of homology do not coincide:
 
-| Событие на графе | Гомологическое событие | $\\beta$ |
+| Event on the graph | Homological event | $\\beta$ |
 |---|---|---|
-| Компоненты сливаются | гибель класса $H_0$ | $\\beta_0 - 1$ |
-| Компонента распадается | рождение класса $H_0$ | $\\beta_0 + 1$ |
-| Путь замыкается в цикл | рождение класса $H_1$ | $\\beta_1 + 1$ |
-| В цикл добавляется хорда | **рождение** нового класса $H_1$ | $\\beta_1 + 1$ |
-| Удаляется ребро цикла | гибель класса $H_1$ | $\\beta_1 - 1$ |
+| Components merge | death of an $H_0$ class | $\\beta_0 - 1$ |
+| A component splits | birth of an $H_0$ class | $\\beta_0 + 1$ |
+| A path closes into a cycle | birth of an $H_1$ class | $\\beta_1 + 1$ |
+| A chord is added to a cycle | **birth** of a new $H_1$ class | $\\beta_1 + 1$ |
+| An edge of a cycle is removed | death of an $H_1$ class | $\\beta_1 - 1$ |
 
-Обратите внимание на строку про хорду: на языке графов это «разделение» одного цикла
-на два, а на языке гомологий — **рождение**, а не разделение. В штрихкоде операции
-разделения класса не существует вовсе; есть только рождение и гибель. Поэтому в JSON
-поле `type` принимает **только** `birth` или `death`, а интуитивная формулировка
-кладётся отдельным полем `narrative`.
+Note the row about the chord: in the language of graphs it is a "split" of one cycle into two, in
+the language of homology a **birth**, not a split. A barcode has no operation of splitting a class
+at all; there are only births and deaths. So in JSON the `type` field takes **only** `birth` or
+`death`, and the intuitive wording goes into a separate field `narrative`.
 
-### Сценарий `cycle_lifecycle`
+### The `cycle_lifecycle` scenario
 
-24 узла, 60 снимков, пять запланированных событий:
+24 nodes, 60 snapshots, five scheduled events:
 
-1. путь $0-1-\\dots-23$, циклов нет ($\\beta_1 = 0$);
-2. **снимок 12**: замыкание ребром $(23,0)$ → рождение класса в $H_1$;
-3. **снимок 27**: хорда $(0,12)$ делит 24-цикл на два → рождение второго класса;
-4. **снимок 41**: удаление ребра $(6,7)$ → гибель класса в $H_1$;
-5. **снимок 48**: удаление $(3,4)$ отделяет компоненту → рождение класса в $H_0$;
-6. **снимок 55**: восстановление $(3,4)$ → слияние, гибель класса в $H_0$.
+1. the path $0-1-\\dots-23$, no cycles ($\\beta_1 = 0$);
+2. **snapshot 12**: closing by the edge $(23,0)$ → birth of a class in $H_1$;
+3. **snapshot 27**: the chord $(0,12)$ splits the 24-cycle in two → birth of a second class;
+4. **snapshot 41**: removing the edge $(6,7)$ → death of a class in $H_1$;
+5. **snapshot 48**: removing $(3,4)$ detaches a component → birth of a class in $H_0$;
+6. **snapshot 55**: restoring $(3,4)$ → merge, death of a class in $H_0$.
 
-Треугольников в сценарии не возникает ни на одном снимке — иначе флаг-комплекс заполнил
-бы цикл и произошедшее событие не совпало бы с записанным в лог.
+No triangles arise in the scenario on any snapshot — otherwise the flag complex would fill a cycle
+and the event that happened would differ from the one recorded in the log.
 
-**Конвенция индекса.** Запись `snapshot: k` означает, что $G_k$ **уже содержит**
-изменение, а $G_{k-1}$ — ещё нет; скачок кривой приходится на переход $k-1 \\to k$.
-Альтернативное прочтение даёт сдвиг на единицу по всему логу, невидимый внутри этого
-семейства и всплывающий только в Задаче 2 — где он будет выглядеть систематической
-ошибкой алгоритма локализации.
+**Index convention.** The record `snapshot: k` means that $G_k$ **already contains** the change and
+$G_{k-1}$ does not yet; the jump of the curve falls on the transition $k-1 \\to k$. The alternative
+reading shifts the whole log by one, invisible inside this family and surfacing only in Task 2 —
+where it would look like a systematic error of the localisation algorithm.
 
-### Истина здесь двойная
+### The truth here is twofold
 
-`events` — намерение планировщика, записанное при построении. `betti_curve` — посчитана
-эталонной реализацией (путь B) по **записанным на диск снимкам**, а не по внутреннему
-состоянию планировщика: иначе кривая описывала бы намерение, а не то, что легло на диск.
-Тест требует их точного совпадения — сравниваются мультимножества пар «позиция,
-направление», а не количества, иначе сдвиг всех событий на единицу прошёл бы
-незамеченным."""),
+`events` is the scheduler's intent, recorded during construction. `betti_curve` is computed by the
+reference implementation (path B) from **the snapshots written to disk**, not from the scheduler's
+internal state: otherwise the curve would describe the intent rather than what landed on disk. A
+test requires them to match exactly — multisets of "position, direction" pairs are compared, not
+counts, otherwise a shift of all events by one would go unnoticed."""),
     code("""lifecycle = build_dynamic_graph("cycle_lifecycle", CONFIG)
 gt = lifecycle.ground_truth
 curve, events = gt.betti_curve, gt.events
 
-# Пять различных графов на 60 снимков: сценарий целиком помещается в один ряд.
+# Five distinct graphs over 60 snapshots: the whole scenario fits in one row.
 n_nodes = lifecycle.snapshots.shape[1]
 ang = np.linspace(0, 2 * np.pi, n_nodes, endpoint=False) + np.pi / 2
 ring_pos = np.c_[np.cos(ang), np.sin(ang)]
-phases = [(0, "0–11: путь"), (12, "12–26: путь замкнулся"), (27, "27–40: + хорда (0,12)"),
-          (41, "41–47: удалено (6,7)"), (48, "48–54: удалено (3,4)")]
+phases = [(0, "0–11: a path"), (12, "12–26: the path closed"), (27, "27–40: + chord (0,12)"),
+          (41, "41–47: (6,7) removed"), (48, "48–54: (3,4) removed")]
 
 fig, axes = plt.subplots(1, 5, figsize=(14, 3.1))
 for ax, (t, title) in zip(axes, phases):
@@ -854,17 +841,24 @@ for ax, (t, title) in zip(axes, phases):
     b = curve[0][t], curve[1][t], curve[2][t]
     ax.set_title(f"{title}\\nbeta = {b}", fontsize=8)
     ax.set_aspect("equal"); ax.axis("off")
-fig.suptitle("cycle_lifecycle: пять различных графов сценария (24 узла, 60 снимков)",
+fig.suptitle("cycle_lifecycle: the five distinct graphs of the scenario (24 nodes, 60 snapshots)",
              fontsize=10)
-fig.tight_layout(); plt.show()"""),
-    md("""Хорда $(0,12)$ показана красным: она делит 24-цикл на два цикла длины 13, и оба
-не короче трёх рёбер — иначе флаг-комплекс заполнил бы треугольник и второе рождение
-в $H_1$ не произошло бы. Треугольников в сценарии нет ни на одном снимке по построению.
+fig.tight_layout(rect=(0, 0, 1, 0.9)); plt.show()"""),
+    md("""The chord $(0,12)$ is shown in red: it splits the 24-cycle into two cycles of length 13,
+both at least three edges long — otherwise the flag complex would fill a triangle and the second
+birth in $H_1$ would not happen. There are no triangles in the scenario on any snapshot, by
+construction.
 
-Снимки 55–59 совпадают с 41–47 **побайтово**: восстановление ребра возвращает граф ровно
-в прежнее состояние. Это намеренно — повтор проверяет, что конвейер не схлопывает
-состояния по идентичности графа и честно рапортует отдельные рождение и гибель $H_0$."""),
-    code("""
+Snapshots 55–59 coincide with 41–47 **byte for byte**: restoring the edge returns the graph exactly
+to its former state. This is intentional — the repetition checks that the pipeline does not collapse
+states by graph identity and honestly reports the separate birth and death of $H_0$."""),
+    code("""# The narratives are recorded truth and stay in the language they were generated in; the
+# English gloss below is for the reader and is not part of any dataset.
+GLOSS = {"h1_a": {"birth": "the path closes into a cycle",
+                  "death": "an edge of the arc cut off by the chord is removed"},
+         "h1_b": {"birth": "a chord splits the cycle in two"},
+         "h0_b": {"birth": "a component detaches from the dangling path",
+                  "death": "the components merge back"}}
 
 fig, ax = plt.subplots(figsize=(11, 3.2))
 for dim, style in ((0, "-o"), (1, "-s")):
@@ -874,28 +868,29 @@ for e in events:
                ls="--", lw=1, alpha=0.8)
     ax.text(e.snapshot, 2.25, f"{e.feature_id}\\n{e.type}", fontsize=6.5, ha="center",
             color="tab:red" if e.type == "death" else "tab:green")
-ax.set_xlabel("снимок"); ax.set_ylabel(r"$\\beta_k$"); ax.set_ylim(-0.2, 2.6)
-ax.set_title("cycle_lifecycle: кривая Бетти и лог событий")
+ax.set_xlabel("snapshot"); ax.set_ylabel(r"$\\beta_k$"); ax.set_ylim(-0.2, 2.6)
+ax.set_title("cycle_lifecycle: Betti curve and event log")
 ax.legend(fontsize=8, loc="center left"); fig.tight_layout(); plt.show()
 
-print(f"{'снимок':>7}{'dim':>5}{'тип':>8}{'признак':>10}   нарратив")
-print("-" * 78)
+print(f"{'snapshot':>9}{'dim':>5}{'type':>8}{'feature':>10}   description")
+print("-" * 80)
 for e in events:
-    print(f"{e.snapshot:>7}{e.dim:>5}{e.type:>8}{e.feature_id:>10}   {e.narrative}")"""),
-    md("""### Два решения, которые выглядят произволом и им не являются
+    gloss = GLOSS.get(e.feature_id, {}).get(e.type, e.narrative)
+    print(f"{e.snapshot:>9}{e.dim:>5}{e.type:>8}{e.feature_id:>10}   {gloss}")"""),
+    md("""### Two decisions that look arbitrary and are not
 
-**Гибель на снимке 41 спарена с рождением на 12 (`h1_a`), а не на 27.** Разложение
-зигзаг-модуля на интервальные модули однозначно (Крулль–Шмидт для колчана типа $A_n$),
-поэтому парность определена и её нельзя назначить. Над $\\mathbb{Z}/2$: $c_1$ — цикл
-через хорду по дуге $0..12$, $c_2$ — по дуге $12..23..0$, $c = c_1 + c_2$ — исходный
-24-цикл. Образы включений — различные прямые, интервалы получаются $[12, 40]$ и
-$[27, \\infty)$.
+**The death at snapshot 41 is paired with the birth at 12 (`h1_a`), not at 27.** The decomposition
+of a zigzag module into interval modules is unique (Krull–Schmidt for a quiver of type $A_n$), so
+the pairing is determined and cannot be assigned. Over $\\mathbb{Z}/2$: $c_1$ is the cycle through
+the chord along the arc $0..12$, $c_2$ along the arc $12..23..0$, $c = c_1 + c_2$ the original
+24-cycle. The images of the inclusions are different lines, and the intervals come out as
+$[12, 40]$ and $[27, \\infty)$.
 
-Интуиция «хорда разделила цикл на два, ломаем один — умирает молодой» здесь **неверна**.
+The intuition "the chord split the cycle in two, break one and the younger dies" is **wrong** here.
 
-**Цена ошибки:** лог с инвертированной парностью не ломает ни один тест внутри
-семейства 2 — кривая Бетти парность не видит. Всплыло бы в Задаче 2 как систематически
-«неверная» пара, и отладка пошла бы в алгоритм, а не в лог."""),
+**The cost of the error:** a log with inverted pairing breaks no test inside family 2 — the Betti
+curve does not see pairing. It would surface in Task 2 as a systematically "wrong" pair, and
+debugging would go into the algorithm rather than the log."""),
     code("""theta = lifecycle.snapshots[40]
 broken = lifecycle.snapshots[41]
 theta_graph = adjacency_from_snapshot(theta, edge_rule=gt.edge_rule,
@@ -918,52 +913,52 @@ broken_graph = adjacency_from_snapshot(broken, edge_rule=gt.edge_rule,
                                        edge_threshold=gt.edge_threshold)
 betti41 = reference.betti_numbers_of_graph(broken_graph, max_homology_dim=2, max_nodes=30)
 
-print("Проверяется каноническая часть утверждения (тождество класса непроверяемо:")
-print("базис H_1 тета-графа не канонический).\\n")
-print(f"  c  и c2 — циклы тета-графа:            {not (boundary @ cycle24 % 2).any()}, "
+print("The canonical part of the claim is checked (the identity of a class cannot be checked:")
+print("the basis of H_1 of the theta graph is not canonical).\\n")
+print(f"  c and c2 are cycles of the theta graph:  {not (boundary @ cycle24 % 2).any()}, "
       f"{not (boundary @ c2 % 2).any()}")
-print(f"  c  использует удалённое ребро (6,7):   {bool(cycle24[removed])}  -> c не в Z_1(G_41)")
-print(f"  c2 не использует его:                  {not bool(c2[removed])}  -> c2 в Z_1(G_41)")
-print(f"  dim Z_1(G_41) = beta_1(G_41) = {betti41[1]}          -> <c2> исчерпывает пережившее")
-print("\\n=> гибель в 41 спарена с рождением в 12.")""")]
+print(f"  c uses the removed edge (6,7):           {bool(cycle24[removed])}  -> c not in Z_1(G_41)")
+print(f"  c2 does not use it:                      {not bool(c2[removed])}  -> c2 in Z_1(G_41)")
+print(f"  dim Z_1(G_41) = beta_1(G_41) = {betti41[1]}            -> <c2> is all that survives")
+print("\\n=> the death at 41 is paired with the birth at 12.")""")]
 
 # ---------------------------------------------------------------- S7
 cells += [md("""---
-# S7. Метрический сценарий, осцилляторы, SBM
+# S7. The metric scenario, oscillators, SBM
 
-Три разных объекта в одной сессии, объединённые тем, что все они — шаг к реалистичности.
+Three different objects in one session, united by being steps towards realism.
 
-## geometric_loop — единственный набор с метрической фильтрацией
+## geometric_loop — the only dataset with a metric filtration
 
-`cycle_lifecycle` из S6 комбинаторен: рёбра назначаются планировщиком напрямую. Реальный
-динамический коннектом устроен иначе — там есть **метрика**, и граф на каждом кадре
-получается порогованием расстояний. `geometric_loop` воспроизводит именно эту цепочку.
+`cycle_lifecycle` from S6 is combinatorial: the scheduler assigns edges directly. A real dynamic
+connectome works differently — there is a **metric**, and the graph on each frame comes from
+thresholding distances. `geometric_loop` reproduces exactly this chain.
 
-Устройство: $n = 24$ точки раскладываются по дуге окружности, у которой во времени
-меняются две вещи — **радиус** $R(t)$ (дышит по кусочно-линейному расписанию) и **ширина
-разрыва дуги** $\\delta$. На каждом кадре по точкам строится комплекс Рипса при
-фиксированном масштабе $\\varepsilon$; на диск пишутся **расстояния**, а не сходства.
+Construction: $n = 24$ points are laid out along an arc of a circle in which two things change over
+time — the **radius** $R(t)$ (it breathes by a piecewise-linear schedule) and the **width of the gap
+in the arc** $\\delta$. On each frame a Rips complex is built on the points at a fixed scale
+$\\varepsilon$; **distances**, not similarities, are written to disk.
 
-Расписание простое: дуга замкнута (петля есть, $\\beta_1 = 1$), на снимках 20–44 разрыв
-открыт (петли нет), затем снова замкнута. Радиус при этом дышит **всё время** и событий
-не порождает — это и есть главный отрицательный контроль набора.
+The schedule is simple: the arc is closed (there is a loop, $\\beta_1 = 1$), on snapshots 20–44 the
+gap is open (no loop), then it is closed again. Meanwhile the radius breathes **all the time** and
+generates no events — this is the main negative control of the dataset.
 
-### $\\varepsilon$ — не забытая ручка, а параметр качественного режима
+### $\\varepsilon$ is not a forgotten knob but a parameter of a qualitative regime
 
-Масштаб $\\varepsilon$ здесь нельзя выбрать «на глаз»: у него есть окно, за пределами
-которого набор перестаёт означать то, что заявлено.
+The scale $\\varepsilon$ cannot be chosen "by eye" here: it has a window outside which the dataset
+stops meaning what it claims.
 
-**Снизу** межточечный шаг $2\\pi R/n$ растёт вместе с радиусом, и при $\\varepsilon$ ниже
-него дыхание радиуса даёт не разрыв дуги, а рассыпание графа на $n$ отдельных компонент.
+**From below** the inter-point step $2\\pi R/n$ grows with the radius, and with $\\varepsilon$ below
+it, radius breathing gives not a gap in the arc but a disintegration of the graph into $n$ separate
+components.
 
-**Сверху** вступает результат Адамашека–Адамса: комплекс Рипса окружности с ростом
-относительного масштаба **не стягивается**, а последовательно эквивалентен
-$S^1, S^3, S^5, \\dots$. При `max_homology_dim: 2` гибель $\\beta_1$ будет видна,
-а родившийся вместо него класс в размерности 3 — нет, и событие будет выглядеть как
-«петля исчезла без причины».
+**From above** the result of Adamaszek–Adams comes in: the Rips complex of a circle does **not**
+contract as the relative scale grows, but is successively equivalent to $S^1, S^3, S^5, \\dots$. At
+`max_homology_dim: 2` the death of $\\beta_1$ will be visible, but the class born instead of it in
+dimension 3 will not, and the event will look like "the loop disappeared for no reason".
 
-Окно получается $2\\pi R_{\\max}/n < \\varepsilon < R_{\\min}\\sqrt{3}$, то есть
-$(0.367, 1.732)$. Обе границы подтверждены измерением — таблица ниже."""),
+The window is $2\\pi R_{\\max}/n < \\varepsilon < R_{\\min}\\sqrt{3}$, i.e. $(0.367, 1.732)$. Both
+bounds are confirmed by measurement — table below."""),
     code("""loop_cfg = CONFIG.dynamic_events.scenarios.geometric_loop
 n, radii = loop_cfg.n_points, loop_cfg.radius_schedule
 
@@ -977,26 +972,26 @@ def loop_betti(radius, eps, gap):
 
 closed = 2 * np.pi / n
 grid = [0.20, 0.30, 0.40, 0.80, 1.70, 1.90]
-print("Окно по eps: beta при закрытой дуге\\n")
+print("Window in eps: beta with the arc closed\\n")
 print(f"{'eps':>6}" + "".join(f"{'R=' + str(R):>14}" for R in (1.0, 1.4)))
 print("-" * 36)
 for eps in grid:
     cells_ = "".join(f"{str(loop_betti(R, eps, closed)):>14}" for R in (1.0, 1.4))
     mark = ""
-    if eps <= 0.30: mark = "  <- рассыпается"
-    if eps >= 1.90: mark = "  <- режим S^3"
+    if eps <= 0.30: mark = "  <- falls apart"
+    if eps >= 1.90: mark = "  <- S^3 regime"
     print(f"{eps:>6}{cells_}{mark}")
-print(f"\\nпринято eps = {loop_cfg.rips_epsilon} — середина окна (0.367, 1.732) "
-      f"в логарифмическом масштабе")"""),
-    md("""**Закрытое состояние дуги — $\\delta = 2\\pi/n$, а не ноль.** При нуле формула
-$\\theta_j = j(2\\pi-\\delta)/(n-1)$ ставит точки 0 и $n-1$ друг на друга: расстояние
-$2.4\\cdot10^{-16}$. Числа Бетти при этом **совпадают** — (1,1,0) в обоих случаях, —
-поэтому тест согласованности прошёл бы, и вырождение осталось бы в наборе молча.
-Ловится не по $\\beta$, а по минимальному попарному расстоянию."""),
+print(f"\\nadopted eps = {loop_cfg.rips_epsilon} — the middle of the window (0.367, 1.732) "
+      f"on a logarithmic scale")"""),
+    md("""**The closed state of the arc is $\\delta = 2\\pi/n$, not zero.** At zero the formula
+$\\theta_j = j(2\\pi-\\delta)/(n-1)$ puts points 0 and $n-1$ on top of each other: a distance of
+$2.4\\cdot10^{-16}$. The Betti numbers **coincide** — (1,1,0) in both cases — so the consistency test
+would pass, and the degeneracy would stay in the dataset silently. It is caught not by $\\beta$ but
+by the minimum pairwise distance."""),
     code("""loop = build_dynamic_graph("geometric_loop", CONFIG)
 lgt = loop.ground_truth
 
-# Снимки лежат как РАССТОЯНИЯ, поэтому положения точек восстанавливаем из расписания.
+# The snapshots are stored as DISTANCES, so the point positions are recovered from the schedule.
 def loop_points(t):
     gap = loop_cfg.gap_angle if loop_cfg.gap_open_at <= t < loop_cfg.gap_close_at else 2 * np.pi / n
     radius = np.interp(t, np.linspace(0, CONFIG.dynamic_events.n_snapshots - 1,
@@ -1013,17 +1008,17 @@ for ax, t in zip(axes, (0, 19, 30, 50)):
     for i, j in zip(iu[0][adj[iu] > 0], iu[1][adj[iu] > 0]):
         ax.plot(*pts[[i, j]].T, color="tab:blue", lw=0.8, alpha=0.65, zorder=2)
     ax.scatter(*pts.T, s=18, color="k", zorder=3)
-    state = "разрыв открыт" if gap > 2 * np.pi / n else "дуга замкнута"
-    ax.set_title(f"снимок {t}: {state}\\nR = {radius:.2f}, рёбер {int(adj.sum() // 2)}, "
+    state = "gap open" if gap > 2 * np.pi / n else "arc closed"
+    ax.set_title(f"snapshot {t}: {state}\\nR = {radius:.2f}, {int(adj.sum() // 2)} edges, "
                  f"beta_1 = {lgt.betti_curve[1][t]}", fontsize=8)
     ax.set_aspect("equal"); ax.axis("off"); ax.set_xlim(-1.6, 1.6); ax.set_ylim(-1.6, 1.6)
-fig.suptitle("geometric_loop: метрическая фильтрация — радиус дышит, дуга рвётся",
+fig.suptitle("geometric_loop: a metric filtration — the radius breathes, the arc breaks",
              fontsize=10)
-fig.tight_layout(); plt.show()"""),
-    md("""Видно оба механизма сразу. Радиус меняется от кадра к кадру и **меняет граф**
-(число рёбер на панелях разное), но $\\beta$ при этом не двигается. Разрыв дуги — двигает.
-Это и делает набор отрицательным контролем: детектор, срабатывающий на смену комплекса,
-поймается на дыхании радиуса."""),
+fig.tight_layout(rect=(0, 0, 1, 0.9)); plt.show()"""),
+    md("""Both mechanisms are visible at once. The radius changes from frame to frame and **changes
+the graph** (the edge count differs between panels), but $\\beta$ does not move. The gap in the arc
+does move it. This is what makes the dataset a negative control: a detector that fires on a change
+of complex will be caught on radius breathing."""),
     code("""
 graphs = [adjacency_from_snapshot(s, edge_rule=lgt.edge_rule, edge_threshold=lgt.edge_threshold)
           for s in loop.snapshots]
@@ -1033,64 +1028,62 @@ scheduled = {e.snapshot for e in lgt.events}
 fig, ax = plt.subplots(figsize=(11, 3))
 ax.plot(lgt.betti_curve[1], "-s", ms=2.5, lw=1.4, label=r"$\\beta_1$", color="tab:orange")
 ax2 = ax.twinx()
-ax2.plot([int(g.sum() // 2) for g in graphs], lw=1, color="gray", alpha=0.6, label="рёбер")
-ax2.set_ylabel("рёбер", color="gray")
+ax2.plot([int(g.sum() // 2) for g in graphs], lw=1, color="gray", alpha=0.6, label="edges")
+ax2.set_ylabel("edges", color="gray")
 for t in changes:
     is_event = t in scheduled
     ax.axvline(t, color="tab:red" if is_event else "tab:blue", ls="--" if is_event else ":",
                lw=1.2 if is_event else 1)
-ax.set_xlabel("снимок"); ax.set_ylabel(r"$\\beta_1$"); ax.set_ylim(-0.2, 1.4)
-ax.set_title("geometric_loop: красным — события, синим — граф меняется БЕЗ события")
+ax.set_xlabel("snapshot"); ax.set_ylabel(r"$\\beta_1$"); ax.set_ylim(-0.2, 1.4)
+ax.set_title("geometric_loop: red — events, blue — the graph changes WITHOUT an event")
 ax.legend(fontsize=8, loc="center left"); fig.tight_layout(); plt.show()
 
-print(f"граф меняется на снимках: {changes}")
-print(f"события запланированы на:  {sorted(scheduled)}")
-print(f"дыхание радиуса без события: {[t for t in changes if t not in scheduled]}")
-print(f"различных графов: {len({g.tobytes() for g in graphs})} на {len(graphs)} снимков")"""),
-    md("""Три снимка, где граф меняется без события, — **сильнейший отрицательный контроль
-набора**: детектор, срабатывающий на смену комплекса, поймается здесь. Тест называет их
-поимённо, потому что проверка «по всему диапазону» прошла бы и на наборе, где комплекс
-вообще не менялся.
+print(f"the graph changes at snapshots:  {changes}")
+print(f"events are scheduled at:         {sorted(scheduled)}")
+print(f"radius breathing without event:  {[t for t in changes if t not in scheduled]}")
+print(f"distinct graphs: {len({g.tobytes() for g in graphs})} over {len(graphs)} snapshots")"""),
+    md("""The three snapshots where the graph changes without an event are **the strongest negative
+control of the dataset**: a detector that fires on a change of complex will be caught here. The test
+names them individually, because a check "over the whole range" would also pass on a dataset where
+the complex never changed.
 
-## Осцилляторы: ряд → скользящее окно → динамический граф
+## Oscillators: series → sliding window → dynamic graph
 
-### Что это моделирует
+### What this models
 
-Семейство 3 — синтетический аналог фМРТ. Реальная цепочка обработки выглядит так:
-из мозга снимаются временные ряды по областям, между ними скользящим окном считается
-корреляция, из корреляционных матриц строится динамическая сеть, по ней — персистентность.
-На реальных данных **ни один** шаг этой цепочки не проверяем: неизвестно, какая связь
-была на самом деле.
+Family 3 is a synthetic analogue of fMRI. The real processing chain looks like this: time series are
+recorded from brain regions, a sliding window computes correlations between them, a dynamic network
+is built from the correlation matrices, and persistence from that. On real data **not one** step of
+this chain can be checked: it is unknown what the coupling actually was.
 
-Здесь связь задана **расписанием**, то есть известна точно, и вся цепочка становится
-проверяемой.
+Here the coupling is set by a **schedule**, i.e. known exactly, and the whole chain becomes
+checkable.
 
-Ряды порождаются двумя классическими системами связанных осцилляторов:
+The series are generated by two classical systems of coupled oscillators:
 
-- **Курамото** — фазовые осцилляторы,
+- **Kuramoto** — phase oscillators,
   $\\dot\\theta_i = \\omega_i + \\frac{K}{N}\\sum_j A_{ij}(t)\\sin(\\theta_j - \\theta_i)$,
-  наблюдаемая $x_i = \\sin\\theta_i$. Связанные каналы синхронизируются по фазе.
-- **Рёсслер** — хаотические аттракторы с диффузной связью. При $c = 5.7$ система
-  хаотична, что даёт ряды заметно менее регулярные, чем у Курамото.
+  observable $x_i = \\sin\\theta_i$. Coupled channels synchronise in phase.
+- **Rössler** — chaotic attractors with diffusive coupling. At $c = 5.7$ the system is chaotic,
+  giving series noticeably less regular than Kuramoto's.
 
-### Что такое «режим связи»
+### What a "coupling regime" is
 
-**Режим — это разбиение каналов на блоки.** Матрица связи режима блочно-диагональна:
-$A_{ij} = 1$, если $i$ и $j$ в одном блоке, иначе 0. Хранится отдельным массивом
-`coupling.npy` — по одной матрице на режим.
+**A regime is a partition of the channels into blocks.** The coupling matrix of a regime is block
+diagonal: $A_{ij} = 1$ if $i$ and $j$ are in the same block, otherwise 0. It is stored as a separate
+array `coupling.npy` — one matrix per regime.
 
-Соседние разбиения обязаны быть связаны **измельчением** — иначе слово «слияние»
-теряет смысл. Переход $[15,15] \\to [10,10,10]$ не слияние и не деление: ни одно
-разбиение не измельчает другое, блоки просто перенарезаны. Принятое расписание при
-30 каналах:
+Neighbouring partitions must be related by **refinement** — otherwise the word "merge" loses its
+meaning. The transition $[15,15] \\to [10,10,10]$ is neither a merge nor a split: neither partition
+refines the other, the blocks are simply recut. The adopted schedule at 30 channels:
 
 $$[10,10,10] \\;\\longrightarrow\\; [20,10] \\;\\longrightarrow\\; [10,10,10]$$
 
-Первый переход — **слияние** (два блока по 10 становятся одним из 20), второй —
-**деление** обратно.
+The first transition is a **merge** (two blocks of 10 become one of 20), the second a **split**
+back.
 
-Ниже: сверху — сам ряд (четыре канала из тридцати, вертикальные линии — границы
-режимов), снизу — три матрицы связи, по одной на режим."""),
+Below: on top the series itself (four channels of thirty, vertical lines are regime boundaries), at
+the bottom three coupling matrices, one per regime."""),
     code("""kuramoto = build_series("kuramoto", CONFIG)
 osc, win = CONFIG.oscillators, CONFIG.sliding_window
 schedule = osc.coupling_schedule
@@ -1100,43 +1093,44 @@ gs = fig.add_gridspec(2, 3, height_ratios=[1, 1.15])
 
 ax = fig.add_subplot(gs[0, :])
 for ch in (0, 5, 12, 25):
-    ax.plot(kuramoto.series[ch, :600], lw=0.8, label=f"канал {ch}")
+    ax.plot(kuramoto.series[ch, :600], lw=0.8, label=f"channel {ch}")
 for k in range(1, len(schedule.regimes)):
     ax.axvline(k * schedule.regime_length, color="k", ls="--", lw=1)
-ax.set_xlim(0, 600); ax.set_title("Курамото: наблюдаемая $x_i = \\\\sin\\\\theta_i$ (начало ряда)")
+ax.set_xlim(0, 600); ax.set_title("Kuramoto: the observable $x_i = \\\\sin\\\\theta_i$ (start of the series)")
 ax.legend(fontsize=7, ncol=4)
 
 for i, (matrix, partition) in enumerate(zip(kuramoto.coupling, schedule.regimes)):
     ax = fig.add_subplot(gs[1, i])
-    ax.imshow(matrix, cmap="Blues"); ax.set_title(f"режим {i}: {list(partition)}", fontsize=9)
+    ax.imshow(matrix, cmap="Blues"); ax.set_title(f"regime {i}: {list(partition)}", fontsize=9)
     ax.set_xticks([]); ax.set_yticks([]); ax.grid(False)
-fig.suptitle("Расписание связи: слияние на первом переходе, деление на втором", fontsize=10)
+fig.suptitle("Coupling schedule: a merge at the first transition, a split at the second", fontsize=10)
 fig.tight_layout(); plt.show()"""),
-    md("""### Скользящее окно: ряд обратно в сеть
+    md("""### Sliding window: the series back into a network
 
-Окно длины $L$ с шагом $s$; в каждом окне считается матрица корреляций Пирсона между
-каналами. Результат — последовательность взвешенных полносвязных графов, то есть снова
-динамический граф, но полученный из ряда, а не назначенный.
+A window of length $L$ with step $s$; in each window the Pearson correlation matrix between the
+channels is computed. The result is a sequence of weighted fully connected graphs, i.e. again a
+dynamic graph, but obtained from a series rather than assigned.
 
-Две тонкости, обе существенные:
+Two subtleties, both essential:
 
-**Сходство — это $\\lvert r\\rvert$, а не $r$.** В расстояния идёт $d = 1 - \\lvert r\\rvert$.
-Модуль здесь не косметика: $1 - r$ при $r < 0$ превышает единицу, а матрица расстояний
-обязана быть неотрицательной. Содержательно антикорреляция — тоже связь, и по абсолютной
-величине сильная.
+**Similarity is $\\lvert r\\rvert$, not $r$.** Distances are $d = 1 - \\lvert r\\rvert$. The absolute
+value is not cosmetic: $1 - r$ at $r < 0$ exceeds one, while a distance matrix must be
+non-negative. In substance, anticorrelation is also a connection, and a strong one in absolute
+value.
 
-**Окно ограничено с двух сторон**, а не с одной:
+**The window is bounded on both sides**, not one:
 
-$$\\text{период колебания} \\;\\ll\\; L\\,\\Delta t \\;\\ll\\; \\text{длительность режима}$$
+$$\\text{oscillation period} \\;\\ll\\; L\\,\\Delta t \\;\\ll\\; \\text{regime duration}$$
 
-Сверху: окно длиннее интервала между сменами режима размазывает событие. Снизу: окно
-короче нескольких периодов измеряет не связь, а общий тренд — за долю периода любые
-две гладкие синусоиды похожи. Нижняя граница добавлена после измерения: при 0.16 периода
-в окне корреляция внутри блока (0.946) и между блоками (0.936) **неразличимы**.
+From above: a window longer than the interval between regime changes smears the event. From below: a
+window shorter than several periods measures not coupling but a common trend — over a fraction of a
+period any two smooth sinusoids look alike. The lower bound was added after a measurement: at 0.16
+periods per window the within-block (0.946) and between-block (0.936) correlations are
+**indistinguishable**.
 
-Ниже — насколько восстановленная окном связность согласуется с истинной $A(t)$.
-Статистика: усреднённая по окнам режима матрица $\\lvert r\\rvert$ против $A$ этого
-режима (по одному окну согласие слишком шумно, чтобы его порогать)."""),
+Below — how well the coupling recovered by the window agrees with the true $A(t)$. The statistic:
+the $\\lvert r\\rvert$ matrix averaged over a regime's windows against that regime's $A$ (per single
+window the agreement is too noisy to threshold)."""),
     code("""corr = sw.correlation_windows(kuramoto.series, length=win.length, step=win.step)
 sim = sw.similarity_from_correlation(corr)
 starts = sw.window_starts(osc.n_timepoints, length=win.length, step=win.step)
@@ -1149,15 +1143,15 @@ for i, s in enumerate(starts):
     if r is not None:
         grouped.setdefault(r, []).append(sim[i])
 
-print("Согласие восстановленной связности с истинным A(t)")
-print(f"(усреднённая по окнам режима матрица |r| против A этого режима)\\n")
-print(f"{'режим':>7}{'разбиение':>16}{'согласие':>11}")
+print("Agreement of the recovered coupling with the true A(t)")
+print(f"(the |r| matrix averaged over a regime's windows against that regime's A)\\n")
+print(f"{'regime':>7}{'partition':>16}{'agreement':>11}")
 print("-" * 34)
 for r, mats in sorted(grouped.items()):
     mean = np.mean(mats, axis=0)
     agreement = float(np.corrcoef(mean[off], kuramoto.coupling[r][off])[0, 1])
     print(f"{r:>7}{str(list(schedule.regimes[r])):>16}{agreement:>11.3f}")
-print(f"\\nпорог min_coupling_agreement = {win.min_coupling_agreement}")"""),
+print(f"\\nthreshold min_coupling_agreement = {win.min_coupling_agreement}")"""),
     code("""fig, axes = plt.subplots(2, 3, figsize=(12, 7))
 osc_ang = np.linspace(0, 2 * np.pi, osc.n_channels, endpoint=False)
 osc_pos = np.c_[np.cos(osc_ang), np.sin(osc_ang)]
@@ -1175,7 +1169,7 @@ for col, (regime, mats) in enumerate(sorted(grouped.items())):
         ax.plot(*osc_pos[[i, j]].T, color=palette(lab[i]), lw=0.6, alpha=0.55)
     ax.scatter(*osc_pos.T, s=34, c=[palette(k) for k in lab], zorder=3,
                edgecolor="white", lw=0.5)
-    ax.set_title(f"истинная связь, режим {regime}: {list(schedule.regimes[regime])}",
+    ax.set_title(f"true coupling, regime {regime}: {list(schedule.regimes[regime])}",
                  fontsize=8.5)
     ax.set_aspect("equal"); ax.axis("off")
 
@@ -1187,60 +1181,58 @@ for col, (regime, mats) in enumerate(sorted(grouped.items())):
     ax.scatter(*osc_pos.T, s=34, c=[palette(k) for k in lab], zorder=3,
                edgecolor="white", lw=0.5)
     agreement = float(np.corrcoef(recovered[off], truth[off])[0, 1])
-    ax.set_title(f"восстановлено окном: 15% сильнейших\\nсогласие {agreement:.3f}",
+    ax.set_title(f"recovered by the window: strongest 15%\\nagreement {agreement:.3f}",
                  fontsize=8.5)
     ax.set_aspect("equal"); ax.axis("off")
 
-fig.suptitle("Курамото: сверху — истинное $A(t)$, снизу — что видит скользящее окно",
+fig.suptitle("Kuramoto: top — the true $A(t)$, bottom — what the sliding window sees",
              fontsize=10)
 fig.tight_layout(); plt.show()"""),
-    md("""Верхний ряд — вход, который задан расписанием; нижний — то, что удаётся
-восстановить из ряда. Блочная структура узнаётся, но не идеально: связь внутри блока
-у фазово-захваченных осцилляторов проявляется как $|\\cos\\Delta\\varphi|$, и часть пар
-внутри блока выглядит слабее, чем часть пар между блоками.
+    md("""The top row is the input set by the schedule; the bottom row is what can be recovered from
+the series. The block structure is recognisable, but not perfectly: coupling within a block of
+phase-locked oscillators shows up as $|\\cos\\Delta\\varphi|$, and some pairs within a block look
+weaker than some pairs between blocks.
 
-**Чего эта статистика не делает: она не различает режимы.** Согласие с *чужим*
-режимом доходит до 0.440 при истинном минимуме 0.383 — классы перекрываются, и никакой
-порог их не разделит. Это следствие вложенности разбиений: $[20,10]$ — огрубление
-$[10,10,10]$, соседние режимы совпадают большей частью структуры. Честный нулевой
-контроль — перестановка меток каналов: $-0.039\\ldots0.068$ против истинных
-$0.383\\ldots0.878$.
+**What this statistic does not do: it does not distinguish regimes.** Agreement with *another*
+regime reaches 0.440 against a true minimum of 0.383 — the classes overlap, and no threshold will
+separate them. This follows from the nesting of partitions: $[20,10]$ is a coarsening of
+$[10,10,10]$, and neighbouring regimes share most of their structure. The honest null control is a
+permutation of channel labels: $-0.039\\ldots0.068$ against the true $0.383\\ldots0.878$.
 
-**Окно ограничено с двух сторон.** Сверху — длительностью режима, снизу — периодом
-колебания: при 0.16 периода в окне корреляция внутри блока (0.946) и между блоками
-(0.936) неразличимы, и связь не восстанавливается вовсе."""),
-    md("""## Динамическая SBM: набор, у которого топологической истины нет
+**The window is bounded on both sides.** From above by the regime duration, from below by the
+oscillation period: at 0.16 periods per window the within-block (0.946) and between-block (0.936)
+correlations are indistinguishable, and the coupling is not recovered at all."""),
+    md("""## Dynamic SBM: a dataset with no topological truth
 
-**Стохастическая блочная модель** — стандартный способ породить граф с сообществами:
-узлы разбиты на блоки, ребро внутри блока проводится с вероятностью $p_{in}$, между
-блоками — с меньшей $p_{out}$. Здесь блочная матрица меняется во времени: сообщества
-сливаются и делятся по расписанию.
+**The stochastic block model** is the standard way to generate a graph with communities: nodes are
+split into blocks, an edge within a block is drawn with probability $p_{in}$, between blocks with a
+smaller $p_{out}$. Here the block matrix changes over time: communities merge and split according to
+a schedule.
 
-Изначально этот набор задумывался как проверка $\\beta_0$: сообщества сливаются →
-компоненты сливаются → $\\beta_0$ падает. **Измерение показало, что это неверно.**
-При $p_{in} = 0.35$, $p_{out} = 0.02$ и блоках по 15 узлов межблочных рёбер на снимке
-выходит от 7 до 41: блоки прошиты между собой десятками рёбер, отдельными компонентами
-никогда не являются, и слияние двух сообществ не меняет в гомологиях **ничего**.
+Originally this dataset was meant as a check of $\\beta_0$: communities merge → components merge →
+$\\beta_0$ drops. **A measurement showed that this is wrong.** At $p_{in} = 0.35$, $p_{out} = 0.02$
+and blocks of 15 nodes there are 7 to 41 inter-block edges per snapshot: the blocks are stitched
+together by dozens of edges, they are never separate components, and merging two communities changes
+**nothing** in homology.
 
-Что $\\beta_0$ при этом всё-таки двигается — не помогает, а мешает: причина в случайных
-**изолированных вершинах** (узел с вероятностью $\\approx 10^{-3}$ не вытягивает ни
-одного ребра, на наборе $60\\times60$ таких ожидается 3.5), и его экскурсии к расписанию
-не привязаны вовсе.
+That $\\beta_0$ does move nonetheless does not help but hinders: the cause is random **isolated
+vertices** (a node draws no edge at all with probability $\\approx 10^{-3}$; on a $60\\times60$
+dataset 3.5 such vertices are expected), and its excursions are not tied to the schedule at all.
 
-Поэтому у SBM `truth_kind: partition`: истина — метки сообществ и расписание, полностью
-известные заранее, а `betti_curve` и `events` **не пишутся**. Записать измеренную кривую
-под именем истины значило бы объявить истиной выход пайплайна — ровно то, ради избежания
-чего вся эта работа и делается раньше алгоритмов."""),
+So the SBM has `truth_kind: partition`: the truth is the community labels and the schedule, fully
+known in advance, and `betti_curve` and `events` **are not written**. Recording the measured curve
+under the name of truth would declare the pipeline's output to be truth — exactly what all this work
+being done before the algorithms is meant to avoid."""),
     code("""sbm = build_dynamic_sbm(CONFIG)
 labels = sbm.ground_truth.community_labels
 
 fig, ax = plt.subplots(1, 3, figsize=(12, 3))
 ax[0].imshow(labels.T, aspect="auto", cmap="tab10", interpolation="nearest")
-ax[0].set_xlabel("снимок"); ax[0].set_ylabel("узел"); ax[0].grid(False)
-ax[0].set_title("SBM: метки сообществ по времени")
+ax[0].set_xlabel("snapshot"); ax[0].set_ylabel("node"); ax[0].grid(False)
+ax[0].set_title("SBM: community labels over time")
 for i, t in enumerate((10, 30)):
     ax[i + 1].imshow(sbm.snapshots[t], cmap="Greys", interpolation="nearest")
-    ax[i + 1].set_title(f"снимок {t}: {len(set(labels[t]))} сообщества", fontsize=9)
+    ax[i + 1].set_title(f"snapshot {t}: {len(set(labels[t]))} communities", fontsize=9)
     ax[i + 1].set_xticks([]); ax[i + 1].set_yticks([]); ax[i + 1].grid(False)
 fig.tight_layout(); plt.show()
 
@@ -1251,7 +1243,7 @@ for s in sbm.snapshots:
     a = s > 0.5; keep = a.sum(1) > 0
     comps.add(connected_components(csr_matrix(a[np.ix_(keep, keep)]), directed=False)[0])
 print(f"truth_kind = {sbm.ground_truth.truth_kind}, betti_curve = {sbm.ground_truth.betti_curve}")
-print(f"компонент после удаления изолированных вершин, по всем снимкам: {sorted(comps)}")"""),
+print(f"components after removing isolated vertices, over all snapshots: {sorted(comps)}")"""),
     code("""fig, axes = plt.subplots(1, 2, figsize=(11, 5))
 sbm_ang = np.linspace(0, 2 * np.pi, CONFIG.dynamic_sbm.n_nodes, endpoint=False)
 sbm_pos = np.c_[np.cos(sbm_ang), np.sin(sbm_ang)]
@@ -1268,84 +1260,81 @@ for ax, t in zip(axes, (10, 30)):
     ax.scatter(*sbm_pos.T, s=42, c=[palette(k) for k in lab], zorder=3,
                edgecolor="white", lw=0.6)
     cross = int(adj[iu][lab[iu[0]] != lab[iu[1]]].sum())
-    ax.set_title(f"снимок {t}: {len(set(lab))} сообщества\\n"
-                 f"межблочных рёбер {cross}", fontsize=9)
+    ax.set_title(f"snapshot {t}: {len(set(lab))} communities\\n"
+                 f"{cross} inter-block edges", fontsize=9)
     ax.set_aspect("equal"); ax.axis("off")
-fig.suptitle("Динамическая SBM: цвет — сообщество, серым — межблочные рёбра", fontsize=10)
+fig.suptitle("Dynamic SBM: colour — community, grey — inter-block edges", fontsize=10)
 fig.tight_layout(); plt.show()"""),
-    md("""**Слияние сообществ не является гомологическим событием.** Блоки прошиты между
-собой десятками рёбер (серые линии на рисунке), граф связен, и слияние не меняет
-ничего в гомологиях. $\\beta_0$ всё же гуляет между 1 и 2 — но из-за случайных
-изолированных вершин, а не из-за сообществ.
+    md("""**A community merge is not a homological event.** The blocks are stitched together by dozens
+of edges (grey lines in the figure), the graph is connected, and the merge changes nothing in
+homology. $\\beta_0$ does wander between 1 and 2 — but because of random isolated vertices, not
+communities.
 
-Поэтому у SBM `truth_kind: partition`, а `betti_curve` и `events` **не пишутся**:
-измеренная кривая под именем истины была бы истиной как выходом пайплайна.""")]
+So the SBM has `truth_kind: partition`, and `betti_curve` and `events` **are not written**: a
+measured curve under the name of truth would be truth as pipeline output.""")]
 
 # ---------------------------------------------------------------- S8
 cells += [md("""---
-# S8. Шум и нулевые модели
+# S8. Noise and null models
 
-Семейство 4 отвечает на два вопроса, которых предыдущие семейства не касались:
-**как деградируют ответы при контролируемом шуме** и **не срабатывает ли пайплайн там,
-где структуры нет вовсе**.
+Family 4 answers two questions the previous families did not touch: **how answers degrade under
+controlled noise** and **whether the pipeline fires where there is no structure at all**.
 
-Четыре механизма шума, каждый со своим уровнем как параметром:
+Four noise mechanisms, each with its level as a parameter:
 
-| Механизм | Что портит | Уровень |
+| Mechanism | What it corrupts | Level |
 |---|---|---|
-| `point_jitter` | положение точек в облаке | $\\sigma$ гауссова сдвига |
-| `weight_jitter` | веса рёбер сети | $\\sigma$ |
-| `spurious_edges` | добавляет ложные рёбра | $p^+$ — доля от **отсутствующих** |
-| `missing_edges` | удаляет существующие | $p^-$ — доля от существующих |
+| `point_jitter` | point positions in a cloud | $\\sigma$ of a Gaussian shift |
+| `weight_jitter` | network edge weights | $\\sigma$ |
+| `spurious_edges` | adds false edges | $p^+$ — a fraction of the **absent** ones |
+| `missing_edges` | removes existing ones | $p^-$ — a fraction of the existing ones |
 
-**Нулевые модели** — данные без топологической структуры: равномерное облако в кубе
-(для пайплайна «облако → Рипс») и граф Эрдёша–Реньи $G(n,p)$ (для пайплайна
-«снимки → флаг-комплекс»).
+**Null models** are data without topological structure: a uniform cloud in a cube (for the "cloud →
+Rips" pipeline) and an Erdős–Rényi graph $G(n,p)$ (for the "snapshots → flag complex" pipeline).
 
-## Устойчивость: граница $d_B \\le 2\\,d_H$, а не $d_H$
+## Stability: the bound $d_B \\le 2\\,d_H$, not $d_H$
 
-### Что такое устойчивость диаграмм
+### What stability of diagrams is
 
-Ключевое свойство персистентных гомологий, ради которого их вообще применяют к
-зашумлённым данным: **малое возмущение данных даёт малое возмущение диаграммы**. Это
-теорема Коэн-Штайнера–Эдельсбруннера–Харера, и формулируется она через две меры:
+The key property of persistent homology, for which it is applied to noisy data at all: **a small
+perturbation of the data gives a small perturbation of the diagram**. This is the
+Cohen-Steiner–Edelsbrunner–Harer theorem, and it is stated through two measures:
 
-- $d_H$ — **расстояние Хаусдорфа** между облаками точек: насколько далеко пришлось
-  сдвинуть точки;
-- $d_B$ — **bottleneck-расстояние** между диаграммами: минимальный по всем сопоставлениям
-  баров максимальный сдвиг одного бара.
+- $d_H$ — the **Hausdorff distance** between point clouds: how far the points had to be moved;
+- $d_B$ — the **bottleneck distance** between diagrams: the minimum over all matchings of bars of
+  the maximum shift of a single bar.
 
-### Двойка, которой в документе сначала не было
+### The factor two that was missing from the document at first
 
-В первоначальной редакции проекта стояло $d_B \\le d_H$. Это **неверно**. Верная запись:
+The original edition of the project said $d_B \\le d_H$. This is **wrong**. The right form is:
 
 $$d_B \\le 2\\,d_{GH} \\le 2\\,d_H$$
 
-Двойка не подгонка под замер, она следует из параметризации. Значение фильтрации
-симплекса в комплексе Рипса — его **диаметр**, а не радиус. Если каждая точка сдвинута
-не более чем на $\\delta$, то у пары, реализующей максимум, сдвигаются **оба конца**,
-поэтому диаметр меняется на $2\\delta$. Запись без двойки соответствовала бы фильтрации,
-параметризованной радиусом (комплекс Чеха), а не диаметром.
+The two is not fitted to the measurement; it follows from the parametrisation. The filtration value
+of a simplex in the Rips complex is its **diameter**, not its radius. If each point is moved by at
+most $\\delta$, then for the pair realising the maximum **both ends** move, so the diameter changes
+by $2\\delta$. The form without the two would correspond to a filtration parametrised by radius
+(the Čech complex), not by diameter.
 
-Проверено измерением на окружности (400 точек, три калибровочных сида, четыре уровня
-джиттера — двенадцать комбинаций): **девять из двенадцати** нарушают $d_B \\le d_H$,
-отношение доходит до 1.33, а границу $2\\,d_H$ не нарушает ни одна. График ниже; ячейка
-считает ровно эти условия, поэтому её вывод и есть источник приведённых чисел.
+Checked by measurement on the circle (400 points, three calibration seeds, four jitter levels —
+twelve combinations): **nine of twelve** violate $d_B \\le d_H$, the ratio reaches 1.33, and none
+violates the $2\\,d_H$ bound. The figure is below; the cell computes exactly these conditions, so its
+output is the source of the numbers quoted.
 
-Ловушка при написании теста: в $H_0$ граница $d_B \\le d_H$ не нарушается **нигде** —
-нульмерные бары рождаются все в нуле, и bottleneck по ним ведёт себя мягче. Тест,
-написанный только по $H_0$, прошёл бы и оставил неверную теорему в документе.
+A trap in writing the test: in $H_0$ the bound $d_B \\le d_H$ is violated **nowhere** —
+zero-dimensional bars are all born at zero, and bottleneck behaves more gently on them. A test
+written on $H_0$ alone would pass and leave a wrong theorem in the document.
 
-Но сначала — как шум вообще выглядит."""),
+But first — what noise looks like at all."""),
     code("""from tdadyn.synthetic import make_noisy_snapshots
 
 fig, axes = plt.subplots(2, 4, figsize=(13.5, 6.4))
 clean_ring = build_static_cloud("circle", CONFIG, n_points=120, noise_sigma=0.0).points
 for ax, lvl in zip(axes[0], CONFIG.noise.point_jitter_sigma):
     pts = make_jittered_cloud(clean_ring, "b", lvl, 0, rng_for(CONFIG.seed, "nb_show")).points
-    ax.scatter(*clean_ring.T, s=8, color="lightgray", label="чистое")
-    ax.scatter(*pts.T, s=9, color="tab:red", alpha=0.85, label="с джиттером")
-    ax.set_title(f"джиттер точек, $\\\\sigma$ = {lvl}", fontsize=8.5)
+    ax.scatter(*clean_ring.T, s=8, color="lightgray", label="clean")
+    ax.scatter(*pts.T, s=9, color="tab:red", alpha=0.85, label="jittered")
+    ax.set_title(f"point jitter, $\\\\sigma$ = {lvl}", fontsize=8.5)
     ax.set_aspect("equal"); ax.axis("off")
 axes[0, 0].legend(fontsize=6.5, loc="lower center")
 
@@ -1363,14 +1352,14 @@ for ax, lvl in zip(axes[1], CONFIG.noise.spurious_edge_fraction):
         ax.plot(*ring_pos[[i, j]].T, color="tab:red" if added else "tab:blue",
                 lw=1.1 if added else 0.9, alpha=0.9 if added else 0.6, zorder=2)
     ax.scatter(*ring_pos.T, s=14, color="k", zorder=3)
-    ax.set_title(f"ложные рёбра, $p^+$ = {lvl}\\nрёбер {int(adj.sum() // 2)} "
-                 f"(было {int(orig.sum() // 2)})", fontsize=8.5)
+    ax.set_title(f"spurious edges, $p^+$ = {lvl}\\n{int(adj.sum() // 2)} edges "
+                 f"(was {int(orig.sum() // 2)})", fontsize=8.5)
     ax.set_aspect("equal"); ax.axis("off")
-fig.suptitle("Семейство 4: что делает шум. Красным — добавленное", fontsize=10)
+fig.suptitle("Family 4: what noise does. Red — added", fontsize=10)
 fig.tight_layout(); plt.show()"""),
-    md("""$p^+$ — доля от **отсутствующих** рёбер, а не от существующих, поэтому при
-$p^+ = 0.10$ на разреженном графе добавляется заметно больше рёбер, чем было. Уровень 0.0
-даёт побитово исходный набор, и это проверяется сравнением sha256 в манифесте."""),
+    md("""$p^+$ is a fraction of the **absent** edges, not of the existing ones, so at $p^+ = 0.10$ on
+a sparse graph noticeably more edges are added than there were. Level 0.0 gives the source dataset
+bitwise, and this is checked by comparing sha256 in the manifest."""),
     code("""from persim import bottleneck
 
 def dgm1(points):
@@ -1382,8 +1371,8 @@ def hausdorff(a, b):
     d = np.linalg.norm(a[:, None] - b[None, :], axis=-1)
     return max(d.min(1).max(), d.min(0).max())
 
-# Условия — те же, что в method.md 4.1 и в тесте: 400 точек, поток "stability".
-# Иначе проза и вывод разойдутся: замер на другом потоке даёт другое число нарушений.
+# The conditions are those of method.md 4.1 and of the test: 400 points, the "stability" stream.
+# Otherwise prose and output diverge: a measurement on another stream gives a different count.
 base = build_static_cloud("circle", CONFIG, n_points=400, noise_sigma=0.0)
 clean = dgm1(base.points)
 levels = [0.02, 0.05, 0.10, 0.15]
@@ -1395,18 +1384,18 @@ for lvl in levels:
 
 fig, ax = plt.subplots(figsize=(6, 3.4))
 db = np.array([r[1] for r in rows]); dh = np.array([r[2] for r in rows])
-ax.scatter(dh, db, s=22, alpha=0.8, label=r"замеры ($H_1$)")
+ax.scatter(dh, db, s=22, alpha=0.8, label=r"measurements ($H_1$)")
 line = np.linspace(0, dh.max() * 1.05, 10)
-ax.plot(line, line, "r--", label=r"$d_B = d_H$ — нарушается")
-ax.plot(line, 2 * line, "g-", label=r"$d_B = 2 d_H$ — держится")
+ax.plot(line, line, "r--", label=r"$d_B = d_H$ — violated")
+ax.plot(line, 2 * line, "g-", label=r"$d_B = 2 d_H$ — holds")
 ax.set_xlabel(r"$d_H$"); ax.set_ylabel(r"$d_B$"); ax.legend(fontsize=7)
-ax.set_title("Граница устойчивости на окружности")
+ax.set_title("The stability bound on the circle")
 fig.tight_layout(); plt.show()
 
-print(f"нарушений d_B <= d_H:    {(db > dh).sum()} из {len(rows)}, отношение до {(db/dh).max():.2f}")
-print(f"нарушений d_B <= 2*d_H:  {(db > 2*dh).sum()} из {len(rows)}")"""),
-    md("""**Ловушка:** в $H_0$ граница $d_B \\le d_H$ не нарушается нигде — тест, написанный
-только по нульмерным барам, прошёл бы и оставил неверную теорему в документе."""),
+print(f"violations of d_B <= d_H:    {(db > dh).sum()} of {len(rows)}, ratio up to {(db/dh).max():.2f}")
+print(f"violations of d_B <= 2*d_H:  {(db > 2*dh).sum()} of {len(rows)}")"""),
+    md("""**Trap:** in $H_0$ the bound $d_B \\le d_H$ is violated nowhere — a test written on
+zero-dimensional bars alone would pass and leave a wrong theorem in the document."""),
     code("""from tdadyn.synthetic.build import STABILITY_OBJECTS, stability_curve
 import dataclasses
 
@@ -1422,44 +1411,44 @@ for dim, ax in zip(("H1", "H2"), axes):
         e = curve["objects"][name]
         ax.errorbar(e["levels"], e[dim]["mean"], yerr=e[dim]["spread"], marker="o", ms=3,
                     capsize=2, label=name)
-    ax.set_xlabel(r"$\\sigma$ джиттера точек"); ax.set_ylabel(r"$d_B$")
+    ax.set_xlabel(r"point jitter $\\sigma$"); ax.set_ylabel(r"$d_B$")
     ax.set_title(f"${dim[0]}_{dim[1]}$"); ax.legend(fontsize=7)
-fig.suptitle(f"Кривая устойчивости, {curve['n_points']} точек "
-             f"(в отчёте Результата 6 — {CONFIG.static_clouds.n_points})", fontsize=10)
+fig.suptitle(f"Stability curve, {curve['n_points']} points "
+             f"(in the Result 6 report — {CONFIG.static_clouds.n_points})", fontsize=10)
 fig.tight_layout(); plt.show()"""),
-    md("""Это **Результат 6** проекта: $d_B$ как функция уровня шума. Здесь он показан на
-сокращённом числе точек ради времени счёта; отчётный артефакт производит сборка по флагу
-`--results` при рабочем размере.
+    md("""This is **Result 6** of the project: $d_B$ as a function of the noise level. It is shown here
+on a reduced number of points for the sake of computation time; the reported artefact is produced by
+the build with the `--results` flag at the working size.
 
-**Одной окружности недостаточно.** Каждый объект информативен ровно в своей размерности
-и плоск в другой: у окружности $H_2$ плоская (нет полости — нечему двигаться), у сферы
-почти не двигается $H_1$ (нет петель). Кривая по одному объекту информативна наполовину —
-а $H_2$ самое хрупкое место пайплайна, ровно то, которое старый критерий значимости терял.
+**One circle is not enough.** Each object is informative exactly in its own dimension and flat in
+the other: the circle's $H_2$ is flat (no cavity — nothing to move), the sphere's $H_1$ barely moves
+(no loops). A curve on one object is informative by half — and $H_2$ is the most fragile part of the
+pipeline, exactly the one the old significance criterion used to lose.
 
-## Нулевые модели измеряют частоту ложных срабатываний, а не утверждают ноль
+## Null models measure the false positive rate rather than claiming zero
 
-В первоначальной редакции требование к нулевым моделям звучало так: «у нулевой модели
-нет значимых долгоживущих баров». Оно **невыполнимо**, и это тоже установлено
-измерением, а не рассуждением.
+In the original edition the requirement on the null models read: "the null model has no significant
+long-lived bars". It is **impossible to satisfy**, and this too was established by measurement, not
+by argument.
 
-Случайный граф честно имеет циклы. Это не артефакт вычисления и не шум, который можно
-отсечь порогом, — это и есть **нулевое распределение**, относительно которого измеряется
-всё остальное. Таблица ниже: числа Бетти графа Эрдёша–Реньи на 24 узлах при растущей
-плотности, посчитанные эталонной реализацией, по пять реализаций на плотность.
+A random graph honestly has cycles. This is not an artefact of computation and not noise that can
+be cut off by a threshold — it is the **null distribution** against which everything else is
+measured. The table below: Betti numbers of an Erdős–Rényi graph on 24 nodes at growing density,
+computed by the reference implementation, five realisations per density.
 
-Приводится **разброс** по реализациям, а не одно «типичное» значение: у нулевой модели
-типичного значения не существует, и первая редакция этой таблицы, хранившая первую
-реализацию из пяти, переворачивалась от смены потока случайности."""),
+The **spread** over realisations is given, not one "typical" value: a null model has no typical
+value, and the first edition of this table, which kept the first realisation of five, flipped with a
+change of random stream."""),
     code("""pairs = 24 * 23 // 2
-print(f"ER на n=24, флаг-комплекс эталоном, 5 реализаций на плотность")
-print(f"(плотность cycle_lifecycle: 24/{pairs} = {24/pairs:.3f})\\n")
-# Разброс по пяти реализациям, а не одна из них: "типичное" значение у нулевой модели
-# переворачивается от смены потока (method.md 4.2).
+print(f"ER on n=24, flag complex by the reference, 5 realisations per density")
+print(f"(density of cycle_lifecycle: 24/{pairs} = {24/pairs:.3f})\\n")
+# The spread over five realisations, not one of them: the "typical" value of a null model
+# flips with a change of stream (method.md 4.2).
 def span(values):
     lo, hi = min(values), max(values)
     return str(lo) if lo == hi else f"{lo}-{hi}"
 
-print(f"{'m':>5}{'p':>8}{'beta_0':>9}{'beta_1':>9}{'beta_2':>9}   чистых (1,0,0)")
+print(f"{'m':>5}{'p':>8}{'beta_0':>9}{'beta_1':>9}{'beta_2':>9}   clean (1,0,0)")
 print("-" * 62)
 for m in (12, 24, 36, 60, 100, 180, 220):
     out, clean_n = [], 0
@@ -1472,136 +1461,133 @@ for m in (12, 24, 36, 60, 100, 180, 220):
         bb = (b[0], b[1], b[2]); out.append(bb); clean_n += bb == (1, 0, 0)
     spans = [span([o[k] for o in out]) for k in range(3)]
     print(f"{m:>5}{m/pairs:>8.3f}{spans[0]:>9}{spans[1]:>9}{spans[2]:>9}   {clean_n}/5")"""),
-    md("""Надёжно чисто становится только при $p \\gtrsim 0.8$ — на почти полном графе, который
-нулевой моделью ничего не контролирует. При $p = 0.652$ чисты уже три реализации из пяти,
-но у остальных двух держится $\\beta_2 = 2$: режим ещё не вышел из области, где признаки
-появляются сами. Поэтому истина нулевого набора: **расписания нет,
-список событий пуст**. Это утверждение о конструкции, проверяемое на уровне генератора.
+    md("""It becomes reliably clean only at $p \\gtrsim 0.8$ — on an almost complete graph, which as a
+null model controls nothing. At $p = 0.652$ three realisations of five are already clean, but the
+other two keep $\\beta_2 = 2$: the regime has not yet left the region where features appear by
+themselves. So the truth of the null dataset is: **there is no schedule, the event list is empty**.
+This is a statement about the construction, checkable at the generator level.
 
-**У самого критерия есть ненулевая частота ложных срабатываний**, и она не сводится
-к нулю размером выборки. Измерено на потоке генератора, 200 испытаний, $\\mathbb{R}^3$:
+**The criterion itself has a non-zero false positive rate**, and it does not shrink to zero with
+sample size. Measured on the generator's stream, 200 trials, $\\mathbb{R}^3$:
 
-| $n$ | Промахов | Частота | 95% сверху |
+| $n$ | Misses | Rate | 95% upper |
 |---|---|---|---|
 | 200 | 12/200 | 6.0% | 10.2% |
 | 400 | 3/200 | **1.5%** | 4.3% |
 
-*Таблица — цитата из `docs/method.md` §1.2a: 200 испытаний в ячейке отчёта считать
-слишком долго.*
+*The table is a quotation from `docs/method.md` §1.2a: 200 trials are too slow to compute in a report
+cell.*
 
-Механизм: когда над шумовым полом уцелел ровно **один** бар, сравнивать его не с чем,
-и одинокий выживший значим по построению. Порог в конфиге взят выше 95%-границы
-истинной частоты, а не выше наблюдённого на калибровочных сидах нуля: шестьдесят
-испытаний ноль не устанавливают.""")]
+The mechanism: when exactly **one** bar survives above the noise floor, there is nothing to compare
+it with, and the lone survivor is significant by construction. The threshold in the config is set
+above the 95% bound of the true rate, not above the zero observed on the calibration seeds: sixty
+trials do not establish zero.""")]
 
 # ---------------------------------------------------------------- S9
 cells += [md("""---
-# S9. Сборка и воспроизводимость
+# S9. Build and reproducibility
 
-Одна команда собирает все 38 наборов за несколько секунд:
+One command builds all 38 datasets in a few seconds:
 
 ```
 python -m tdadyn.synthetic.build --config config.yaml
 ```
 
-Рядом с данными пишется **`manifest.json`** — реестр всего собранного: идентификатор
-набора, семейство, генератор, seed, путь, параметры, версия пакета, дата и хеши.
-Он нужен для двух вещей: воспроизводимости и быстрого обнаружения того, что данные
-пересобраны с другими параметрами.
+Next to the data a **`manifest.json`** is written — a registry of everything built: dataset
+identifier, family, generator, seed, path, parameters, package version, date and hashes. It serves
+two purposes: reproducibility and quick detection that data were rebuilt with different parameters.
 
-Два решения о хешах, которые выглядят техническими и таковыми не являются:
+Two decisions about hashes that look technical and are not:
 
-**sha256 считается по байтам файла `.npy`**, а не по `ndarray.tobytes()`. Результат
-проверяем обычным `shasum -a 256`, и в хеш попадает заголовок — поэтому изменившиеся
-dtype или форма не спрячутся за одинаковой полезной нагрузкой.
+**sha256 is computed over the bytes of the `.npy` file**, not over `ndarray.tobytes()`. The result
+can be checked with a plain `shasum -a 256`, and the header goes into the hash — so a changed dtype
+or shape cannot hide behind an identical payload.
 
-**Хешируется не только массив, но и истина** — поле `truth_sha256`. Без него проверка
-«пересборка даёт те же хеши» не покрывала бы ожидаемые числа Бетти, лог событий и
-примечания: при правке истины массивы не меняются, и подмена прошла бы незамеченной.
-Считается он по канонической сериализации **разобранной записи**, а не по байтам JSON:
-байтовый хеш вобрал бы отступы и порядок ключей, и косметическое переформатирование
-читалось бы как изменение данных."""),
+**Not only the array is hashed but also the truth** — the `truth_sha256` field. Without it the check
+"a rebuild gives the same hashes" would not cover the expected Betti numbers, the event log and the
+notes: arrays do not change when the truth is edited, and a substitution would go unnoticed. It is
+computed over a canonical serialisation of **the parsed record**, not over the bytes of the JSON: a
+byte hash would absorb indentation and key order, and cosmetic reformatting would read as a change of
+data."""),
     code("""e = next(x for x in ENTRIES if x.generator == "cycle_lifecycle")
-print("Запись манифеста:\\n")
+print("A manifest entry:\\n")
 for field in ("dataset_id", "family", "generator", "seed", "path"):
     print(f"  {field:<16}{getattr(e, field)}")
 print(f"  {'arrays':<16}{ {k: v[:16] + '...' for k, v in e.arrays.items()} }")
 print(f"  {'truth_sha256':<16}{e.truth_sha256[:16]}...")
-print(f"\\nОтбрасывается при сравнении пересборки: generated_at, package_version")
-print("truth_sha256 НЕ отбрасывается: он воспроизводим, и потому входит в сравнение.")
-print("\\nБез него проверка «те же хеши» не покрывала бы ожидаемые числа Бетти,")
-print("лог событий и notes: массивы при правке истины не меняются.")"""),
-    md("""**Проверка нулевого уровня — бесплатная и ловит целый класс отказов.** sha256
-возмущённого массива при уровне 0.0 равен sha256 базового; оба числа уже в манифесте.
-Ловит неверно подключённую базу, сдвиг потока случайности между уровнями и безусловно
-применённый `clip`.
+print(f"\\nDropped when comparing a rebuild: generated_at, package_version")
+print("truth_sha256 is NOT dropped: it is reproducible and therefore takes part in the comparison.")
+print("\\nWithout it the 'same hashes' check would not cover the expected Betti numbers,")
+print("the event log and notes: arrays do not change when the truth is edited.")"""),
+    md("""**The zero-level check is free and catches a whole class of failures.** The sha256 of the
+perturbed array at level 0.0 equals the sha256 of the base; both numbers are already in the manifest.
+It catches a wrongly connected base, a shift of the random stream between levels and an
+unconditionally applied `clip`.
 
-**Оговорка о воспроизводимости.** Формулировка — «две сборки **в одной среде** дают
-одинаковые записи». Больше обещать нельзя: Рёсслер при $c = 5.7$ хаотичен, и смена
-версии scipy, метода или допусков уводит ряд целиком.""")]
+**A caveat on reproducibility.** The wording is "two builds **in one environment** give the same
+entries". More cannot be promised: Rössler at $c = 5.7$ is chaotic, and a change of scipy version,
+method or tolerances moves the series entirely.""")]
 
 # ---------------------------------------------------------------- decisions
 cells += [md("""---
-# Решения на развилках
+# Decisions at the forks
 
-Места, где спецификация допускала несколько прочтений и требовалось выбрать одно.
-Сведены в одну таблицу, потому что все они разделяют общее свойство: **неверный выбор
-не приводил бы к падению**. Он дал бы правдоподобный набор данных с неверной истиной —
-ошибку, которая проявилась бы не здесь, а в Задаче 2, где алгоритм валидировался бы
-против испорченного эталона, и обнаружилась бы в лучшем случае на рецензировании.
+Places where the specification allowed several readings and one had to be chosen. They are gathered
+in one table because they all share a common property: **a wrong choice would not have caused a
+crash**. It would have given a plausible dataset with wrong truth — an error that would have shown up
+not here but in Task 2, where the algorithm would have been validated against a corrupted reference,
+and would have been discovered at best in peer review.
 
-Поэтому каждый выбор здесь обоснован не соображением, а измерением или доказательством,
-и в столбце «почему» стоит именно оно.
+So every choice here is justified not by an argument but by a measurement or a proof, and that is
+what the "why" column contains.
 
-| Развилка | Решение | Почему |
+| Fork | Decision | Why |
 |---|---|---|
-| Критерий значимости | разрыв в спектре с шагом в пыль | старое правило: 9 промахов из 54, ошибается в обе стороны |
-| Парность гибели $H_1$ | спарена с рождением при замыкании пути | разложение зигзаг-модуля однозначно; не конвенция |
-| Закрытое состояние дуги | $\\delta = 2\\pi/n$, не ноль | при нуле две точки совпадают, а $\\beta$ этого не видит |
-| Род истины vs раскладка | отдельное поле `truth_kind` | SBM: на диске граф, истина — разбиение |
-| Направление порога | поле `edge_rule` в истине | иначе метрический набор читается как дополнение |
-| Истина SBM | разбиение; кривая не пишется | измеренная кривая = истина как выход пайплайна |
-| Истина нулевых моделей | пустой лог событий | $(1,0,0)$ недостижимо ни при какой плотности |
-| Раскладка семейства 4 | только возмущённый массив | пара «источник + производное» рассогласована в обе стороны |
-| Порог согласия связности | калибровка на 3 сидах, нулевой контроль — перестановка меток | чужой режим не нулевой контроль: разбиения вложены |
-| Граница устойчивости | $d_B \\le 2 d_H$ | параметризация диаметром; 9 из 12 нарушают форму без двойки |
+| Significance criterion | a gap in the spectrum with a step into the dust | the old rule: 9 misses out of 54, errs in both directions |
+| Pairing of the $H_1$ death | paired with the birth when the path closed | the decomposition of a zigzag module is unique; not a convention |
+| Closed state of the arc | $\\delta = 2\\pi/n$, not zero | at zero two points coincide, and $\\beta$ does not see it |
+| Kind of truth vs layout | a separate field `truth_kind` | SBM: a graph on disk, a partition as truth |
+| Threshold direction | the `edge_rule` field in the truth | otherwise the metric dataset is read as the complement |
+| SBM truth | a partition; no curve written | a measured curve = truth as pipeline output |
+| Null model truth | an empty event log | $(1,0,0)$ is unreachable at any working density |
+| Family 4 layout | only the perturbed array | a "source + derived" pair is inconsistent in both directions |
+| Coupling agreement threshold | calibrated on 3 seeds, null control is label permutation | another regime is not a null control: the partitions are nested |
+| Stability bound | $d_B \\le 2 d_H$ | parametrisation by diameter; 9 of 12 violate the form without the two |
 
 ---
 
-# Ограничения
+# Limitations
 
-**Что эти данные не делают:**
+**What these data do not do:**
 
-- **Не заменяют реальные данные.** Динамика не претендует на реалистичность; ряды
-  осцилляторов — аналог фМРТ по структуре связи, а не по спектру или уровню шума.
-- **Не подтверждают научную осмысленность** набора для конкретной задачи. Тесты
-  проверяют соответствие заявленной истине, и только.
-- **Не дают универсальных порогов.** Параметры критерия откалиброваны на облаках
-  семейства 1 в $\\mathbb{R}^3$ и $\\mathbb{R}^4$. На коннектомы Задачи 3 не переносятся:
-  там иное распределение расстояний и, главное, нет известного $\\beta_k$, относительно
-  которого можно калиброваться.
-- **Критерий не инвариантен к перепараметризации фильтрации.** Монотонное преобразование
-  сходство → расстояние сохраняет структуру диаграммы, но искажает персистентности,
-  а критерий сравнивает именно их.
-- **Нулевые модели не утверждают отсутствие признаков** — они позволяют частоту ложных
-  срабатываний измерить.
-- **Воспроизводимость Рёсслера — в пределах одной среды.**
-- **Wasserstein не считается**: мера расхождения диаграмм одна — bottleneck.
+- **They do not replace real data.** The dynamics make no claim to realism; the oscillator series are
+  an fMRI analogue in coupling structure, not in spectrum or noise level.
+- **They do not confirm the scientific meaningfulness** of a dataset for a particular task. The
+  tests check conformance to the declared truth, and only that.
+- **They give no universal thresholds.** The criterion parameters were calibrated on family-1 clouds
+  in $\\mathbb{R}^3$ and $\\mathbb{R}^4$. They do not transfer to the connectomes of Task 3: there the
+  distance distribution differs and, above all, there is no known $\\beta_k$ to calibrate against.
+- **The criterion is not invariant under reparametrisation of the filtration.** A monotone
+  similarity → distance transform preserves the structure of the diagram but distorts the
+  persistences, and the criterion compares exactly those.
+- **Null models do not claim the absence of features** — they allow the false positive rate to be
+  measured.
+- **Rössler reproducibility holds within one environment.**
+- **Wasserstein is not computed**: there is one measure of diagram discrepancy — bottleneck.
 
-**Известные артефакты, которые не являются багами:** комплекс Рипса окружности при росте
-масштаба последовательно эквивалентен $S^1, S^3, S^5,\\dots$; числа Бетти по зашумлённой
-выборке восстанавливаются только как персистентные; $H_0$ всегда содержит один
-бесконечный бар.
+**Known artefacts that are not bugs:** the Rips complex of a circle as the scale grows is
+successively equivalent to $S^1, S^3, S^5,\\dots$; Betti numbers from a noisy sample are recovered
+only as persistent ones; $H_0$ always contains one infinite bar.
 
 ---
 
-# Что дальше
+# What next
 
 | | |
 |---|---|
-| **Задача 2** | зигзаг-алгоритмы и локализация событий — `docs/handoff.md` перечисляет ловушки |
-| **Задача 3** | персистентные инварианты коннектомов; параметры критерия туда не наследуются |
-| **Результат 6** | устойчивость и сложность; кривая производится сборкой по `--results` |""")]
+| **Task 2** | zigzag algorithms and event localisation — `docs/handoff.md` lists the traps |
+| **Task 3** | persistent invariants of connectomes; the criterion parameters are not inherited there |
+| **Result 6** | stability and complexity; the curve is produced by the build with `--results` |""")]
 
 nb = nbf.v4.new_notebook(cells=cells)
 nb.metadata = {
@@ -1611,6 +1597,6 @@ nb.metadata = {
 out = pathlib.Path("notebooks/report.ipynb")
 out.parent.mkdir(exist_ok=True)
 nbf.write(nb, str(out))
-print(f"написано {out}: {len(cells)} ячеек "
-      f"({sum(c.cell_type == 'code' for c in cells)} кода, "
-      f"{sum(c.cell_type == 'markdown' for c in cells)} текста)")
+print(f"wrote {out}: {len(cells)} cells "
+      f"({sum(c.cell_type == 'code' for c in cells)} code, "
+      f"{sum(c.cell_type == 'markdown' for c in cells)} markdown)")
