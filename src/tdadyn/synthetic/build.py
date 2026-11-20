@@ -288,3 +288,7 @@ def main(argv: list[str] | None = None) -> None:
     print(f"manifest -> {path}")
     if args.results:
         print(f"stability curve -> {write_stability(config)}")
+
+
+if __name__ == "__main__":  # pragma: no cover - exercised through the command line
+    main()

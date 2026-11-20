@@ -209,3 +209,37 @@ def test_the_manifest_is_replaced_not_accumulated(config, tmp_path):
     write_manifest(root, entries)
     write_manifest(root, entries[:3])
     assert len(read_manifest(root)["datasets"]) == 3
+
+
+def test_the_build_command_actually_runs_as_a_module(tmp_path):
+    """``python -m tdadyn.synthetic.build`` is the documented entry point, so run it as one.
+
+    Every other test here calls :func:`build_all` directly, and for that reason none of them
+    noticed when the ``__main__`` guard was lost while ``replace_output_root`` moved to
+    ``core``: the module imported cleanly, did nothing, and exited with status 0.  A command
+    that silently does nothing is worse than one that fails, so the check is on what the
+    command leaves on disk, not on its exit status.
+    """
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    repo = Path(__file__).resolve().parents[1]
+    run = subprocess.run(
+        [sys.executable, "-m", "tdadyn.synthetic.build", "--config", str(repo / "config.yaml"),
+         "--family", "null", "--output-root", str(tmp_path)],
+        capture_output=True, text=True, check=True,
+    )
+    assert "datasets ->" in run.stdout, run.stdout + run.stderr
+    assert read_manifest(tmp_path)["datasets"], "the command wrote an empty manifest"
+
+
+@pytest.mark.parametrize("module", ["tdadyn.synthetic.build", "tdadyn.results"])
+def test_every_documented_command_answers_help(module):
+    """Both commands named in the README parse arguments when run with ``-m``."""
+    import subprocess
+    import sys
+
+    run = subprocess.run([sys.executable, "-m", module, "--help"],
+                         capture_output=True, text=True, check=True)
+    assert run.stdout.startswith("usage:"), f"{module} printed nothing for --help"
