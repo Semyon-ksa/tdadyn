@@ -1,11 +1,11 @@
-# Вызывает ту же цель, что и локальный прогон, и ничего сверх неё.
+# Calls the same target as the local run, and nothing beyond it.
 #
-# Только `fast`, и намеренно без [zigzag]: это то, что `pyproject.toml` обещает
-# пользователю — `pip install -e .` работает и тесты проходят без необязательных
-# бэкендов. Чистая машина ловит то, чего не видит рабочая: забытую зависимость,
-# тест, опирающийся на файл, который есть только на одном диске.
+# Only `fast`, and deliberately without [zigzag]: this is what `pyproject.toml` promises
+# the user — `pip install -e .` works and the tests pass without the optional backends.
+# A clean machine catches what a working one does not: a forgotten dependency, a test
+# that relies on a file present on one disk only.
 #
-# `slow` (около 11 минут) и `zigzag` (около 6) остаются локальными целями.
+# `slow` (about 11 minutes) and `zigzag` (about 6) remain local targets.
 name: tests
 
 on:

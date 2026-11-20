@@ -333,7 +333,7 @@ class Zigzag:
     present.  ``union_rule``, the index convention and any notion of bar significance are
     module constants or nothing at all, because the invariant depends on them: a config
     key would invite shifting one by one and getting a plausible barcode with a wrong
-    truth (``docs/roadmap.md``, "Ключи конфига").
+    truth (``docs/roadmap.md``, "Config keys added by Task 2").
     """
 
     backend: str

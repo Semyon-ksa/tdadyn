@@ -1,19 +1,19 @@
-# Данные генерируются целиком из config.yaml + seed, в репозиторий не попадают.
-# В git хранится manifest.json, чтобы отслеживать, чем именно был собран набор.
-# Исключения перечислены по шагам: git не возвращает файлы из исключённого каталога,
-# поэтому каждый уровень пути приходится открывать отдельно.
+# Data are generated entirely from config.yaml + seed and do not go into the repository.
+# manifest.json is kept in git to record exactly what the datasets were built from.
+# Exceptions are listed step by step: git does not re-include files from an excluded
+# directory, so every level of the path has to be opened separately.
 data/*
 !data/synthetic/
 data/synthetic/*
 !data/synthetic/manifest.json
-# Отчётные числа Результата 6: производятся сборкой (--results), а не тестами,
-# и должны переживать пересборку данных.
+# Reported numbers of the stability curve: produced by the build (--results), not by
+# the tests, and they must survive a rebuild of the data.
 !data/synthetic/results/
 data/synthetic/results/*
 !data/synthetic/results/stability.json
-# Отчётные числа Результата 2: производятся сборкой (tdadyn.zigzag.run --results).
-# Исключения здесь пофайловые, поэтому каждый новый артефакт надо открывать отдельно —
-# иначе он игнорируется молча, как это уже случилось с manifest.json.
+# Reported numbers of the zigzag analysis: produced by `python -m tdadyn.results --results`.
+# Exceptions here are per file, so every new artefact has to be opened separately —
+# otherwise it is ignored silently, as already happened with manifest.json.
 !data/synthetic/results/zigzag_events.json
 
 .venv/

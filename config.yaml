@@ -1,49 +1,50 @@
-# Все параметры генерации синтетических данных.
-# Магических чисел в коде быть не должно: любое число, влияющее на результат, живёт здесь.
+# All parameters of synthetic data generation.
+# What can be changed without rewriting a proof lives here; what a proof depends on is a
+# module constant in the code.
 
-format_version: 2         # 2: обязательный truth_kind, поля edge_rule/edge_threshold
-seed: 20260201            # базовый seed; каждый генератор получает производный поток
-output_root: data/synthetic   # относительно каталога этого файла, не рабочего каталога
+format_version: 2         # 2: mandatory truth_kind, edge_rule/edge_threshold fields
+seed: 20260201            # base seed; every generator gets a derived stream
+output_root: data/synthetic   # relative to the directory of this file, not the working directory
 
-# --- Имена каталогов наборов ---
+# --- Dataset directory names ---
 naming:
-  float_precision: 6           # значащих цифр для float-параметров в имени каталога
+  float_precision: 6           # significant digits for float parameters in a directory name
 
-# --- Параметры проверки топологии (общие, НЕ подбираются под датасет) ---
+# --- Topology check parameters (common, NOT tuned per dataset) ---
 topology_check:
   max_homology_dim: 2
-  coeff_field: 2                 # Z/p, p простое. Влияет на бутылку Клейна:
-                                 # p=2 -> (1,2,1), p=3 -> (1,1,0). Рациональных
-                                 # коэффициентов в ripser/gudhi нет; Q проверяется
-                                 # через p=3 (см. docs/method.md, раздел 1.2)
-  coeff_field_test_values: [2, 3]  # для параметризованного теста бутылки Клейна.
-                                 # Эталон (путь B) работает только при p=2;
-                                 # при p=3 доступен только основной пайплайн (путь A)
-  # Критерий значимости ОТКАЛИБРОВАН: 0 промахов на всех 54 комбинациях таблицы
-  # docs/validation.md, раздел 2 (9 случаев x 3 сида x 2 уровня шума).
-  # Старое правило (persistence >= ratio * diam) непригодно: 9 промахов из 54 —
-  # теряет полость тора и бутылки Клейна. Обоснование — method.md, 1.2a.
-  criterion: gap                 # gap | diam_ratio (второе оставлено для сравнения)
-  significance_ratio: 0.15       # используется только при criterion: diam_ratio
-  # Параметры взяты из центра области нулевых промахов, а не с её края:
-  # нуль держится при floor от 0.05 до 0.10 и gap_min от 1.45 до 1.62.
-  gap_noise_floor_ratio: 0.07    # отсечка шумового пола, в долях diam(X)
-  gap_min_ratio: 1.55            # минимальный разрыв, ниже которого признаков нет
+  coeff_field: 2                 # Z/p, p prime. Affects the Klein bottle:
+                                 # p=2 -> (1,2,1), p=3 -> (1,1,0). ripser/gudhi have no
+                                 # rational coefficients; Q is checked via p=3
+                                 # (see docs/method.md, section 1.2)
+  coeff_field_test_values: [2, 3]  # for the parametrised Klein bottle test.
+                                 # The reference (path B) works only at p=2;
+                                 # at p=3 only the main pipeline (path A) is available
+  # The significance criterion is CALIBRATED: 0 misses on all 54 combinations of the table
+  # in docs/validation.md, section 2 (9 cases x 3 seeds x 2 noise levels).
+  # The old rule (persistence >= ratio * diam) is unfit: 9 misses out of 54 — it loses the
+  # cavity of the torus and the Klein bottle. Justification — method.md, 1.2a.
+  criterion: gap                 # gap | diam_ratio (the latter kept for comparison)
+  significance_ratio: 0.15       # used only with criterion: diam_ratio
+  # The parameters are taken from the centre of the zero-miss region, not from its edge:
+  # zero holds for floor from 0.05 to 0.10 and gap_min from 1.45 to 1.62.
+  gap_noise_floor_ratio: 0.07    # noise floor cut-off, as a fraction of diam(X)
+  gap_min_ratio: 1.55            # minimum gap below which there are no features
   calibration_seeds: [20260201, 7, 99]
-  reference_max_nodes: 30        # предел для медленной эталонной реализации
-  # Перекрёстная проверка A vs B на семействе 1 (см. docs/validation.md, раздел 1.1).
-  # Сравнивается СОГЛАСИЕ реализаций на одном комплексе, а не совпадение с таблицей.
-  cross_check_n_points: 18       # размер подвыборки; ограничен стоимостью d3 ~ C(n,4)
-  cross_check_n_scales: 9        # масштабы = середины между соседними расстояниями
+  reference_max_nodes: 30        # limit for the slow reference implementation
+  # Cross-check A vs B on family 1 (see docs/validation.md, section 1.1).
+  # What is compared is the AGREEMENT of the implementations on one complex, not the table.
+  cross_check_n_points: 18       # subsample size; bounded by the cost of d3 ~ C(n,4)
+  cross_check_n_scales: 9        # scales = midpoints between neighbouring distances
 
-# --- Семейство 1: статические облака ---
+# --- Family 1: static clouds ---
 static_clouds:
-  n_points: 400                  # значение по умолчанию для плоских объектов
-  # По-генераторные переопределения. Измерено: тор и бутылка Клейна при 400 точках
-  # не дают разделения в H1/H2. При 600 разрыв в H1 всё ещё неустойчив по сидам:
-  # у тора отношения на позициях 1 и 2 равны 1.73 и 1.62, то есть наибольшим
-  # оказывается ложный, и beta_1 выходит 1 вместо 2. При 900 точках истинный разрез
-  # даёт 2.0-2.35 против случайных 1.3-1.65 на всех трёх калибровочных сидах.
+  n_points: 400                  # default for planar objects
+  # Per-generator overrides. Measured: the torus and the Klein bottle at 400 points do not
+  # separate in H1/H2. At 600 the gap in H1 is still unstable across seeds: for the torus
+  # the ratios at positions 1 and 2 are 1.73 and 1.62, i.e. the false one is largest, and
+  # beta_1 comes out 1 instead of 2. At 900 points the true cut gives 2.0-2.35 against
+  # random 1.3-1.65 on all three calibration seeds.
   n_points_by_generator:
     torus: 900
     klein_bottle: 900
@@ -54,144 +55,146 @@ static_clouds:
     radius: 1.0
   two_circles:
     radius: 1.0
-    separation: 3.0              # > 2*radius, иначе компоненты сольются
+    separation: 3.0              # > 2*radius, otherwise the components merge
   figure_eight:
     scale: 1.0
   torus:
     R: 2.0
     r: 0.8
-    sampling: rejection          # rejection | naive — naive НЕ равномерен по площади
+    sampling: rejection          # rejection | naive — naive is NOT uniform by area
   sphere:
     radius: 1.0
     sampling: muller             # muller | naive_angles
   klein_bottle:
-    embedding: r4_tube           # трубчатое вложение в R^4 (method.md, 1.1);
-                                 # r3 даёт самопересечение и портит ground-truth
-    a: 1.8                       # больший радиус; обязательно a > b
+    embedding: r4_tube           # tubular embedding in R^4 (method.md, 1.1);
+                                 # r3 self-intersects and spoils the ground truth
+    a: 1.8                       # the larger radius; a > b is mandatory
     b: 1.0
-    sampling: rejection          # плотность ~ sqrt((a+b cos v)^2 + b^2 sin^2(v)/4)
+    sampling: rejection          # density ~ sqrt((a+b cos v)^2 + b^2 sin^2(v)/4)
   hopf_link:
     radius: 1.0
-    offset: 1.0                  # смещение центра второй окружности
+    offset: 1.0                  # offset of the second circle's centre
 
-# Построение взвешенной сети из облака
+# Building a weighted network from a cloud
 network_from_cloud:
   method: gaussian_kernel        # gaussian_kernel | knn
-  # Ширина ядра задаётся в долях МЕДИАННОГО попарного расстояния, а не абсолютным
-  # числом: масштабы объектов семейства 1 различаются. Измерено: абсолютное 0.5 при
-  # диаметре тора 5.71 схлопывает 60% весов ниже 1e-6 и ломает one_minus (см.
-  # docs/method.md, 1.3). При ширине 2.0 оба преобразования верны.
+  # The kernel width is a fraction of the MEDIAN pairwise distance, not an absolute
+  # number: the scales of family-1 objects differ. Measured: an absolute 0.5 at a torus
+  # diameter of 5.71 collapses 60% of the weights below 1e-6 and breaks one_minus (see
+  # docs/method.md, 1.3). At width 2.0 both transforms are correct.
   kernel_sigma_median_fraction: 0.65
-  kernel_sigma_by_generator: {}  # абсолютные переопределения, если понадобятся
-  max_collapsed_weight_fraction: 0.10   # сторож: доля весов < 1e-6; выше — ядро вырождено
-  # k-NN: расстояния = кратчайшие пути по графу (геодезика, конструкция Isomap).
-  # НЕ средство контроля сложности: матрица кратчайших путей плотная, комплекс Рипса
-  # такого же размера (см. docs/method.md, 1.3). Ценность — внутренняя метрика.
-  # k работает в ОКНЕ: снизу граф рвётся на компоненты, сверху короткое замыкание
-  # (хорды поперёк дырок). Измерено на торе: diam_geo сползает с 7.72 (k=8) до 5.72
-  # (k=250) при евклидовом 5.71 — метрика выродилась.
-  # Измерено при 900 точках (тор и Клейн): k=10 теряет петлю, k=20..160 верны,
-  # отношение диаметров сползает с 1.32 (k=10) до 1.11 (k=160) — сторож 1.10 срабатывает
-  # около k=180. Принято 40: середина окна в логарифме, вдвое от нижнего отказа и
-  # вчетверо от сторожа. 20 работает, но стоит на самом краю.
-  # 40 — не значение по умолчанию, а измеренное: проверено на всех ПЯТИ связных объектах
-  # (окружность, восьмёрка, тор, сфера, бутылка Клейна) на трёх калибровочных сидах.
-  # Окна: у окружности и сферы верно на всём ряду 10..160; у восьмёрки до 80 (при 160
-  # отношение 1.02, сторож срабатывает); у тора и Клейна снизу отказ при 10, сверху
-  # сторож около 180. 40 лежит внутри пересечения всех пяти окон.
+  kernel_sigma_by_generator: {}  # absolute overrides, should they be needed
+  max_collapsed_weight_fraction: 0.10   # guard: fraction of weights < 1e-6; above it the kernel is degenerate
+  # k-NN: distances = shortest paths in the graph (geodesics, the Isomap construction).
+  # NOT a means of controlling complexity: the shortest-path matrix is dense, the Rips
+  # complex is just as large (see docs/method.md, 1.3). The value is the intrinsic metric.
+  # k works in a WINDOW: from below the graph breaks into components, from above it
+  # short-circuits (chords across the holes). Measured on the torus: diam_geo slides from
+  # 7.72 (k=8) to 5.72 (k=250) with Euclidean 5.71 — the metric has degenerated.
+  # Measured at 900 points (torus and Klein): k=10 loses a loop, k=20..160 are correct,
+  # the diameter ratio slides from 1.32 (k=10) to 1.11 (k=160) — the 1.10 guard fires
+  # around k=180. 40 is adopted: the middle of the window on a log scale, twice the lower
+  # failure and a quarter of the guard. 20 works but sits right at the edge.
+  # 40 is not a default but a measured value: checked on all FIVE connected objects
+  # (circle, figure eight, torus, sphere, Klein bottle) on three calibration seeds.
+  # Windows: circle and sphere are correct over the whole range 10..160; figure eight up to
+  # 80 (at 160 the ratio is 1.02 and the guard fires); torus and Klein fail at 10 from
+  # below, guard at about 180 from above. 40 lies inside the intersection of all five.
   knn_k: 40
-  # Двум окружностям нужен больший k: компоненты разделены пустотой, и при 20 и 40 граф
-  # несвязен. Окно k=80..100 (при 60 рвётся на сидах 7 и 99, при 120 сторож); принято 100.
-  # Зацепления Хопфа здесь НЕТ намеренно: он исключён из геодезической конструкции целиком,
-  # потому что мостовые циклы у вплотную проходящих компонент долговечны и неотличимы от
-  # настоящих признаков ни при каком k (docs/method.md, 1.3). Переопределение для него
-  # выглядело бы подобранным значением, тогда как рабочего значения не существует.
+  # Two circles need a larger k: the components are separated by empty space, and at 20
+  # and 40 the graph is disconnected. Window k=80..100 (at 60 it breaks on seeds 7 and 99,
+  # at 120 the guard fires); 100 is adopted.
+  # The Hopf link is deliberately ABSENT here: it is excluded from the geodesic construction
+  # entirely, because bridge cycles of components passing right next to each other are
+  # long-lived and indistinguishable from real features at any k (docs/method.md, 1.3). An
+  # override for it would look like a tuned value, while no working value exists.
   knn_k_by_generator:
     two_circles: 100
-  knn_symmetrize: union          # union | mutual — union даёт связность при меньшем k
-  knn_require_connected: true    # несвязный граф -> явная ошибка, не подмена бесконечностей
-  min_geodesic_diameter_ratio: 1.10  # сторож: diam_geo / diam_euclid; ближе к 1 -> вырождение
-  # Оба преобразования равноправны и оба проверяются. one_minus НЕ запрещать:
-  # это стандартный выбор для коннектомов (d = 1 - |r|) в Задаче 3. sqrt_neg_log
-  # осмыслен только для гауссова ядра, к корреляционной матрице неприменим.
+  knn_symmetrize: union          # union | mutual — union gives connectivity at a smaller k
+  knn_require_connected: true    # disconnected graph -> explicit error, not replaced infinities
+  min_geodesic_diameter_ratio: 1.10  # guard: diam_geo / diam_euclid; closer to 1 -> degeneration
+  # Both transforms are equal and both are checked. Do NOT forbid one_minus: it is the
+  # standard choice for connectomes (d = 1 - |r|) in Task 3. sqrt_neg_log makes sense only
+  # for a Gaussian kernel and does not apply to a correlation matrix.
   distance_from_similarity: sqrt_neg_log   # sqrt_neg_log | one_minus
   test_both_transforms: true
 
-# --- Семейство 2: динамические графы с событиями ---
+# --- Family 2: dynamic graphs with events ---
 dynamic_events:
-  n_nodes: 24                    # <= reference_max_nodes, иначе эталон не посчитать
+  n_nodes: 24                    # <= reference_max_nodes, otherwise the reference cannot compute it
   n_snapshots: 60
   edge_weight: 1.0
-  threshold: 0.5                 # порог бинаризации для флаг-комплекса
+  threshold: 0.5                 # binarisation threshold for the flag complex
   scenarios:
     cycle_lifecycle:
-      path_closes_at: 12         # рождение H1
-      chord_added_at: 27         # рождение второго H1
-      edge_removed_at: 41        # гибель H1
-      component_splits_at: 48    # рождение H0
-      component_merges_at: 55    # гибель H0
-    # Метрический сценарий: точки на окружности, комплекс Рипса на каждом кадре.
-    # Спецификация дописана в S7 — method.md, 2.1a; все числа там измерены эталоном.
+      path_closes_at: 12         # birth of H1
+      chord_added_at: 27         # birth of a second H1
+      edge_removed_at: 41        # death of H1
+      component_splits_at: 48    # birth of H0
+      component_merges_at: 55    # death of H0
+    # Metric scenario: points on a circle, a Rips complex on every frame.
+    # Specification — method.md, 2.1a; every number there is measured by the reference.
     geometric_loop:
-      n_points: 24               # <= reference_max_nodes (было 60 при пределе 30)
-      rips_epsilon: 0.8          # середина окна (2*pi*R_max/n, R_min*sqrt(3)) =
-                                 # (0.367, 1.732) в логарифмическом масштабе.
-                                 # Снизу граф рассыпается на n компонент, сверху
-                                 # VR(S^1) уходит в режим S^3 и beta_1 гибнет
-      radius_schedule: [1.0, 1.4, 1.0]   # кусочно-линейно по индексу снимка;
-                                 # дыхание радиуса событий не порождает
-      gap_angle: 1.2             # ширина открытого разрыва, радианы. Требуется
-                                 # 2*R_min*sin(gap/2) > eps, то есть > 0.823;
-                                 # при 0.8 петля на малом радиусе не рвётся
-      gap_open_at: 20            # гибель H1
-      gap_close_at: 45           # рождение H1
+      n_points: 24               # <= reference_max_nodes (was 60 with a limit of 30)
+      rips_epsilon: 0.8          # middle of the window (2*pi*R_max/n, R_min*sqrt(3)) =
+                                 # (0.367, 1.732) on a logarithmic scale.
+                                 # Below it the graph scatters into n components, above it
+                                 # VR(S^1) enters the S^3 regime and beta_1 dies
+      radius_schedule: [1.0, 1.4, 1.0]   # piecewise linear in the snapshot index;
+                                 # radius breathing generates no events
+      gap_angle: 1.2             # width of the open gap, radians. Requires
+                                 # 2*R_min*sin(gap/2) > eps, i.e. > 0.823;
+                                 # at 0.8 the loop does not break at the small radius
+      gap_open_at: 20            # death of H1
+      gap_close_at: 45           # birth of H1
 
-# --- Семейство 3: SBM и осцилляторы ---
+# --- Family 3: SBM and oscillators ---
 dynamic_sbm:
   n_nodes: 60
   n_snapshots: 60
   block_sizes: [15, 15, 15, 15]
   p_in: 0.35
   p_out: 0.02
-  merge_at: 20                   # два сообщества сливаются
-  split_at: 40                   # сообщество делится
+  merge_at: 20                   # two communities merge
+  split_at: 40                   # a community splits
 
 oscillators:
   model: kuramoto                # kuramoto | roessler
   n_channels: 30
-  n_timepoints: 3000        # == regime_length * len(regimes), иначе ряд и coupling.npy
-                            # разъезжаются и окно сопоставляется не с тем режимом
-  dt: 0.2                   # окно должно покрывать НЕСКОЛЬКО периодов колебания:
-                            # при dt=0.01 окно занимало 0.16 периода и корреляция
-                            # внутри блока (0.946) не отличалась от межблочной (0.936)
+  n_timepoints: 3000        # == regime_length * len(regimes), otherwise the series and
+                            # coupling.npy drift apart and a window meets the wrong regime
+  dt: 0.2                   # a window must cover SEVERAL oscillation periods:
+                            # at dt=0.01 a window spanned 0.16 of a period, and the
+                            # within-block correlation (0.946) did not differ from the
+                            # between-block one (0.936)
   kuramoto:
-    K: 6.0                   # выше порога синхронизации: эффективная связь внутри
-                             # блока (K/N)*(block-1) = 1.8 против K_c ~ 1.6
+    K: 6.0                   # above the synchronisation threshold: effective coupling within
+                             # a block (K/N)*(block-1) = 1.8 against K_c ~ 1.6
     omega_dist: normal
     omega_scale: 1.0
   roessler:
     a: 0.2
     b: 0.2
     c: 5.7
-    # Связь работает в ОКНЕ, как и k в network_from_cloud. Сверху — полная
-    # синхронизация: при 0.04 каналы внутри блока совпадают побитово (разброс 2.7e-9,
-    # при 0.15 ровно 0), |r| внутри блока равен ровно 1, и набор вырождается — внутри
-    # блока не остаётся никакой изменчивости. Снизу связь не проявляется: при 0.002
-    # разрыв |r| внутри/между всего 0.090. Измерено (разрыв |r|, сид 20260201):
-    #   0.002 -> 0.090   0.005 -> 0.440   0.01 -> 0.542   0.02 -> 0.445   0.04+ -> вырождение
-    # Принято 0.01 — середина окна [0.005, 0.02] в логарифмическом масштабе.
+    # The coupling works in a WINDOW, like k in network_from_cloud. From above — complete
+    # synchronisation: at 0.04 the channels within a block coincide bitwise (spread 2.7e-9,
+    # exactly 0 at 0.15), |r| within a block is exactly 1, and the dataset degenerates — no
+    # variability is left within a block. From below the coupling does not show: at 0.002
+    # the within/between gap in |r| is only 0.090. Measured (gap in |r|, seed 20260201):
+    #   0.002 -> 0.090   0.005 -> 0.440   0.01 -> 0.542   0.02 -> 0.445   0.04+ -> degenerate
+    # 0.01 is adopted — the middle of the window [0.005, 0.02] on a logarithmic scale.
     epsilon: 0.01
   integrator:
     method: RK45
     rtol: 1.0e-6
     atol: 1.0e-9
   coupling_schedule:
-    regime_length: 1000          # должно быть >> sliding_window.length
-    transient_length: 1000       # интегрируется под первым режимом и отбрасывается:
-                                 # Рёсслер стартует вне аттрактора (method.md, 3.1a)
-    # Режим — это разбиение каналов на блоки (method.md, 3.1a). Соседние разбиения
-    # обязаны быть связаны измельчением, иначе это не слияние и не деление, а
-    # перенарезка: [10,10,10] -> [20,10] сливает два блока, обратный переход делит.
+    regime_length: 1000          # must be >> sliding_window.length
+    transient_length: 1000       # integrated under the first regime and discarded:
+                                 # Rössler starts off the attractor (method.md, 3.1a)
+    # A regime is a partition of the channels into blocks (method.md, 3.1a). Neighbouring
+    # partitions must be related by refinement, otherwise it is neither a merge nor a split
+    # but a recut: [10,10,10] -> [20,10] merges two blocks, the reverse transition splits.
     regimes:
       - [10, 10, 10]
       - [20, 10]
@@ -200,112 +203,119 @@ oscillators:
 sliding_window:
   length: 100
   step: 10
-  fisher_z: true                 # только для статистики согласия с A(t); в путь
-                                 # к расстояниям не идёт (method.md, 3.4)
-  # Формализует требование "L << длительность режима" из method.md §3.4: окно длиннее
-  # доли режима размазывает событие через границу режима и не даёт его локализовать.
+  fisher_z: true                 # only for the agreement statistic with A(t); it does not
+                                 # enter the path to distances (method.md, 3.4)
+  # Formalises the requirement "L << regime duration" from method.md §3.4: a window longer
+  # than a fraction of a regime smears the event across the regime boundary and prevents
+  # localising it.
   max_length_fraction_of_regime: 0.2
-  # Порог согласия восстановленной связности с истинным A(t) (validation.md, семейство 3).
-  # ОТКАЛИБРОВАН на трёх сидах [20260201, 7, 99], Курамото, статистика — усреднённая по
-  # окнам режима матрица |r| против A(t) этого режима (9 значений: 3 сида x 3 режима):
-  #   истина:            min 0.383, max 0.878
-  #   перестановка меток: min -0.039, max 0.068   <- честный нулевой контроль
-  # Принято 0.25 — близко к центру разрыва (0.068, 0.383): втрое выше нуля и в полтора
-  # раза ниже худшего истинного случая.
-  # ЧЕГО ПОРОГ НЕ ДЕЛАЕТ: не различает режимы между собой. Сравнение с ЧУЖИМ режимом
-  # даёт до 0.440, то есть перекрывается с истиной. Это следствие вложенности разбиений
-  # (method.md, 3.1a): [20,10] — огрубление [10,10,10], и соседние режимы совпадают
-  # большей частью структуры. Статистика проверяет «окно восстанавливает связь», а не
-  # «окно различает режимы».
-  # Область применимости: только Курамото с параметрами из этого файла. На Рёсслера НЕ
-  # переносится — при epsilon=0.15 блоки синхронизуются полностью, каналы внутри блока
-  # побитово совпадают и |r| внутри блока равен ровно 1. На коннектомы Задачи 3 тем
-  # более не переносится; механизм тот же, что у topology_check (method.md, 1.2a).
+  # Threshold of agreement between recovered coupling and the true A(t) (validation.md,
+  # family 3). CALIBRATED on three seeds [20260201, 7, 99], Kuramoto; the statistic is the
+  # |r| matrix averaged over a regime's windows against that regime's A(t)
+  # (9 values: 3 seeds x 3 regimes):
+  #   truth:             min 0.383, max 0.878
+  #   label permutation: min -0.039, max 0.068   <- the honest null control
+  # 0.25 is adopted — close to the centre of the gap (0.068, 0.383): three times above the
+  # null and one and a half times below the worst true case.
+  # WHAT THE THRESHOLD DOES NOT DO: it does not distinguish regimes from one another.
+  # Comparison with ANOTHER regime gives up to 0.440, i.e. it overlaps with the truth. This
+  # follows from the nesting of partitions (method.md, 3.1a): [20,10] is a coarsening of
+  # [10,10,10], and neighbouring regimes share most of their structure. The statistic checks
+  # "the window recovers coupling", not "the window distinguishes regimes".
+  # Scope: Kuramoto with the parameters of this file only. It does NOT carry over to
+  # Rössler — at epsilon=0.15 the blocks synchronise completely, the channels within a block
+  # coincide bitwise and |r| within a block is exactly 1. Still less does it carry over to
+  # the connectomes of Task 3; the mechanism is the same as for topology_check
+  # (method.md, 1.2a).
   min_coupling_agreement: 0.25
 
-# --- Семейство 4: шум и нулевые модели ---
+# --- Family 4: noise and null models ---
 noise:
   weight_jitter_sigma: [0.0, 0.05, 0.10, 0.20]
   spurious_edge_fraction: [0.0, 0.02, 0.05, 0.10]
   missing_edge_fraction: [0.0, 0.02, 0.05, 0.10]
   point_jitter_sigma: [0.0, 0.02, 0.05, 0.10]
-  n_repeats: 10                  # повторов на уровень шума
+  n_repeats: 10                  # repeats per noise level
 
 null_models:
-  # Разведены по двум пайплайнам проекта (method.md, 4.2). match_density_to убран, а не
-  # доопределён: у фильтрации Рипса по облаку параметра плотности нет вообще — фильтрация
-  # проходит все пороги. Плотность осмысленна только для порогованного графа, то есть
-  # для семейства 2, и там её цель — снимки cycle_lifecycle, где она однозначна.
-  uniform_cloud:                 # нулевая модель семейства 1: облако -> Рипс
-    n_points: 400                # см. измерение ниже: при 200 частота 6%, при 400 — 1.5%
+  # Split between the project's two pipelines (method.md, 4.2). match_density_to was
+  # removed rather than defined: a Rips filtration on a cloud has no density parameter at
+  # all — the filtration goes through every threshold. Density makes sense only for a
+  # thresholded graph, i.e. for family 2, and there its target is the cycle_lifecycle
+  # snapshots, where it is unambiguous.
+  uniform_cloud:                 # null model of family 1: cloud -> Rips
+    n_points: 400                # see the measurement below: 6% at 200, 1.5% at 400
     dim: 3
-  erdos_renyi:                   # нулевая модель семейства 2: снимки -> флаг-комплекс
-    n_nodes: 24                  # <= reference_max_nodes, иначе кривую нечем считать
+  erdos_renyi:                   # null model of family 2: snapshots -> flag complex
+    n_nodes: 24                  # <= reference_max_nodes, otherwise the curve cannot be computed
     n_snapshots: 60
   n_realizations: 20
-  # Критерий значимости имеет НЕНУЛЕВУЮ частоту ложных срабатываний на случайных облаках.
-  # Это свойство критерия, а не набора (method.md, 1.2a): отказывает ветвь beta_k = 0,
-  # когда над шумовым полом уцелел ровно один бар и сравнивать его не с чем.
-  # Измерено НА ПОТОКЕ САМОГО ГЕНЕРАТОРА (10 сидов x 20 реализаций = 200 испытаний),
-  # ожидание (1,0,0), R^3:
-  #   n=200 -> 12/200 = 6.0% (95% сверху 10.2%)
-  #   n=400 ->  3/200 = 1.5% (95% сверху  4.3%)
-  # Плато НЕТ: переход с 200 на 400 снижает частоту вчетверо. Ранняя оценка «плато на 2%»
-  # была получена на 60 испытаниях И НА ДРУГОМ ПОТОКЕ — при таком объёме 1/60 и 4/60
-  # неразличимы, и «плато» было шумом.
-  # На трёх калибровочных сидах при n=400 промахов 0 из 60 (при n=200 было 4 из 60).
-  # Порог держится выше 95%-границы истинной частоты (4.3%), а не выше наблюдённого нуля:
-  # утверждать ноль по 60 испытаниям нельзя, а регрессию порог поймает.
+  # The significance criterion has a NON-ZERO false positive rate on random clouds.
+  # It is a property of the criterion, not of the dataset (method.md, 1.2a): the
+  # beta_k = 0 branch fails when exactly one bar survives above the noise floor and there
+  # is nothing to compare it with.
+  # Measured ON THE GENERATOR'S OWN STREAM (10 seeds x 20 realisations = 200 trials),
+  # expectation (1,0,0), R^3:
+  #   n=200 -> 12/200 = 6.0% (95% upper 10.2%)
+  #   n=400 ->  3/200 = 1.5% (95% upper  4.3%)
+  # There is NO plateau: going from 200 to 400 cuts the rate fourfold. An early estimate of
+  # "a plateau at 2%" was obtained on 60 trials AND ON A DIFFERENT STREAM — at that volume
+  # 1/60 and 4/60 are indistinguishable, and the "plateau" was noise.
+  # On the three calibration seeds at n=400 there are 0 misses out of 60 (4 of 60 at n=200).
+  # The threshold is kept above the 95% bound of the true rate (4.3%), not above the
+  # observed zero: zero cannot be claimed from 60 trials, and the threshold will catch a
+  # regression.
   max_false_positive_rate: 0.05
 
-# --- Задача 2: зигзаг-персистентность и временные диаграммы ---
-# Границу S6 соблюдаем: в конфиг идёт то, что можно менять, НЕ переписывая доказательство.
-# Поэтому здесь НЕТ и не будет:
-#   union_rule       — от него зависит инвариант (zigzag.md, 2.2); константа модуля
-#                      UNION_RULE, альтернатива живёт только внутри измеряющего теста
-#   index_convention — от неё зависит перевод бара в событие; ключ приглашал бы сдвинуть
-#                      её на единицу и получить ошибку локализации, неотличимую от
-#                      дефекта алгоритма
-#   significance     — критерий значимости бара в зигзаге НЕ определён, и ключ создавал бы
-#                      впечатление, что определён. topology_check сюда не наследуется
-#                      (zigzag.md, 7): он откалиброван на облаках семейства 1, и, кроме
-#                      того, критерий не инвариантен к перепараметризации фильтрации
-#   edge_rule        — свойство набора, читается из истины, потребителем не настраивается
+# --- Task 2: zigzag persistence and temporal diagrams ---
+# The S6 boundary holds: what goes into the config is what can be changed WITHOUT
+# rewriting the proof. So there is not, and will not be, any of:
+#   union_rule       — the invariant depends on it (zigzag.md, 2.2); a module constant
+#                      UNION_RULE, the alternative lives only inside the test measuring it
+#   index_convention — the translation of a bar into an event depends on it; a key would
+#                      invite shifting it by one and getting a localisation error
+#                      indistinguishable from a defect of the algorithm
+#   significance     — a bar significance criterion is NOT defined for the zigzag, and a key
+#                      would give the impression that it is. topology_check is not inherited
+#                      here (zigzag.md, 7): it is calibrated on family-1 clouds, and,
+#                      moreover, the criterion is not invariant under reparametrisation of
+#                      the filtration
+#   edge_rule        — a property of the dataset, read from the truth, not set by the consumer
 zigzag:
-  backend: reference             # reference | dionysus | fzz — реализация, а не истина.
-                                 # Порядок нерушим: оракул (Z2) до бэкенда (Z3), иначе
-                                 # бэкенд становится собственным эталоном.
-                                 # Согласие в Z3 ДВУСТОРОННЕЕ: оракул <-> dionysus.
-                                 # fzz оставлен в списке, но необязателен: на PyPI его
-                                 # нет, из исходников он собирается только если dionysus
-                                 # не уложится в бюджет. Третьей стороной проверка не
-                                 # становится — второй бэкенд повторяет тот же класс
-                                 # алгоритма и при расхождении не скажет, кто прав
+  backend: reference             # reference | dionysus | fzz — an implementation, not the truth.
+                                 # The order is inviolable: oracle (Z2) before backend (Z3),
+                                 # otherwise the backend becomes its own reference.
+                                 # The Z3 agreement is TWO-SIDED: oracle <-> dionysus.
+                                 # fzz stays in the list but is optional: it is not on PyPI
+                                 # and is built from source only if dionysus does not fit the
+                                 # budget. It would not become a third party to the check — a
+                                 # second backend repeats the same class of algorithm and
+                                 # cannot say which side is right when they disagree
                                  # (docs/zigzag.md, 5.3)
-  max_homology_dim: 1            # комплекс строится до max_homology_dim + 1. Меньше, чем
-                                 # у topology_check (2), намеренно: у обоих наборов
-                                 # семейства 2 события живут в H0 и H1, а стоимость
-                                 # растёт быстро. Больше — запрещено перекрёстной
-                                 # проверкой: выше потолка генераторов истины нет
-  coeff_field: 2                 # при p != 2 — явная ошибка, как в reference/.
-                                 # Названо как в topology_check: два написания одного
-                                 # понятия в одном файле — приглашение прочитать не тот ключ
-  event_matching:                # сопоставление предсказанного лога с истинным (zigzag.md, 6)
-    tolerance: 0                 # допуск по индексу снимка. Ноль принят, но НЕ проверено,
-                                 # достижим ли он при ненулевом шуме; если нет — величина
-                                 # станет отчётной, а не настройкой (Z4)
-    match_dimension: true        # разные размерности не матчатся: сводный recall скрыл бы
-                                 # алгоритм, безупречный в H0 и слепой в H1
-    match_type: true             # рождение не матчится с гибелью
+  max_homology_dim: 1            # the complex is built up to max_homology_dim + 1. Lower than
+                                 # topology_check's (2) on purpose: in both family-2 datasets
+                                 # the events live in H0 and H1, and the cost grows fast.
+                                 # Higher is forbidden by a cross-check: above the
+                                 # generators' ceiling there is no truth
+  coeff_field: 2                 # p != 2 is an explicit error, as in reference/.
+                                 # Named as in topology_check: two spellings of one concept
+                                 # in one file invite reading the wrong key
+  event_matching:                # matching a predicted log against the true one (zigzag.md, 6)
+    tolerance: 0                 # tolerance in snapshot index. Measured in Z4: zero gives unit
+                                 # recall and precision on clean data, and raising it to 1
+                                 # recovers one event in one of eight noisy datasets
+    match_dimension: true        # different dimensions do not match: a pooled recall would hide
+                                 # an algorithm flawless in H0 and blind in H1
+    match_type: true             # a birth does not match a death
   oracle:
-    level: L3                    # L1 | L2 | L3 — глубина независимой проверки.
-                                 # L1 (числа Бетти) и L2 (ранги стрелок) необходимы и
-                                 # НЕДОСТАТОЧНЫ: покрытия не различают {[1,4],[2,3]} и
-                                 # {[1,3],[2,4]} (zigzag.md, 3.4). Сверка — бар в бар
-    max_index_count: 200         # выше — L3 только спот-проверками: он квадратичен по |I|.
-                                 # На cycle_lifecycle |I| = 2*60-1 = 119, считается полностью
-  report:                        # что считается и протоколируется, а не отбрасывается молча
-    invisible_bars: true         # носитель не содержит ни одного целого индекса
-    ephemeral_bars: true         # рождение и гибель внутри одного перехода
-    half_index_events: true      # событие на объединении, которого нет ни в одном снимке
-    censored_bars: true          # бар касается края последовательности
+    level: L3                    # L1 | L2 | L3 — depth of the independent check.
+                                 # L1 (Betti numbers) and L2 (arrow ranks) are necessary and
+                                 # INSUFFICIENT: coverings do not tell {[1,4],[2,3]} from
+                                 # {[1,3],[2,4]} (zigzag.md, 3.4). Comparison is bar for bar
+    max_index_count: 200         # above this, L3 only as spot checks: it is quadratic in |I|.
+                                 # For cycle_lifecycle |I| = 2*60-1 = 119, computed in full
+  report:                        # what is counted and recorded rather than silently discarded
+    invisible_bars: true         # the support contains no integer index
+    ephemeral_bars: true         # birth and death within one transition
+    half_index_events: true      # events derived from a half-integer end of a bar (zigzag.md, 6)
+    censored_bars: true          # the bar touches an end of the sequence

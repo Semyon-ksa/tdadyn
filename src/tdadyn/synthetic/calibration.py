@@ -494,7 +494,7 @@ def collect_spectra(
                     case_name=case.name,
                 )
                 label = f"{case.name} seed={seed} sigma={sigma}"
-                print(f"измерено: {label}", flush=True)
+                print(f"measured: {label}", flush=True)
                 records.append(SpectrumRecord(label, case.name, dict(case.expected), spectra))
     return records
 
@@ -559,27 +559,27 @@ def evaluate(
     failures: dict[str, list[str]] = {name: [] for name in rules}
     for record in records:
         if verbose:
-            print(f"\n{record.label}  ожидание={_as_tuple(record.expected)}")
+            print(f"\n{record.label}  expected={_as_tuple(record.expected)}")
             for dim in sorted(record.spectra):
                 spectrum = record.spectra[dim]
                 head = np.round(spectrum.finite[:5], 3)
-                print(f"   H{dim} inf={spectrum.n_infinite} спектр={head}")
+                print(f"   H{dim} inf={spectrum.n_infinite} spectrum={head}")
         for name, rule in rules.items():
             got = {dim: rule(record.spectra[dim], **parameters) for dim in sorted(record.spectra)}
             ok = got == record.expected
             if not ok:
                 failures[name].append(f"{record.label}: {_as_tuple(got)}")
             if verbose:
-                print(f"   {name:16} -> {_as_tuple(got)}  {'ok' if ok else 'МИМО'}")
+                print(f"   {name:16} -> {_as_tuple(got)}  {'ok' if ok else 'MISS'}")
     return failures
 
 
 def report(failures: dict[str, list[str]], total: int) -> None:
     """Print the summary of a calibration run."""
     print("\n" + "=" * 72)
-    print(f"Итог по {total} комбинациям (случай, сид, sigma):")
+    print(f"Summary over {total} combinations (case, seed, sigma):")
     for name, missed in failures.items():
-        print(f"  {name:16} верно {total - len(missed):3d}/{total}")
+        print(f"  {name:16} correct {total - len(missed):3d}/{total}")
         for failure in missed[:6]:
             print(f"        {failure}")
 
@@ -646,13 +646,13 @@ def main(argv: list[str] | None = None) -> None:
             cases = [case for case in cases if case.name in wanted]
         records = collect_spectra(config, cases, metric=arguments.metric)
         save_spectra(records, cache)
-        print(f"спектры записаны в {cache}")
+        print(f"spectra written to {cache}")
     else:
         records = load_spectra(cache)
         if arguments.case:
             wanted = set(arguments.case)
             records = [record for record in records if record.case_name in wanted]
-        print(f"спектры прочитаны из {cache}: {len(records)} комбинаций")
+        print(f"spectra read from {cache}: {len(records)} combinations")
 
     topology = config.topology_check
     base = {
@@ -669,9 +669,9 @@ def main(argv: list[str] | None = None) -> None:
             "tail_min_ratio": [1.4, 1.6, 2.0, 2.5, 3.0],
         }
         results = sweep(records, CANDIDATE_RULES, grid, base)
-        print(f"\nЛучшие настройки по {len(records)} комбинациям:")
+        print(f"\nBest settings over {len(records)} combinations:")
         for rule_name, parameters, missed in results[:15]:
-            print(f"  {rule_name:16} промахов {missed:3d}  {parameters}")
+            print(f"  {rule_name:16} misses {missed:3d}  {parameters}")
         return
 
     failures = evaluate(records, CANDIDATE_RULES, base)

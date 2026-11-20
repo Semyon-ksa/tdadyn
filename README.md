@@ -4,46 +4,46 @@
 ![python](https://img.shields.io/badge/python-3.12-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-**Топологический анализ динамических графов с проверяемым ответом.**
+**Topological analysis of dynamic graphs, with answers you can check.**
 
-`tdadyn` — Python-пакет для персистентных гомологий на статических и меняющихся во
-времени данных. В нём три части:
+`tdadyn` is a Python package for persistent homology on static and time-varying data. It has
+three parts:
 
-- **генераторы данных с известной топологией** — облака точек, сети, динамические графы и
-  временные ряды, для которых правильный ответ (числа Бетти, лог топологических событий,
-  расписание связей) известен заранее и записан рядом с данными;
-- **зигзаг-персистентность** — барштрих-код последовательности графов, перевод его в лог
-  событий «родился / умер цикл, распалась / слилась компонента» и сверка с истиной по
-  метрикам recall и precision;
-- **независимая эталонная реализация** — гомологии, ранги и зигзаг-барштрих-код над
-  $\mathbb{Z}/2$ без библиотек персистентности, чтобы проверять результат другим способом,
-  а не тем же кодом.
+- **generators of data with known topology** — point clouds, networks, dynamic graphs and time
+  series for which the correct answer (Betti numbers, a log of topological events, a coupling
+  schedule) is known in advance and stored next to the data;
+- **zigzag persistence** — the barcode of a sequence of graphs, its translation into a log of
+  events ("a cycle is born / dies, a component splits off / merges") and its comparison with the
+  truth by recall and precision;
+- **an independent reference implementation** — homology, ranks and the zigzag barcode over
+  $\mathbb{Z}/2$ without any persistence library, so that results are checked by a different
+  method rather than by the same code.
 
-Пакет нужен, чтобы ответить на вопрос «правильно ли мой пайплайн находит топологию» там,
-где ответ известен, — до того, как применять его к данным, где ответа нет.
+The package answers the question "does my pipeline find the topology correctly" where the answer
+is known — before it is applied to data where it is not.
 
-## Возможности
+## Features
 
-- 17 генераторов в четырёх семействах: многообразия ($S^1$, тор, сфера, бутылка Клейна, …),
-  динамические графы с запланированными событиями, ряды связанных осцилляторов
-  (Курамото, Рёсслер), шумовые и нулевые модели.
-- Машиночитаемая истина для каждого набора (`ground_truth.json`) со схемой и валидацией.
-- Сборка всех 38 эталонных наборов одной командой; детерминированные имена каталогов,
-  `manifest.json` с sha256 массивов и истины.
-- Критерий значимости баров (разрыв в спектре персистентностей), откалиброванный на
-  облаках с известной топологией.
-- Перевод облака в сеть: гауссово ядро, $k$-NN-граф с геодезической метрикой; скользящее
-  окно «ряд → динамический граф».
-- Зигзаг-диаграмма из снимков графа,
+- 17 generators in four families: manifolds ($S^1$, torus, sphere, Klein bottle, …), dynamic
+  graphs with scheduled events, series of coupled oscillators (Kuramoto, Rössler), noise and null
+  models.
+- Machine-readable truth for every dataset (`ground_truth.json`) with a schema and validation.
+- One command builds all 38 reference datasets; deterministic directory names, a `manifest.json`
+  with sha256 of the arrays and of the truth.
+- A bar significance criterion (a gap in the spectrum of persistences) calibrated on clouds with
+  known topology.
+- From cloud to network: Gaussian kernel, $k$-NN graph with a geodesic metric; a sliding window
+  "series → dynamic graph".
+- A zigzag diagram from graph snapshots,
   $K_0 \hookrightarrow K_0 \cup K_1 \hookleftarrow K_1 \hookrightarrow \cdots$;
-  поток элементарных операций, адаптер к Dionysus 2.
-- Независимый оракул зигзаг-барштрих-кода через обобщённый ранг и обращение Мёбиуса.
-- Лог событий из барштрих-кода, сопоставление с истиной, частота ложных срабатываний с
-  доверительным интервалом Уилсона.
+  a stream of elementary operations, an adapter to Dionysus 2.
+- An independent oracle for the zigzag barcode via the generalised rank and Möbius inversion.
+- An event log from the barcode, matching against the truth, a false positive rate with a Wilson
+  confidence interval.
 
-## Установка
+## Installation
 
-Нужен Python 3.12.
+Python 3.12 is required.
 
 ```bash
 git clone https://github.com/Semyon-ksa/tdadyn.git
@@ -52,27 +52,27 @@ python -m venv .venv
 .venv/bin/pip install -e ".[dev]"
 ```
 
-Необязательные зависимости:
+Optional dependencies:
 
-| Extra | Что добавляет | Когда нужно |
+| Extra | Adds | Needed for |
 |---|---|---|
-| `zigzag` | Dionysus 2 | быстрый зигзаг-бэкенд; без него доступен только эталонный оракул |
-| `notebook` | matplotlib, nbclient, nbconvert | сборка отчётных ноутбуков |
-| `dev` | pytest | тесты |
+| `zigzag` | Dionysus 2 | the fast zigzag backend; without it only the reference oracle is available |
+| `notebook` | matplotlib, nbclient, nbconvert | building the report notebooks |
+| `dev` | pytest | tests |
 
 ```bash
 .venv/bin/pip install -e ".[dev,zigzag]"
 ```
 
-Базовая установка работает без зигзаг-бэкенда; функции, которым он нужен, импортируют его
-внутри себя и сообщают, если его нет.
+The base installation works without the zigzag backend; functions that need it import it inside
+themselves and say so if it is missing.
 
-## Быстрый старт
+## Quick start
 
-Примеры ниже запускаются из корня репозитория: параметры генераторов берутся из
+The examples below are run from the repository root: generator parameters come from
 `config.yaml`.
 
-### Набор данных с известным ответом
+### A dataset with a known answer
 
 ```python
 from tdadyn.core import load_config
@@ -85,8 +85,8 @@ torus.points.shape                   # (900, 3)
 torus.ground_truth.expected_betti    # {0: 1, 1: 2, 2: 1}
 ```
 
-Генераторы можно вызывать и напрямую. Случайность передаётся явно, глобальное состояние
-numpy не используется:
+Generators can also be called directly. Randomness is passed explicitly; numpy's global state is
+never used:
 
 ```python
 from tdadyn.core import rng_for
@@ -97,7 +97,7 @@ circle = make_circle(n_points=400, radius=1.0, noise_sigma=0.03, coeff_field=2,
 circle.ground_truth.expected_betti   # {0: 1, 1: 1, 2: 0}
 ```
 
-### Проверить, восстанавливает ли пайплайн топологию
+### Check whether a pipeline recovers the topology
 
 ```python
 from tdadyn.synthetic.persistence import pairwise_distances, significant_betti
@@ -107,44 +107,47 @@ significant_betti(pairwise_distances(circle.points), max_homology_dim=2, coeff_f
                   criterion=check.criterion,
                   gap_noise_floor_ratio=check.gap_noise_floor_ratio,
                   gap_min_ratio=check.gap_min_ratio)
-# {0: 1, 1: 1, 2: 0}  — совпадает с истиной
+# {0: 1, 1: 1, 2: 0}  — matches the truth
 ```
 
-### Динамический граф: от снимков к событиям
+### A dynamic graph: from snapshots to events
 
 ```python
 from tdadyn.synthetic import build_dynamic_graph
 from tdadyn.zigzag import analyse
 
-lifecycle = build_dynamic_graph("cycle_lifecycle", config)   # 60 снимков на 24 вершинах
+lifecycle = build_dynamic_graph("cycle_lifecycle", config)   # 60 snapshots on 24 vertices
 for event in lifecycle.ground_truth.events:
-    print(event.snapshot, event.dim, event.type, event.narrative)
-# 12 1 birth путь замыкается в цикл
-# 27 1 birth хорда делит цикл на два
-# 41 1 death удалено ребро дуги, отрезанной хордой
-# 48 0 birth от висячего пути отделяется компонента
-# 55 0 death компоненты сливаются обратно
+    print(event.snapshot, event.dim, event.type)
+# 12 1 birth   ← the path closes into a cycle
+# 27 1 birth   ← a chord splits the cycle in two
+# 41 1 death   ← an edge of the arc cut off by the chord is removed
+# 48 0 birth   ← a component detaches from the dangling path
+# 55 0 death   ← the components merge back
 
 report = analyse(lifecycle, config=config, truth=lifecycle.ground_truth.events)
 report.metrics.recall, report.metrics.precision   # (1.0, 1.0)
 ```
 
-`analyse` строит зигзаг-диаграмму, считает барштрих-код, переводит его в события и
-сопоставляет их с истиной. То же по шагам:
+Each event also carries a `narrative` string with the description above; in the generated
+datasets it is recorded in Russian.
+
+`analyse` builds the zigzag diagram, computes the barcode, translates it into events and matches
+them against the truth. The same step by step:
 
 ```python
 from tdadyn.zigzag import zigzag_complexes, barcode_from
 
-complexes = zigzag_complexes(lifecycle, max_homology_dim=1, max_nodes=30)  # 119 комплексов
+complexes = zigzag_complexes(lifecycle, max_homology_dim=1, max_nodes=30)  # 119 complexes
 barcode_from(list(complexes.values()), backend="dionysus", max_homology_dim=1)
 # {0: ((0, 118), (96, 108)), 1: ((23, 81), (53, 118))}
 ```
 
-Концы баров — позиции на диаграмме: позиция $p$ соответствует индексу $p/2$, нечётные
-позиции — объединения соседних снимков. Бар `(23, 81)` — это $[11\tfrac12,\,40\tfrac12]$:
-цикл, рождённый на снимке 12 и умерший на снимке 41.
+Bar ends are positions in the diagram: position $p$ corresponds to index $p/2$, and odd positions
+are unions of neighbouring snapshots. The bar `(23, 81)` is $[11\tfrac12,\,40\tfrac12]$: a cycle
+born at snapshot 12 that dies at snapshot 41.
 
-### Эталонная проверка
+### Reference check
 
 ```python
 import numpy as np
@@ -152,102 +155,102 @@ from tdadyn.reference import flag_complex, betti_numbers
 
 octahedron = 1 - np.kron(np.eye(3, dtype=int), np.ones((2, 2), dtype=int))
 betti_numbers(flag_complex(octahedron, max_homology_dim=2, max_nodes=30), 2)
-# {0: 1, 1: 0, 2: 1}  — полость без 3-симплексов
+# {0: 1, 1: 0, 2: 1}  — a cavity without 3-simplices
 ```
 
-## Состав пакета
+## Package layout
 
-| Модуль | Назначение |
+| Module | Purpose |
 |---|---|
-| `tdadyn.core` | контракты данных (`GroundTruth`, `Event`, `*Dataset`), разбор и валидация конфига, производные потоки случайности `rng_for`, правило ребра `adjacency_from_snapshot`, чтение и запись наборов, манифест |
-| `tdadyn.synthetic` | генераторы, сборка наборов из конфига, шум, перевод облака в сеть, скользящее окно, персистентность и критерий значимости |
-| `tdadyn.zigzag` | зигзаг-диаграмма, поток операций, бэкенд Dionysus, барштрих-код → события, метрики, нулевые модели |
-| `tdadyn.reference` | эталон над $\mathbb{Z}/2$: граничные матрицы и ранги, флаг-комплекс, зигзаг-оракул |
-| `tdadyn.results` | командная строка, собирающая барштрих-коды и метрики по всем наборам в один артефакт |
+| `tdadyn.core` | data contracts (`GroundTruth`, `Event`, `*Dataset`), config parsing and validation, derived random streams `rng_for`, the edge rule `adjacency_from_snapshot`, reading and writing datasets, the manifest |
+| `tdadyn.synthetic` | generators, building datasets from the config, noise, cloud → network, sliding window, persistence and the significance criterion |
+| `tdadyn.zigzag` | zigzag diagram, operation stream, Dionysus backend, barcode → events, metrics, null models |
+| `tdadyn.reference` | the reference over $\mathbb{Z}/2$: boundary matrices and ranks, flag complex, zigzag oracle |
+| `tdadyn.results` | the command that collects barcodes and metrics over all datasets into one artefact |
 
-Зависимости между слоями односторонние. `core` и `reference` не импортируют ничего из
-пакета. `synthetic` и `zigzag` опираются на них — генераторы считают эталоном кривую Бетти,
-зигзаг сверяется с оракулом, — но друг о друге не знают: генераторы, производящие истину,
-не видят алгоритм, который её проверяет, а алгоритм читает данные только с диска. Правило
-закреплено тестом `tests/test_layering.py`. Единственный модуль, которому нужны и
-генераторы, и алгоритм, — `tdadyn.results`, и он стоит над слоями.
+Dependencies between layers go one way. `core` and `reference` import nothing from the package.
+`synthetic` and `zigzag` rely on them — the generators compute the Betti curve with the reference,
+the zigzag is checked against the oracle — but do not know about each other: the generators that
+produce the truth do not see the algorithm that checks it, and the algorithm reads data only from
+disk. The rule is enforced by `tests/test_layering.py`. The only module that needs both the
+generators and the algorithm is `tdadyn.results`, and it sits above the layers.
 
-## Наборы данных
+## Datasets
 
-| Семейство | Генераторы | Истина | Что проверяет |
+| Family | Generators | Truth | What it tests |
 |---|---|---|---|
-| Статические облака | `circle`, `two_circles`, `figure_eight`, `torus`, `sphere`, `klein_bottle`, `hopf_link` | числа Бетти | восстановление топологии многообразия, $H_0$–$H_2$, зависимость от поля коэффициентов |
-| Динамические графы | `cycle_lifecycle`, `geometric_loop` | кривая Бетти по снимкам и лог событий | обнаружение и локализацию рождений и гибелей классов во времени |
-| SBM и осцилляторы | `dynamic_sbm`, `kuramoto`, `roessler` | разбиение на сообщества и расписание связи | цепочку «временной ряд → сеть → персистентность» |
-| Шум и нулевые модели | `point_jitter`, `weight_jitter`, `spurious_edges`, `missing_edges`; Erdős–Rényi, равномерное облако | уровень шума; отсутствие событий | деградацию под шумом и частоту ложных срабатываний |
+| Static clouds | `circle`, `two_circles`, `figure_eight`, `torus`, `sphere`, `klein_bottle`, `hopf_link` | Betti numbers | recovering the topology of a manifold, $H_0$–$H_2$, dependence on the coefficient field |
+| Dynamic graphs | `cycle_lifecycle`, `geometric_loop` | Betti curve over snapshots and an event log | detecting and localising births and deaths of classes in time |
+| SBM and oscillators | `dynamic_sbm`, `kuramoto`, `roessler` | community partition and coupling schedule | the chain "time series → network → persistence" |
+| Noise and null models | `point_jitter`, `weight_jitter`, `spurious_edges`, `missing_edges`; Erdős–Rényi, uniform cloud | noise level; absence of events | degradation under noise and the false positive rate |
 
-Несколько наборов устроены так, чтобы ловить конкретные ошибки:
+Several datasets are built to catch specific errors:
 
-- **бутылка Клейна** даёт $(1,2,1)$ над $\mathbb{Z}/2$ и $(1,1,0)$ над $\mathbb{Z}/3$ — если
-  ответы совпали, поле коэффициентов не доходит до вычислений;
-- **зацепление Хопфа** имеет $\beta_0 = 2$ — компоненты, проходящие вплотную, не должны
-  склеиться;
-- в **`cycle_lifecycle`** гибель цикла на снимке 41 спарена с рождением на 12, а не на 27,
-  хотя интуиция подсказывает обратное; кривая Бетти этого не видит, барштрих-код видит;
-- в **`geometric_loop`** граф меняется на снимках 4, 43 и 56, а топология — нет: событий там
-  быть не должно.
+- the **Klein bottle** gives $(1,2,1)$ over $\mathbb{Z}/2$ and $(1,1,0)$ over $\mathbb{Z}/3$ — if the
+  answers coincide, the coefficient field does not reach the computation;
+- the **Hopf link** has $\beta_0 = 2$ — components passing right next to each other must not stick
+  together;
+- in **`cycle_lifecycle`** the death of a cycle at snapshot 41 is paired with the birth at 12, not
+  at 27, although intuition suggests the opposite; the Betti curve does not see this, the barcode
+  does;
+- in **`geometric_loop`** the graph changes at snapshots 4, 43 and 56 while the topology does not:
+  there must be no events there.
 
-## Командная строка
+## Command line
 
 ```bash
 .venv/bin/python -m tdadyn.synthetic.build --config config.yaml
 ```
 
-Собирает 38 наборов (около 13 МБ) в `data/synthetic/` за несколько секунд и пишет
+Builds 38 datasets (about 13 MB) in `data/synthetic/` in a few seconds and writes
 `manifest.json`.
 
-| Флаг | Действие |
+| Flag | Effect |
 |---|---|
-| `--family NAME` | собрать только одно семейство; можно повторять |
-| `--output-root DIR` | писать в другой каталог |
-| `--results` | дополнительно посчитать кривую устойчивости диаграмм к шуму в `results/stability.json` (около девяти минут) |
+| `--family NAME` | build only one family; can be repeated |
+| `--output-root DIR` | write to another directory |
+| `--results` | also compute the stability curve of diagrams under noise into `results/stability.json` (about nine minutes) |
 
 ```bash
 .venv/bin/python -m tdadyn.results --config config.yaml --results
 ```
 
-Прогоняет зигзаг по всем динамическим наборам и пишет
-`data/synthetic/results/zigzag_events.json`: барштрих-коды, метрики, счётчики
-цензурированных, невидимых и эфемерных баров, частоту ложных срабатываний на нулевой
-модели и сверку оракула с Dionysus. Нужен extra `zigzag`; занимает около пяти минут, почти
-всё время уходит на оракул. Без `--results` печатает таблицы и ничего не пишет.
+Runs the zigzag over every dynamic dataset and writes `data/synthetic/results/zigzag_events.json`:
+barcodes, metrics, counts of censored, invisible and ephemeral bars, the false positive rate on the
+null model and the oracle–Dionysus comparison. Needs the `zigzag` extra; takes about five minutes,
+almost all of it spent in the oracle. Without `--results` it prints tables and writes nothing.
 
-Те же действия доступны через `make`:
+The same actions are available through `make`:
 
-| Цель | Действие |
+| Target | Effect |
 |---|---|
-| `make fast` | быстрые тесты, около 20 секунд, без зигзаг-бэкенда |
-| `make slow` | топологические проверки, около 11 минут |
-| `make zigzag` | тесты зигзаг-слоя, около 6 минут, нужен `[zigzag]` |
-| `make results` | артефакт зигзаг-анализа |
-| `make report-zigzag` | собрать, выполнить и выгрузить в HTML отчётный ноутбук |
+| `make fast` | fast tests, about 20 seconds, without the zigzag backend |
+| `make slow` | topological checks, about 11 minutes |
+| `make zigzag` | tests of the zigzag layer, about 6 minutes, needs `[zigzag]` |
+| `make results` | the zigzag analysis artefact |
+| `make report-zigzag` | build, execute and export to HTML the report notebook |
 
-## Формат данных
+## Data format
 
 ```
 data/synthetic/
 ├── static_cloud/<dataset_id>/   points.npy, ground_truth.json
 ├── dynamic_graph/<dataset_id>/  snapshots.npy, ground_truth.json
 ├── series/<dataset_id>/         series.npy, coupling.npy, ground_truth.json
-├── noisy/ …                     только возмущённый массив
+├── noisy/ …                     only the perturbed array
 ├── null/ …
 ├── results/                     stability.json, zigzag_events.json
 └── manifest.json
 ```
 
-| Объект | Форма |
+| Object | Shape |
 |---|---|
-| облако точек | `(n_points, dim)` |
-| матрица весов или расстояний | `(n_nodes, n_nodes)`, симметричная |
-| динамический граф | `(T, n_nodes, n_nodes)` |
-| временной ряд | `(n_channels, n_timepoints)` |
+| point cloud | `(n_points, dim)` |
+| weight or distance matrix | `(n_nodes, n_nodes)`, symmetric |
+| dynamic graph | `(T, n_nodes, n_nodes)` |
+| time series | `(n_channels, n_timepoints)` |
 
-Имя каталога — детерминированная функция генератора, всех его параметров и seed:
+The directory name is a deterministic function of the generator, all its parameters and the seed:
 `cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201`.
 
 ```python
@@ -258,93 +261,92 @@ dataset.snapshots.shape          # (60, 24, 24)
 dataset.ground_truth.edge_rule   # 'weight_above'
 ```
 
-`ground_truth.json` хранит род истины (`truth_kind`), параметры вызова генератора, seed и
-поля, обязательные для этого рода: числа Бетти, кривую Бетти и события, метки сообществ
-или уровень шума. У динамических графов записано и **правило ребра**: у сетей сходства ребро
-есть при $w_{ij} > t$, у метрических наборов — при $d_{ij} \le \varepsilon$. Применённое
-наоборот, оно молча даёт дополнение графа, поэтому в коде оно реализовано один раз —
-`core.adjacency_from_snapshot`. Полная схема — в [`docs/data.md`](docs/data.md).
+`ground_truth.json` holds the kind of truth (`truth_kind`), the generator call parameters, the seed
+and the fields mandatory for that kind: Betti numbers, a Betti curve and events, community labels or
+a noise level. Dynamic graphs also record the **edge rule**: for similarity networks an edge exists
+when $w_{ij} > t$, for metric datasets when $d_{ij} \le \varepsilon$. Applied the wrong way round, it
+silently yields the complement of the graph, so the code implements it exactly once —
+`core.adjacency_from_snapshot`. The full schema is in [`docs/data.md`](docs/data.md).
 
-## Как устроен зигзаг
+## How the zigzag works
 
-- **Комплексы.** Каждый снимок превращается в граф по правилу ребра, граф — во
-  флаг-комплекс, обрезанный на размерности $k_{\max}+1$.
-- **Диаграмма.** Между соседними снимками стоит их **посимплексное объединение**
-  $K_i \cup K_{i+1}$, а не флаг-комплекс объединения графов: промежуточный объект не
-  содержит симплексов, которых нет ни в одном снимке. Индексы $0, \tfrac12, 1, \dots, T-1$.
-- **Барштрих-код.** Модуль над колчаном типа $A_N$ разлагается на интервалы однозначно
-  (теорема Габриэля), поэтому код не зависит от алгоритма и его можно проверить
-  независимым вычислением.
-- **События.** Рождение — на первом снимке, где класс уже виден; гибель — на первом снимке,
-  где его уже нет. Бар, идущий от начала или до конца наблюдения, помечается как
-  цензурированный и в метрики не входит. Бар, не застающий ни одного снимка, считается
-  отдельно как невидимый.
-- **Метрики.** Сопоставление внутри пары «размерность, тип» с допуском по времени
-  (по умолчанию 0); recall, precision и ошибка локализации раздельно по размерностям.
+- **Complexes.** Each snapshot becomes a graph by the edge rule, the graph becomes a flag complex
+  truncated at dimension $k_{\max}+1$.
+- **Diagram.** Between neighbouring snapshots stands their **simplexwise union**
+  $K_i \cup K_{i+1}$, not the flag complex of the union of graphs: an intermediate object contains no
+  simplex that is absent from every snapshot. Indices are $0, \tfrac12, 1, \dots, T-1$.
+- **Barcode.** A module over a quiver of type $A_N$ decomposes into intervals uniquely (Gabriel's
+  theorem), so the barcode does not depend on the algorithm and can be checked by an independent
+  computation.
+- **Events.** A birth is placed at the first snapshot where the class is already visible; a death at
+  the first snapshot where it is gone. A bar that runs from the start or to the end of the observation
+  is marked as censored and is excluded from the metrics. A bar that covers no snapshot at all is
+  counted separately as invisible.
+- **Metrics.** Matching within a "dimension, type" pair with a time tolerance (0 by default); recall,
+  precision and localisation error, separately by dimension.
 
-Лог событий, как и кривая Бетти, **слеп к спариванию**: две разные раскладки баров могут
-дать один и тот же лог. Поэтому recall и precision не проверяют, какое рождение спарено с
-какой гибелью, — это проверяет сверка барштрих-кодов бар в бар.
+The event log, like the Betti curve, is **blind to pairing**: two different arrangements of bars can
+give the same log. So recall and precision do not check which birth is paired with which death — the
+bar-for-bar barcode comparison does.
 
-## Независимая проверка
+## Independent verification
 
-`tdadyn.reference` вычисляет то же самое другим способом:
+`tdadyn.reference` computes the same things by a different method:
 
-- числа Бетти — через ранги граничных матриц над $\mathbb{Z}/2$;
-- зигзаг-барштрих-код — через обобщённый ранг $r(b,d)$ (ранг отображения из предела в
-  копредел) и обращение Мёбиуса, без реализации зигзаг-алгоритма.
+- Betti numbers — from ranks of boundary matrices over $\mathbb{Z}/2$;
+- the zigzag barcode — from the generalised rank $r(b,d)$ (the rank of the map from the limit to the
+  colimit) and Möbius inversion, without implementing a zigzag algorithm.
 
-Эталон медленный и ограничен 30 вершинами — поэтому динамические наборы спроектированы на
-24. На всех 18 динамических наборах, включая зашумлённые, барштрих-коды оракула и
-Dionysus совпадают бар в бар: 3192 бара, ноль расхождений.
+The reference is slow and limited to 30 vertices — which is why the dynamic datasets are designed on
+24. On all 18 dynamic datasets, noisy ones included, the barcodes of the oracle and of Dionysus agree
+bar for bar: 3192 bars, zero discrepancies.
 
-## Воспроизводимость
+## Reproducibility
 
-- Каждая функция принимает `rng: np.random.Generator`; потоки выводятся из одного базового
-  seed по имени (`rng_for(seed, "torus")`), поэтому добавление генератора не сдвигает
-  остальные.
-- `manifest.json` хранит sha256 каждого массива и sha256 канонической сериализации истины.
-  Пересборка в той же среде даёт те же хеши; артефакт зигзаг-анализа — тот же
+- Every function takes `rng: np.random.Generator`; streams are derived from one base seed by name
+  (`rng_for(seed, "torus")`), so adding a generator does not shift the others.
+- `manifest.json` stores the sha256 of every array and the sha256 of a canonical serialisation of the
+  truth. A rebuild in the same environment gives the same hashes; the zigzag artefact gives the same
   `content_sha256`.
-- Оговорка: система Рёсслера хаотична, и смена версии scipy, метода интегрирования или
-  допусков меняет её ряд целиком. Воспроизводимость обещана в пределах одной среды.
+- Caveat: the Rössler system is chaotic, and a change of scipy version, integration method or
+  tolerances changes its series entirely. Reproducibility is promised within one environment.
 
-## Ограничения
+## Limitations
 
-- **Синтетика не заменяет реальные данные.** Ряды осцилляторов похожи на фМРТ структурой
-  связей, а не спектром или уровнем шума.
-- **Параметры критерия значимости** откалиброваны на облаках точек и на другие типы данных
-  (например, коннектомы) не переносятся.
-- **Значимость бара в зигзаге не определена.** Без неё на шуме precision падает до долей
-  процента, а на нулевой модели Erdős–Rényi событие находится почти на каждом снимке
-  (0.98 при 95% интервале [0.979, 0.987]). Это измерение, а не дефект: случайный граф
-  при такой плотности действительно непрерывно рождает и теряет циклы.
-- **Эталон** ограничен небольшими комплексами; на больших наборах он годится для
-  выборочной проверки, а не для регрессии.
+- **Synthetic data do not replace real data.** The oscillator series resemble fMRI in their coupling
+  structure, not in spectrum or noise level.
+- **The significance criterion parameters** were calibrated on point clouds and do not transfer to
+  other data types (for example, connectomes).
+- **Bar significance in the zigzag is not defined.** Without it the precision on noise drops to
+  fractions of a percent, and on the Erdős–Rényi null model an event is found on almost every snapshot
+  (0.98, 95% interval [0.979, 0.987]). This is a measurement, not a defect: a random graph at that
+  density really does keep creating and losing cycles.
+- **The reference** is limited to small complexes; on large datasets it is suitable for spot checks,
+  not for regression testing.
 
-## Тесты
+## Tests
 
 ```bash
-make fast    # обязана проходить без необязательных зависимостей; её же запускает CI
+make fast    # must pass without optional dependencies; this is what CI runs
 make slow
 make zigzag
 ```
 
-Ожидаемые числа Бетти и барштрих-коды в тестах — **вход, а не выход**: они выведены из
-конструкции наборов, а не скопированы из результата работы кода. Там, где ответ держится на
-выкладке, тест вычисляет его сам.
+Expected Betti numbers and barcodes in the tests are **inputs, not outputs**: they are derived from
+the construction of the datasets, not copied from the output of the code. Where the answer rests on a
+derivation, the test computes it itself.
 
-## Документация
+## Documentation
 
-| Документ | Содержание |
+| Document | Contents |
 |---|---|
-| [`docs/method.md`](docs/method.md) | конструкции, формулы, эталонные значения и все измерения |
-| [`docs/data.md`](docs/data.md) | раскладка на диске, контракты API, схема истины, манифест |
-| [`docs/validation.md`](docs/validation.md) | критерии корректности и обязательные тесты |
-| [`docs/zigzag.md`](docs/zigzag.md) | зигзаг: конструкция, инвариант, перевод в события, метрики |
-| [`notebooks/zigzag_report.html`](notebooks/zigzag_report.html) | иллюстрированный отчёт о зигзаг-анализе |
-| [`notebooks/report.html`](notebooks/report.html) | отчёт о генераторах и их проверке |
+| [`docs/method.md`](docs/method.md) | constructions, formulas, reference values and every measurement |
+| [`docs/data.md`](docs/data.md) | layout on disk, API contracts, truth schema, manifest |
+| [`docs/validation.md`](docs/validation.md) | correctness criteria and mandatory tests |
+| [`docs/zigzag.md`](docs/zigzag.md) | zigzag: construction, invariant, translation into events, metrics |
+| [`notebooks/zigzag_report.html`](notebooks/zigzag_report.html) | illustrated report on the zigzag analysis |
+| [`notebooks/report.html`](notebooks/report.html) | report on the generators and their verification |
 
-## Лицензия
+## License
 
-MIT — см. [`LICENSE`](LICENSE).
+MIT — see [`LICENSE`](LICENSE).

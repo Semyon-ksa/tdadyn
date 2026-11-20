@@ -21,25 +21,22 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
-# Зигзаг-бэкенды Задачи 2. Необязательные: `pip install -e .` обязана работать без них,
-# и цель `fast` обязана проходить в таком окружении. Импорт бэкенда — внутри функции.
+# Zigzag backends. Optional: `pip install -e .` must work without them, and the `fast`
+# target must pass in such an environment. The backend is imported inside a function.
 #
-# Замерено в Z0, а не выписано по памяти: dionysus 2.2.3 ставится готовым колесом
-# (macosx arm64, cp312), Boost при этом не нужен — прежнее опасение про сборку из
-# исходников к Dionysus не относится, и вывод «необязательные зависимости» держится
-# теперь на fzz, а не на нём.
-# fast-zigzag (Dey-Hou) на PyPI отсутствует: проверены имена fzz, fast-zigzag,
-# fastzigzag, fzzpy, pyfzz, fast_zigzag — ни одного дистрибутива. Здесь он не
-# объявляется, и не только потому, что строка для несуществующего пакета сломала бы
-# установку: проверкой является ОРАКУЛ, вычисляющий барштрих-код другим способом, а
-# второй бэкенд повторяет тот же класс алгоритма и при расхождении не скажет, кто прав.
-# Его ценность — скорость, а она в критерий Результата 2 не входит (docs/zigzag.md 5.3).
+# Measured, not written from memory: dionysus 2.2.3 installs as a prebuilt wheel
+# (macosx arm64, cp312) and needs no Boost — the old concern about building from source
+# does not apply to Dionysus, and the "optional dependencies" decision now rests on fzz.
+# fast-zigzag (Dey-Hou) is not on PyPI: the names fzz, fast-zigzag, fastzigzag, fzzpy,
+# pyfzz, fast_zigzag were checked — no distribution. It is not declared here, and not only
+# because a line for a non-existent package would break installation: the check is the
+# ORACLE, which computes the barcode by a different method, while a second backend repeats
+# the same class of algorithm and cannot say which side is right when they disagree. Its
+# value is speed, which is not part of the correctness criterion (docs/zigzag.md 5.3).
 zigzag = ["dionysus>=2.2"]
-# Отчётный ноутбук: notebooks/report.ipynb. Вынесено отдельно от dev, потому что
-# тестам это не нужно, а CI из-за jupyter тяжелеет заметно.
-# nbconvert добавлен в Z6: notebooks/report.html Задачи 5 им и собран, но в
-# зависимостях его не было — то есть отчёт не пересобирался инструментами
-# репозитория. Теперь `make report-zigzag` производит и ноутбук, и HTML.
+# Report notebooks. Kept apart from dev because the tests do not need them, and jupyter
+# makes CI noticeably heavier. nbconvert is listed because the HTML reports are produced
+# with it; `make report-zigzag` builds both the notebook and the HTML.
 notebook = [
     "matplotlib>=3.8",
     "nbformat>=5.9",

@@ -491,7 +491,7 @@ def test_edge_threshold_must_admit_the_edge_weight(raw):
         parse_config(mutate(raw, "dynamic_events.threshold", weight), config_path=CONFIG_PATH)
 
 
-# --- Задача 2: секция zigzag -------------------------------------------------------
+# --- Task 2: the zigzag section ---------------------------------------------------
 
 
 def test_the_zigzag_section_is_read(raw):
