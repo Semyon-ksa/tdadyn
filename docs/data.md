@@ -1,76 +1,77 @@
-# Данные: контракты, форматы, схема истины
+# Data: contracts, formats, truth schema
 
-## 1. Раскладка на диске
+## 1. Layout on disk
 
 ```
-data/synthetic/                 # в .gitignore, генерируется целиком
+data/synthetic/                 # in .gitignore, generated as a whole
 ├── static_cloud/
 │   └── torus_N900_R2_r0.8_sig0.03_sampling-rejection_coeff_field2_seed20260201/
 │       ├── points.npy          # (n_points, dim) float64
-│       └── ground_truth.json   # сеть НЕ прикладывается: она выводится из точек
+│       └── ground_truth.json   # the network is NOT stored: it is derived from the points
 ├── dynamic_graph/
 │   └── cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201/
-│       ├── snapshots.npy       # (T, n_nodes, n_nodes) float64, симметричные
+│       ├── snapshots.npy       # (T, n_nodes, n_nodes) float64, symmetric
 │       └── ground_truth.json
 ├── series/
 │   └── kuramoto_N30_T3000_K6_omega_scale1_regime_length1000_seed20260201/
 │       ├── series.npy          # (n_channels, n_timepoints) float64
 │       ├── coupling.npy        # (T_schedule, n_channels, n_channels)
 │       └── ground_truth.json
-├── noisy/                      # только возмущённый массив, см. ниже
-│   ├── point_jitter_<база>_level0.05_repeat0_seed.../points.npy
-│   └── weight_jitter_<база>_level0.05_repeat0_seed.../weights.npy
+├── noisy/                      # only the perturbed array, see below
+│   ├── point_jitter_<base>_level0.05_repeat0_seed.../points.npy
+│   └── weight_jitter_<base>_level0.05_repeat0_seed.../weights.npy
 ├── null/
 ├── results/
-│   └── stability.json          # отчётные числа Результата 6; производит сборка
-└── manifest.json               # реестр всех сгенерированных наборов
+│   └── stability.json          # reported numbers of Result 6; produced by the build
+└── manifest.json               # registry of every generated dataset
 ```
 
-Имя каталога набора — детерминированная функция от генератора и параметров, включая seed.
-Один и тот же конфиг обязан давать то же имя и то же содержимое.
+The directory name of a dataset is a deterministic function of the generator and its
+parameters, seed included. The same config must give the same name and the same contents.
 
-**Семейство 4: на диск идёт только возмущённый массив.** Источник восстанавливается по
-`noise_level["base"]`, который хранит `dataset_id` чистого набора. Правило одно на всё
-семейство и действует в обе стороны:
+**Family 4: only the perturbed array goes to disk.** The source is recovered from
+`noise_level["base"]`, which holds the `dataset_id` of the clean dataset. There is one rule
+for the whole family, and it works both ways:
 
-| Механизм | Что лежит | Почему не пара |
+| Mechanism | What is stored | Why not a pair |
 |---|---|---|
-| `point_jitter` | `points.npy` | сеть относилась бы к прежним точкам |
-| `weight_jitter` | `weights.npy` | точки не менялись, а веса испорчены намеренно |
+| `point_jitter` | `points.npy` | a network would belong to the old points |
+| `weight_jitter` | `weights.npy` | the points did not change, the weights are corrupted on purpose |
 | `spurious_edges`, `missing_edges` | `snapshots.npy` | — |
 
-Пара, в которой производный массив не соответствует возмущённому источнику, не должна
-попадать в один каталог **ни в одну сторону**: потребитель, перестроивший сеть из точек,
-получит не то, что на диске, и никакой ошибки не увидит. Измерено: после джиттера точек
-на уровне 0.10 приложенная сеть расходилась с сетью записанных точек до 0.36.
+A pair in which the derived array does not match the perturbed source must not land in one
+directory **in either direction**: a consumer that rebuilds the network from the points gets
+something other than what is on disk and sees no error. Measured: after point jitter at level
+0.10 the attached network differed from the network of the recorded points by up to 0.36.
 
-Каталог, где лежат только веса, читается как `NetworkDataset` — маркер `weights.npy`
-**запасной**, а не первичный: облако точек вправе нести сеть рядом с `points.npy`,
-и первичный маркер сломал бы инвариант «ровно один маркер», которым ловится испорченный
-каталог.
+A directory holding only weights is read as a `NetworkDataset` — the `weights.npy` marker is a
+**fallback**, not a primary one: a point cloud is entitled to carry a network next to
+`points.npy`, and a primary marker would break the "exactly one marker" invariant that catches
+a corrupted directory.
 
-### 1.1. Правило именования
+### 1.1. Naming rule
 
-Имя содержит **все** параметры генератора, а не выборочные. Правило неочевидное, поэтому
-явно: если параметр не попадает в имя, два набора с разной геометрией (например торы с
-разным `R`) получают одинаковое имя и молча перезаписывают друг друга. `naming.py`
-отказывается строить имя, если объявленный порядок параметров не покрывает словарь
-`params` в точности, — именно эта проверка и не даёт параметру выпасть из имени.
+The name contains **all** generator parameters, not a selection. The rule is not obvious, so
+explicitly: if a parameter does not make it into the name, two datasets with different
+geometry (say, tori with different `R`) get the same name and silently overwrite each other.
+`naming.py` refuses to build a name if the declared parameter order does not cover the
+`params` dictionary exactly — this check is what keeps a parameter from dropping out of the
+name.
 
-- Порядок параметров объявляется явно рядом с генератором (`register_name_order`), а не
-  берётся из порядка ключей `params`: JSON пишется с сортировкой ключей, поэтому порядок
-  вставки не переживает round-trip.
-- Частые параметры сокращаются ради читаемости: `n_points`/`n_nodes`/`n_channels` → `N`,
-  `n_snapshots`/`n_timepoints` → `T`, `noise_sigma` → `sig`. Остальные — под своим именем.
-- Числа форматируются как `format(v, f".{naming.float_precision}g")`; строковые значения
-  отделяются дефисом (`sampling-rejection`), числовые пишутся слитно (`N400`).
-- Seed всегда последний.
+- The parameter order is declared explicitly next to the generator (`register_name_order`),
+  not taken from the key order of `params`: JSON is written with sorted keys, so insertion
+  order does not survive a round trip.
+- Frequent parameters are abbreviated for readability: `n_points`/`n_nodes`/`n_channels` →
+  `N`, `n_snapshots`/`n_timepoints` → `T`, `noise_sigma` → `sig`. The rest keep their names.
+- Numbers are formatted as `format(v, f".{naming.float_precision}g")`; string values are
+  separated by a hyphen (`sampling-rejection`), numeric ones are written together (`N400`).
+- The seed always comes last.
 
-**Группировка ключей.** У генераторов с расписанием (семейство 2) прямое перечисление
-всех параметров даёт нечитаемое имя, а выбросить их нельзя — два сценария с разным
-расписанием обязаны различаться именами. Поэтому `register_name_order` принимает не только
-отдельные ключи, но и **группу ключей, сворачиваемую в один токен**: значения группы
-форматируются по общему правилу и соединяются дефисами под одним префиксом.
+**Key grouping.** For generators with a schedule (family 2), listing every parameter yields an
+unreadable name, and none can be dropped — two scenarios with different schedules must differ
+by name. So `register_name_order` accepts not only single keys but also **a group of keys
+collapsed into one token**: the group's values are formatted by the common rule and joined by
+hyphens under one prefix.
 
 ```python
 register_name_order(
@@ -82,47 +83,47 @@ register_name_order(
 # cycle_lifecycle_N24_T60_w1_thr0.5_sched12-27-41-48-55_seed20260201
 ```
 
-Требование точного покрытия `params` при этом не ослабляется: ключ, попавший в группу,
-считается покрытым, ключ, не попавший никуда, по-прежнему приводит к отказу построить имя.
-Хеш параметров вместо группировки не используется намеренно: он тоже обеспечил бы
-различимость, но потерял бы второе свойство имени — по каталогу видно, что в нём лежит.
+The exact-coverage requirement on `params` is not relaxed: a key in a group counts as covered,
+a key in no group still makes the name impossible to build. A parameter hash is deliberately
+not used instead of grouping: it would also guarantee distinctness but would lose the second
+property of the name — that the directory tells you what it holds.
 
-## 2. Порядок осей (фиксирован, менять нельзя)
+## 2. Axis order (fixed, must not change)
 
-| Объект | Форма | Смысл осей |
+| Object | Shape | Meaning of the axes |
 |---|---|---|
-| Облако точек | `(n_points, dim)` | точки × координаты |
-| Матрица весов / расстояний | `(n_nodes, n_nodes)` | симметричная, нули на диагонали для расстояний |
-| Динамический граф | `(T, n_nodes, n_nodes)` | время × узел × узел |
-| Мультивариативный ряд | `(n_channels, n_timepoints)` | канал × время |
-| Расписание связи | `(T_schedule, n_channels, n_channels)` | время × узел × узел |
+| Point cloud | `(n_points, dim)` | points × coordinates |
+| Weight / distance matrix | `(n_nodes, n_nodes)` | symmetric, zero diagonal for distances |
+| Dynamic graph | `(T, n_nodes, n_nodes)` | time × node × node |
+| Multivariate series | `(n_channels, n_timepoints)` | channel × time |
+| Coupling schedule | `(T_schedule, n_channels, n_channels)` | time × node × node |
 
-Ряд хранится как `(n_channels, n_timepoints)` — канал первым. Это отличается от
-соглашения фМРТ-модуля, где ряды приходят как `(n_timepoints, n_rois)`; конвертация
-делается на границе модулей явной транспозицией, а не «по месту».
+A series is stored as `(n_channels, n_timepoints)` — channel first. This differs from the
+convention of the fMRI module, where series arrive as `(n_timepoints, n_rois)`; the conversion
+is done at the module boundary by an explicit transpose, not "in place".
 
-## 3. Контракты API
+## 3. API contracts
 
-Каждый генератор — функция, принимающая параметры и `rng`, возвращающая датакласс.
-Ни один генератор не пишет на диск сам: сохранение — отдельная функция.
+Every generator is a function that takes parameters and an `rng` and returns a dataclass. No
+generator writes to disk itself: saving is a separate function.
 
 ```python
 @dataclass(frozen=True, eq=False)
 class GroundTruth:
     """Machine-readable truth for a generated dataset."""
     format_version: int
-    family: str                  # РАСКЛАДКА НА ДИСКЕ, не род истины:
+    family: str                  # LAYOUT ON DISK, not the kind of truth:
                                  # static_cloud | dynamic_graph | series | noisy | null
-    truth_kind: str              # РОД ИСТИНЫ, определяет обязательные поля:
+    truth_kind: str              # KIND OF TRUTH, determines the mandatory fields:
                                  # expected_betti | betti_curve | partition |
                                  # noise_level | none
     generator: str               # torus, kuramoto, cycle_lifecycle, ...
-    params: dict                 # фактические аргументы вызова генератора
+    params: dict                 # the actual arguments of the generator call
     seed: int
     coeff_field: int | None = None
-    complex: str | None = None                        # "flag" для порогованных графов
+    complex: str | None = None                        # "flag" for thresholded graphs
     edge_rule: str | None = None                      # weight_above | distance_within
-    edge_threshold: float | None = None               # значение t или eps
+    edge_threshold: float | None = None               # the value of t or eps
     expected_betti: dict[int, int] | None = None      # truth_kind: expected_betti
     betti_curve: dict[int, list[int]] | None = None   # truth_kind: betti_curve
     events: list["Event"] | None = None               # truth_kind: betti_curve
@@ -133,11 +134,11 @@ class GroundTruth:
 @dataclass(frozen=True)
 class Event:
     """A single homological event in a dynamic dataset."""
-    snapshot: int      # индекс снимка
-    dim: int           # размерность гомологий: 0, 1, 2
-    type: str          # ТОЛЬКО "birth" или "death"
-    feature_id: str    # устойчивый идентификатор признака
-    narrative: str     # человекочитаемое: "две компоненты сливаются"
+    snapshot: int      # snapshot index
+    dim: int           # homology dimension: 0, 1, 2
+    type: str          # ONLY "birth" or "death"
+    feature_id: str    # stable feature identifier
+    narrative: str     # human-readable: "two components merge"
 
 @dataclass(frozen=True)
 class PointCloudDataset:
@@ -151,8 +152,8 @@ class DynamicGraphDataset:
     ground_truth: GroundTruth
 
 @dataclass(frozen=True)
-class NetworkDataset:            # семейство 4: возмущённая сеть без точек
-    weights: np.ndarray           # (n_nodes, n_nodes), симметричная
+class NetworkDataset:            # family 4: a perturbed network without points
+    weights: np.ndarray           # (n_nodes, n_nodes), symmetric
     ground_truth: GroundTruth
 
 @dataclass(frozen=True)
@@ -162,22 +163,23 @@ class SeriesDataset:
     ground_truth: GroundTruth
 ```
 
-Сигнатура генератора:
+Generator signature:
 
 ```python
 def make_torus(n_points: int, R: float, r: float, noise_sigma: float,
                rng: np.random.Generator) -> PointCloudDataset:
 ```
 
-Правила: `rng` — последний позиционный аргумент, всегда обязателен; глобальное состояние
-numpy не используется; функции чистые (одинаковый вход и rng → одинаковый выход).
+Rules: `rng` is the last positional argument and is always required; numpy's global state is
+not used; functions are pure (the same input and rng → the same output).
 
-Датаклассы объявлены с `eq=False`. Сгенерированный `__eq__` сравнивал бы поля через `==`,
-что на `np.ndarray` даёт `ValueError: ambiguous truth value`; при `eq=False` сравнение
-вырождается в тождество, и тест, сравнивший два разных объекта через `==`, честно падает.
-Содержательное сравнение — `dataset_equal` / `ground_truth_equal`, побитовое по массивам.
+The dataclasses are declared with `eq=False`. A generated `__eq__` would compare fields with
+`==`, which on an `np.ndarray` raises `ValueError: ambiguous truth value`; with `eq=False`
+comparison degenerates to identity, and a test that compared two different objects with `==`
+honestly fails. Comparison by content is `dataset_equal` / `ground_truth_equal`, bitwise on
+arrays.
 
-## 4. Схема ground_truth.json
+## 4. Schema of ground_truth.json
 
 ```json
 {
@@ -195,58 +197,60 @@ numpy не используется; функции чистые (одинако
 }
 ```
 
-### 4.1. `family` — это раскладка, `truth_kind` — род истины
+The `notes` field is part of the recorded truth and is kept verbatim in the language it was
+written in: changing it would change `truth_sha256` of every dataset (§5).
 
-До семейства 3 эти две вещи совпадали, и одно поле обслуживало обе. Динамическая SBM —
-первый объект, где они расходятся: на диске у неё `snapshots.npy`, то есть раскладка
-динамического графа, а истина — разбиение на сообщества и расписание, и баркода среди
-неё нет вовсе (`docs/method.md`, §3.1). Требовать от неё `betti_curve` только потому,
-что на диске лежат снимки, значит кодировать ложное «динамический граф ⇒ у него есть
-топологическая истина».
+### 4.1. `family` is the layout, `truth_kind` is the kind of truth
 
-Поэтому обязательность полей определяется **`truth_kind`**, а `family` отвечает только
-за то, в каком подкаталоге лежит набор и какой файл массива в нём ожидается.
+Up to family 3 the two coincided, and one field served both. The dynamic SBM is the first
+object where they diverge: on disk it has `snapshots.npy`, i.e. the layout of a dynamic graph,
+while its truth is a community partition and a schedule, and there is no barcode in it at all
+(`docs/method.md`, §3.1). Requiring `betti_curve` of it merely because snapshots lie on disk
+would encode the false "dynamic graph ⇒ it has topological truth".
 
-| `truth_kind` | Обязательные поля | Кто |
+So which fields are mandatory is determined by **`truth_kind`**, while `family` only says which
+subdirectory holds the dataset and which array file is expected in it.
+
+| `truth_kind` | Mandatory fields | Who |
 |---|---|---|
-| `expected_betti` | `coeff_field`, `expected_betti` | семейство 1 |
+| `expected_betti` | `coeff_field`, `expected_betti` | family 1 |
 | `betti_curve` | `coeff_field`, `complex`, `edge_rule`, `edge_threshold`, `betti_curve`, `events` | `cycle_lifecycle`, `geometric_loop` |
-| `partition` | `community_labels` | динамическая SBM, ряды осцилляторов |
-| `noise_level` | `noise_level` | зашумлённые наборы семейства 4 |
-| `none` | — | нулевые модели семейства 4 |
+| `partition` | `community_labels` | dynamic SBM, oscillator series |
+| `noise_level` | `noise_level` | noisy datasets of family 4 |
+| `none` | — | null models of family 4 |
 
-Ряды осцилляторов стоят под `partition`, а не под `none`: истина ряда — какие каналы
-связаны с какими, то есть разбиение и расписание, и `community_labels` у него есть
-(`src/tdadyn/synthetic/series.py`). Под `none` попадают только нулевые модели, у которых
-истина — отсутствие расписания, а не какое-то его значение (`docs/method.md`, §4.2).
+Oscillator series sit under `partition`, not `none`: the truth of a series is which channels
+are coupled with which, i.e. a partition and a schedule, and it does have `community_labels`
+(`src/tdadyn/synthetic/series.py`). Only the null models fall under `none`: their truth is the
+absence of a schedule, not some value of it (`docs/method.md`, §4.2).
 
-Поле обязательное и **не выводится из `family` по умолчанию**: неявный дефолт — ровно тот
-механизм молчаливых ошибок, ради устранения которого заводится `edge_rule` ниже.
+The field is mandatory and **is not inferred from `family` by default**: an implicit default is
+exactly the mechanism of silent errors that `edge_rule` below is introduced to remove.
 
-### 4.2. `edge_rule` и `edge_threshold` — направление порога
+### 4.2. `edge_rule` and `edge_threshold` — the threshold direction
 
-`docs/method.md` §2.3 разбирает, почему правил ребра два и почему они противоположны:
-у набора сходств ребро появляется сверху ($w_{ij} > t$, строго), у метрического — снизу
-($d_{ij} \le \varepsilon$, нестрого). Из семейства это не выводится: `cycle_lifecycle`
-и `geometric_loop` оба лежат в `dynamic_graph/`.
+`docs/method.md` §2.3 explains why there are two edge rules and why they point in opposite
+directions: for a similarity dataset an edge appears from above ($w_{ij} > t$, strict), for a
+metric one from below ($d_{ij} \le \varepsilon$, non-strict). This cannot be inferred from the
+family: `cycle_lifecycle` and `geometric_loop` both live in `dynamic_graph/`.
 
-`edge_threshold` намеренно дублирует значение, которое уже есть в `params`. Это не
-избыточность, а разделение назначений: `params` протоколирует **вызов генератора**, поля
-истины определяют **саму истину**. Связывать их знанием о том, какой ключ `params` держит
-порог у какого генератора, — та же неявная конвенция, от которой уходим.
+`edge_threshold` deliberately duplicates a value already present in `params`. This is not
+redundancy but a separation of purposes: `params` records the **generator call**, the truth
+fields define **the truth itself**. Linking them through knowledge of which `params` key holds
+the threshold for which generator is the same implicit convention we are moving away from.
 
-`format_version` поднят с 1 до 2: `truth_kind` обязателен, а обещание побайтовой
-стабильности из §6 распространяется только на необязательные поля.
+`format_version` was raised from 1 to 2: `truth_kind` is mandatory, and the byte-stability
+promise of §6 covers only optional fields.
 
-`dataset_id` в файле есть, но полем датакласса не является: он выводится из
-`(generator, params, seed)`. Хранить его ещё и в объекте значило бы позволить имени и
-параметрам разъехаться. При чтении он сверяется с именем каталога, а если передан
-`float_precision` — то и с пересчитанным заново, что ловит правку `params` руками.
+`dataset_id` is present in the file but is not a dataclass field: it is derived from
+`(generator, params, seed)`. Storing it in the object too would let the name and the parameters
+drift apart. On reading it is checked against the directory name, and if `float_precision` is
+given, against a freshly recomputed one as well, which catches a hand edit of `params`.
 
-Поля со значением `None` в JSON не пишутся вовсе (а не как `null`): так добавление нового
-необязательного поля не меняет побайтово уже сгенерированные файлы.
+Fields whose value is `None` are not written to JSON at all (rather than as `null`): that way
+adding a new optional field does not change already generated files byte for byte.
 
-Для динамического графа:
+For a dynamic graph:
 
 ```json
 {
@@ -279,79 +283,83 @@ numpy не используется; функции чистые (одинако
 }
 ```
 
-Три места в этом примере выглядят как произвол, но им есть причина, и все разобраны
-в `method.md`:
+The `narrative` strings are recorded truth and stay as generated (in Russian): "the path closes
+into a cycle", "a chord splits the cycle in two", "an edge of the arc cut off by the chord is
+removed", "a component detaches from the dangling path", "the components merge back".
 
-- **`edge_rule: weight_above` записан явно**, хотя для этого набора он «очевиден».
-  Очевиден он ровно до появления `geometric_loop`, который лежит в том же семействе
-  и требует `distance_within`. Вывод — `method.md`, 2.3.
+Three places in this example look arbitrary but have a reason, and all are worked out in
+`method.md`:
 
-- **Гибель в 41 спарена с рождением в 12, а не в 27** (`h1_a`, не `h1_b`). Это не
-  конвенция: разложение зигзаг-модуля на интервалы однозначно, и умирает именно класс,
-  рождённый при замыкании пути. Вывод — `method.md`, 2.2a. Интуитивное «хорда породила
-  два цикла, ломаем один — умирает он, молодой» здесь неверно.
-- **`snapshot: k` означает, что $G_k$ уже содержит изменение**, а $G_{k-1}$ — нет.
-  Скачок `betti_curve` приходится на переход $k-1 \to k$. Конвенция — `method.md`, 2.1.
+- **`edge_rule: weight_above` is written explicitly**, although for this dataset it is
+  "obvious". It is obvious only until `geometric_loop` appears, which lives in the same family
+  and requires `distance_within`. Derivation — `method.md`, 2.3.
+- **The death at 41 is paired with the birth at 12, not at 27** (`h1_a`, not `h1_b`). This is
+  not a convention: the decomposition of a zigzag module into intervals is unique, and the class
+  that dies is the one born when the path closed. Derivation — `method.md`, 2.2a. The intuitive
+  "the chord made two cycles, break one and the younger dies" is wrong here.
+- **`snapshot: k` means that $G_k$ already contains the change** and $G_{k-1}$ does not. The
+  jump of `betti_curve` falls on the transition $k-1 \to k$. Convention — `method.md`, 2.1.
 
-**Ключевое требование к согласованности:** `events` и `betti_curve` — два независимых
-источника. `events` отражает намерение планировщика, `betti_curve` считается независимой
-эталонной реализацией из `reference/`. Тест обязан проверить, что скачки `betti_curve`
-в точности соответствуют списку событий. Расхождение означает баг в генераторе, а не
-повод подправить лог.
+**The key consistency requirement:** `events` and `betti_curve` are two independent sources.
+`events` reflects the scheduler's intent, `betti_curve` is computed by the independent
+reference implementation in `reference/`. A test must verify that the jumps of `betti_curve`
+correspond exactly to the event list. A discrepancy means a bug in the generator, not a reason
+to adjust the log.
 
 ## 5. manifest.json
 
-Реестр всех наборов: `dataset_id`, семейство, генератор, seed, путь относительно
-`output_root`, `params`, sha256 массивов, sha256 истины, версия пакета, дата генерации.
-Служит для воспроизводимости и для быстрого обнаружения того, что данные пересобраны
-с другими параметрами. Структура: `{"format_version": 2, "datasets": [ ... ]}`, записи
-отсортированы по `dataset_id`.
+A registry of every dataset: `dataset_id`, family, generator, seed, path relative to
+`output_root`, `params`, sha256 of the arrays, sha256 of the truth, package version, generation
+date. It serves reproducibility and the quick detection that data were rebuilt with different
+parameters. Structure: `{"format_version": 2, "datasets": [ ... ]}`, entries sorted by
+`dataset_id`.
 
-- sha256 считается **по байтам файла `.npy`**, а не по `ndarray.tobytes()`: результат
-  проверяем обычным `shasum -a 256`, и в хеш попадает заголовок, поэтому изменившиеся
-  dtype или форма не спрячутся за одинаковой полезной нагрузкой.
-- **`truth_sha256` считается по канонической сериализации разобранной записи**, а не по
-  байтам `ground_truth.json`. Байтовый хеш вобрал бы отступы, порядок ключей и `repr`
-  float, и косметическое переформатирование читалось бы как изменение данных. Без этого
-  поля проверка «те же хеши» не покрывала бы ожидаемые числа Бетти, лог событий и `notes` —
-  то есть всю ценность наборов: массивы при правке истины не меняются.
-  `entry_payload` его **не** отбрасывает, в отличие от `generated_at` и `package_version`:
-  он воспроизводим и потому входит в сравнение пересборки, а не стоит рядом с ним.
-- Сам манифест побайтово невоспроизводим: в нём записано время генерации. Требование
-  «пересборка даёт те же хеши» проверяется на записи без `generated_at` и
-  `package_version` (`entry_payload`), **в пределах одной среды**: Рёсслер при $c = 5.7$
-  хаотичен, и смена версии scipy, метода или допусков уводит его ряд целиком.
-- Сравниваются **множества** записей в обе стороны: односторонняя проверка пропустила бы
-  исчезнувший набор. Полная пересборка перезаписывает манифест целиком
-  (`write_manifest`), потому что `update_manifest` не удаляет устаревшие строки.
+- sha256 is computed **over the bytes of the `.npy` file**, not over `ndarray.tobytes()`: the
+  result can be checked with a plain `shasum -a 256`, and the header goes into the hash, so a
+  changed dtype or shape cannot hide behind an identical payload.
+- **`truth_sha256` is computed over a canonical serialisation of the parsed record**, not over
+  the bytes of `ground_truth.json`. A byte hash would absorb indentation, key order and float
+  `repr`, and cosmetic reformatting would read as a change of data. Without this field the
+  "same hashes" check would not cover the expected Betti numbers, the event log and `notes` —
+  that is, the whole value of the datasets: arrays do not change when the truth is edited.
+  `entry_payload` does **not** drop it, unlike `generated_at` and `package_version`: it is
+  reproducible and therefore takes part in the rebuild comparison rather than standing beside
+  it.
+- The manifest itself is not byte-reproducible: it records the generation time. The
+  requirement "a rebuild gives the same hashes" is checked on the entry without `generated_at`
+  and `package_version` (`entry_payload`), **within one environment**: Rössler at $c = 5.7$ is
+  chaotic, and a change of scipy version, method or tolerances moves its series entirely.
+- **Sets** of entries are compared in both directions: a one-sided check would miss a vanished
+  dataset. A full rebuild overwrites the manifest as a whole (`write_manifest`), because
+  `update_manifest` does not remove stale rows.
 
-**Манифест хранится в git, и это не исключение из правила «не трогать `data/` руками».**
-Манифест — не данные, а **запись замера**, того же рода, что `results/stability.json`:
-38 наборов регенерируемы из конфига и seed, а утверждение «отчёт и статья написаны против
-вот этих хешей» — нет, и восстановить его пересборкой нельзя. Правило про `data/` защищает
-от правки данных руками и от бинарного мусора в истории; манифест — текстовый JSON на 38
-записей, ровно для диффа и предназначенный.
+**The manifest is kept in git, and that is not an exception to the rule "do not touch `data/`
+by hand".** The manifest is not data but **a record of a measurement**, of the same kind as
+`results/stability.json`: the 38 datasets can be regenerated from the config and seed, while the
+statement "the report and the paper were written against these hashes" cannot, and no rebuild
+can restore it. The rule about `data/` protects against hand edits of data and binary litter in
+history; the manifest is a text JSON of 38 entries, made precisely for diffing.
 
-Больше того, каноническая сериализация `truth_sha256` (§5) окупается **только** под
-контролем версий: её смысл в том, чтобы косметическое переформатирование не читалось как
-изменение данных, а без истории сравнивать не с чем.
+Moreover, the canonical serialisation of `truth_sha256` (§5) pays off **only** under version
+control: its point is that cosmetic reformatting should not read as a change of data, and
+without history there is nothing to compare with.
 
-Кладётся он **прогоном CLI целиком**, а не копированием текущего состояния каталога, и
-перед коммитом сверяется двусторонним сравнением множеств `entry_payload` со свежей
-пересборкой. Отдельные `ground_truth.json` по наборам в git не идут: их содержимое уже
-покрыто полем `truth_sha256`, то есть одной записью вместо 38.
+It is committed **by a full CLI run**, not by copying the current state of the directory, and
+before the commit it is checked by a two-sided comparison of `entry_payload` sets against a
+fresh rebuild. The individual `ground_truth.json` files of the datasets do not go into git:
+their contents are already covered by the `truth_sha256` field, i.e. one entry instead of 38.
 
-## 6. Правила сериализации
+## 6. Serialisation rules
 
-- Массивы — `.npy` (не pickle), float64.
-- JSON — UTF-8, `ensure_ascii=False`, отсортированные ключи, отступ 2.
-- Ключи размерностей гомологий в JSON — строки ("0", "1", "2"), при чтении приводятся
-  к int. Это ограничение JSON, а не выбор дизайна; конвертацию делать в одном месте.
-- `expected_betti` и `betti_curve` перечисляют **все** размерности от 0 до
-  `max_homology_dim`, включая нулевые: отсутствующий ключ неотличим от забытого.
-- `community_labels` хранится внутри `ground_truth.json` (отдельного `.npy` для него нет)
-  и фиксирован как `int64`, иначе round-trip молча менял бы dtype.
-- Ничего не дописывать в существующий каталог набора: пересборка — только целиком.
-- Тип набора при чтении определяется по имени файла массива (`points.npy`,
-  `snapshots.npy`, `series.npy`), а не по `family`: у зашумлённого облака и
-  зашумлённого динамического графа семейство одно и то же — `noisy`.
+- Arrays — `.npy` (not pickle), float64.
+- JSON — UTF-8, `ensure_ascii=False`, sorted keys, indent 2.
+- Homology dimension keys in JSON are strings ("0", "1", "2") and are converted to int on
+  reading. This is a JSON limitation, not a design choice; the conversion happens in one place.
+- `expected_betti` and `betti_curve` list **every** dimension from 0 to `max_homology_dim`,
+  zeros included: a missing key is indistinguishable from a forgotten one.
+- `community_labels` is stored inside `ground_truth.json` (there is no separate `.npy` for it)
+  and fixed as `int64`, otherwise a round trip would silently change the dtype.
+- Nothing is appended to an existing dataset directory: a rebuild is always whole.
+- The dataset type on reading is determined by the name of the array file (`points.npy`,
+  `snapshots.npy`, `series.npy`), not by `family`: a noisy cloud and a noisy dynamic graph have
+  the same family — `noisy`.

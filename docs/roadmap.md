@@ -1,230 +1,230 @@
-# Порядок работ по сессиям
+# Order of work by session
 
-Одна сессия — один связный кусок с коммитом в конце. Не начинать следующую, пока
-предыдущая не прошла тесты. В начале каждой сессии — план, без правок кода.
+One session is one coherent piece of work with a commit at the end. Do not start the next one
+until the previous one has passed its tests. Each session begins with a plan, without code
+changes.
 
-## S1. Каркас и контракты
+## S1. Skeleton and contracts
 
-- Структура пакета `src/tdadyn/synthetic/`, `pyproject.toml`, `.venv`, зависимости.
-- Загрузчик `config.yaml` с валидацией (обязательные ключи, типы, диапазоны).
-- Датаклассы из `docs/data.md`: `GroundTruth`, `Event`, `*Dataset`.
-- Сериализация: запись/чтение набора, `manifest.json`, детерминированное имя каталога.
-- Производные потоки случайности: из базового seed — независимый `np.random.Generator`
-  на генератор и на повтор.
-- Тесты: детерминизм, round-trip, схема, независимость от глобального seed.
+- Package structure `src/tdadyn/synthetic/`, `pyproject.toml`, `.venv`, dependencies.
+- A `config.yaml` loader with validation (mandatory keys, types, ranges).
+- The dataclasses of `docs/data.md`: `GroundTruth`, `Event`, `*Dataset`.
+- Serialisation: writing/reading a dataset, `manifest.json`, a deterministic directory name.
+- Derived random streams: from the base seed, an independent `np.random.Generator` per
+  generator and per repeat.
+- Tests: determinism, round trip, schema, independence from the global seed.
 
-**Готово, когда:** пустых генераторов ещё нет, но сохранение фиктивного набора
-воспроизводимо и проходит валидацию схемы.
+**Done when:** there are no generators yet, but saving a dummy dataset is reproducible and
+passes schema validation.
 
-## S2. Эталонная реализация чисел Бетти (reference/)
+## S2. Reference implementation of Betti numbers (reference/)
 
-Делается РАНЬШЕ генераторов: без неё нечем проверять.
+Done BEFORE the generators: without it there is nothing to check them with.
 
-Разделить на два слоя — это снимает развилку про размерность обрыва:
+Split into two layers — this removes the question of where to cut off the dimension:
 
-- **Слой 1, движок гомологий:** принимает явный список симплексов; граничные матрицы
-  над Z/2, ранги, $\beta_k = \dim\ker\partial_k - \operatorname{rank}\partial_{k+1}$.
-  **Только $\mathbb{Z}/2$**, обобщение на произвольное $p$ не делать: сложение строк
-  остаётся XOR, деление не нужно. При вызове с $p \ne 2$ — явная ошибка, не молчаливый
-  расчёт над $\mathbb{Z}/2$. Ограничение указать в докстринге.
-- **Слой 2, построитель флаг-комплекса:** принимает граф, перечисляет **все** клики
-  каждого размера (не только максимальные — `networkx.find_cliques` не подходит),
-  строит до размерности $k_{\max}+1$ (при `max_homology_dim: 2` — до 3). Параметра
-  обрыва не предусматривать.
-- Ограничение на размер (`reference_max_nodes`), явная ошибка при превышении.
-- Тесты слоя 1: точка, две точки, отрезок, треугольник как 1-скелет ($\beta_1=1$),
-  заполненный треугольник ($\beta_1=0$), полый тетраэдр как явный 2-скелет ($\beta_2=1$).
-- Тесты слоя 2: $K_3 \to (1,0,0)$, $K_4 \to (1,0,0)$ (ловит обрыв на размерности 2),
-  октаэдр $K_{2,2,2} \to (1,0,1)$ (честная полость без 3-симплексов), счёт граней
-  $K_4$ по размерностям = (4, 6, 4, 1) (ловит перечисление только максимальных клик).
+- **Layer 1, the homology engine:** takes an explicit list of simplices; boundary matrices over
+  Z/2, ranks, $\beta_k = \dim\ker\partial_k - \operatorname{rank}\partial_{k+1}$.
+  **$\mathbb{Z}/2$ only**, no generalisation to arbitrary $p$: row addition stays XOR, no
+  division is needed. A call with $p \ne 2$ is an explicit error, not a silent computation over
+  $\mathbb{Z}/2$. State the limitation in the docstring.
+- **Layer 2, the flag complex builder:** takes a graph, enumerates **all** cliques of every size
+  (not only maximal ones — `networkx.find_cliques` does not fit), builds up to dimension
+  $k_{\max}+1$ (at `max_homology_dim: 2`, up to 3). No cut-off parameter.
+- A size limit (`reference_max_nodes`), an explicit error when exceeded.
+- Layer 1 tests: a point, two points, a segment, a triangle as a 1-skeleton ($\beta_1=1$), a
+  filled triangle ($\beta_1=0$), a hollow tetrahedron as an explicit 2-skeleton ($\beta_2=1$).
+- Layer 2 tests: $K_3 \to (1,0,0)$, $K_4 \to (1,0,0)$ (catches a cut-off at dimension 2), the
+  octahedron $K_{2,2,2} \to (1,0,1)$ (an honest cavity without 3-simplices), the face count of
+  $K_4$ by dimension = (4, 6, 4, 1) (catches enumeration of maximal cliques only).
 
-**Готово, когда:** все ручные примеры сходятся. Это фундамент доверия ко всему остальному.
+**Done when:** every hand-worked example agrees. This is the foundation of trust in everything
+else.
 
-## S3. Статические облака, часть 1 (плоские)
+## S3. Static clouds, part 1 (planar)
 
-- Окружность, две окружности, восьмёрка.
-- Харнесс проверки: облако → расстояния → ripser → подсчёт значимых баров.
-- Перекрёстная проверка A vs B (см. `docs/validation.md`, раздел 1.1): подвыборка
-  `cross_check_n_points` точек, масштабы — середины между соседними различными
-  расстояниями, $\beta_k(\varepsilon)$ из штрихкода как число баров с
-  $b \le \varepsilon < d$, ripser с `thresh=inf`. Проверяется согласие реализаций,
-  а не совпадение с таблицей.
-- Тесты Бетти при $\sigma=0$ и при рабочем $\sigma$.
+- Circle, two circles, figure eight.
+- Verification harness: cloud → distances → ripser → count of significant bars.
+- Cross-check A vs B (see `docs/validation.md`, section 1.1): a subsample of
+  `cross_check_n_points` points, scales are midpoints between neighbouring distinct distances,
+  $\beta_k(\varepsilon)$ from the barcode as the number of bars with $b \le \varepsilon < d$,
+  ripser with `thresh=inf`. Agreement of the implementations is checked, not a match with the
+  table.
+- Betti tests at $\sigma=0$ and at the working $\sigma$.
 
-## S4. Статические облака, часть 2 (поверхности)
+## S4. Static clouds, part 2 (surfaces)
 
-- Тор с rejection sampling (геометрия зафиксирована: R=2.0, r=0.8, менять не нужно —
-  вопрос решается критерием, а не подгонкой объекта), сфера методом Мюллера,
-  бутылка Клейна — трубчатое вложение в R⁴ с rejection sampling по элементу площади
-  (формулы в `docs/method.md`, 1.1), зацепление Хопфа.
-- **Калибровка критерия значимости — до топологических тестов, а не после.** Прогнать
-  таблицу случаев из `docs/validation.md`, раздел 2, на трёх сидах; принять форму
-  критерия и параметры; только затем фиксировать их в конфиге и снимать пометку
-  «НЕ ОТКАЛИБРОВАНО». Нерешённый на входе вопрос — случай $\beta_k = 0$ и различение
-  сферы в $H_1$ (ожидается 0) от бутылки Клейна над $\mathbb{Z}/3$ в $H_1$ (ожидается 1):
-  при 400–600 точках их разрывы 1.30x и 1.32x почти неразличимы, при большей выборке
-  не проверено.
-- Тест равномерности сэмплирования бутылки Клейна (КС-критерий), как для тора.
-- Тесты равномерности сэмплирования (КС-критерий для тора, отсутствие полюсов для сферы).
-- Тест бутылки Клейна, параметризованный по полю коэффициентов: $p=2 \to (1,2,1)$,
-  $p=3 \to (1,1,0)$. Рациональные коэффициенты недоступны в ripser/gudhi, поэтому
-  $\mathbb{Q}$ проверяется через $p=3$.
-- Тест зацепления Хопфа: $\beta_0 = 2$.
+- Torus with rejection sampling (geometry fixed: R=2.0, r=0.8, no need to change it — the
+  question is solved by the criterion, not by tuning the object), sphere by Muller's method,
+  Klein bottle — the tubular embedding in R⁴ with rejection sampling by the area element
+  (formulas in `docs/method.md`, 1.1), Hopf link.
+- **Calibrating the significance criterion — before the topological tests, not after.** Run the
+  table of cases from `docs/validation.md`, section 2, on three seeds; adopt the form of the
+  criterion and its parameters; only then fix them in the config and remove the "NOT CALIBRATED"
+  mark. The open question on entry is the case $\beta_k = 0$ and telling the sphere in $H_1$
+  (expected 0) from the Klein bottle over $\mathbb{Z}/3$ in $H_1$ (expected 1): at 400–600 points
+  their gaps of 1.30x and 1.32x are almost indistinguishable; larger samples were not checked.
+- Klein bottle sampling uniformity test (KS test), as for the torus.
+- Sampling uniformity tests (KS test for the torus, no poles for the sphere).
+- Klein bottle test parametrised by the coefficient field: $p=2 \to (1,2,1)$,
+  $p=3 \to (1,1,0)$. Rational coefficients are unavailable in ripser/gudhi, so $\mathbb{Q}$ is
+  checked via $p=3$.
+- Hopf link test: $\beta_0 = 2$.
 
-## S5. Облако → взвешенная сеть
+## S5. Cloud → weighted network
 
-- Гауссово ядро и k-NN. Для k-NN расстояния — **кратчайшие пути** по графу
-  (геодезика), симметризация объединением, явная проверка связности.
-- **Подбор окна по $k$:** прогнать возрастающий ряд ($k$ = 10, 20, 40, 80, 160) на торе
-  и бутылке Клейна при рабочем числе точек. Снизу окно ограничено связностью, сверху —
-  коротким замыканием. Сторож: $\mathrm{diam}_{geo}/\mathrm{diam}_{euclid}$ не ниже
-  `min_geodesic_diameter_ratio`. Формулировка «чем больше $k$, тем лучше» неверна —
-  см. `docs/method.md`, 1.3.
-- **Отдельная калибровка критерия для геодезики:** параметры 0.07 и 1.55 получены на
-  евклидовых облаках и на другую метрику не наследуются. Прогнать таблицу из
-  `docs/validation.md`, раздел 2, заново; если окажется, что нужны другие значения —
-  хранить их отдельно, а не переписывать евклидовы.
-- Обратное преобразование в расстояния, тест монотонности.
-- **Ширина ядра — в долях медианного попарного расстояния**, по-генераторно, а не
-  абсолютным числом: измерено, что абсолютное 0.5 при диаметре тора 5.71 схлопывает
-  60% весов и ломает `one_minus` (`docs/method.md`, 1.3).
-- **Сторожевой тест на вырожденное ядро:** доля весов ниже $10^{-6}$ не превышает
-  `max_collapsed_weight_fraction`. Это и есть отрицательный контроль шага —
-  не «`one_minus` ломает тор», а «вырожденное ядро ломает всё».
-- Оба преобразования (`sqrt_neg_log` и `one_minus`) проверяются как равноправные;
-  `one_minus` не запрещать — он поедет в Задачу 3 как $d = 1-|r|$.
-- Тест: топология сети совпадает с топологией исходного облака — **проверять по
-  структуре диаграммы (какие классы и в каком порядке), а не по совпадению
-  персистентностей**: монотонное преобразование сохраняет первое и искажает второе.
+- Gaussian kernel and k-NN. For k-NN the distances are **shortest paths** in the graph
+  (geodesics), symmetrisation by union, an explicit connectivity check.
+- **Choosing the window in $k$:** run an increasing series ($k$ = 10, 20, 40, 80, 160) on the
+  torus and the Klein bottle at the working number of points. From below the window is bounded by
+  connectivity, from above by short-circuiting. Guard: $\mathrm{diam}_{geo}/\mathrm{diam}_{euclid}$
+  not below `min_geodesic_diameter_ratio`. The phrase "the larger $k$, the better" is wrong — see
+  `docs/method.md`, 1.3.
+- **Separate calibration of the criterion for geodesics:** the parameters 0.07 and 1.55 were
+  obtained on Euclidean clouds and are not inherited by another metric. Rerun the table of
+  `docs/validation.md`, section 2; if other values turn out to be needed, store them separately
+  rather than overwriting the Euclidean ones.
+- The inverse transform to distances, a monotonicity test.
+- **Kernel width as a fraction of the median pairwise distance**, per generator, not as an
+  absolute number: measured, an absolute 0.5 at a torus diameter of 5.71 collapses 60% of the
+  weights and breaks `one_minus` (`docs/method.md`, 1.3).
+- **A guard test against a degenerate kernel:** the fraction of weights below $10^{-6}$ does not
+  exceed `max_collapsed_weight_fraction`. This is the negative control of the step — not
+  "`one_minus` breaks the torus" but "a degenerate kernel breaks everything".
+- Both transforms (`sqrt_neg_log` and `one_minus`) are checked as equals; do not forbid
+  `one_minus` — it goes to Task 3 as $d = 1-|r|$.
+- Test: the topology of the network matches the topology of the source cloud — **check by the
+  structure of the diagram (which classes, in which order), not by equality of persistences**: a
+  monotone transform preserves the former and distorts the latter.
 
-## S6. Динамические графы с событиями
+## S6. Dynamic graphs with events
 
-- Планировщик сценария `cycle_lifecycle` из конфига, ведущий лог событий.
-- Независимый расчёт `betti_curve` через `reference/` — по записанным снимкам, а не по
-  внутреннему состоянию планировщика: иначе кривая описывает намерение, а не то, что
-  легло на диск.
-- Тест согласованности: скачки кривой Бетти ↔ список событий, ни больше ни меньше,
-  **с проверкой позиций поимённо** (конвенция индекса — `method.md`, 2.1).
-- Тест парности: вектор 24-цикла над $\mathbb{Z}/2$ не лежит в $Z_1(G_{41})$, а $c_2$
-  лежит, — то есть гибель в 41 спарена с рождением в 12 (`method.md`, 2.2a).
-- Тест на перестановку меток узлов: `betti_curve` и события не меняются.
-- Тест на треугольнике: $\beta_1$ флаг-комплекса ≠ цикломатическое число.
-- Группировка ключей расписания в `register_name_order` (`data.md`, 1.1).
+- A scheduler for the `cycle_lifecycle` scenario from the config, keeping an event log.
+- Independent computation of `betti_curve` through `reference/` — from the recorded snapshots,
+  not from the scheduler's internal state: otherwise the curve describes the intent, not what was
+  written to disk.
+- Consistency test: Betti curve jumps ↔ the event list, no more and no less, **with positions
+  checked individually** (index convention — `method.md`, 2.1).
+- Pairing test: the vector of the 24-cycle over $\mathbb{Z}/2$ does not lie in $Z_1(G_{41})$
+  while $c_2$ does — i.e. the death at 41 is paired with the birth at 12 (`method.md`, 2.2a).
+- Node relabelling test: `betti_curve` and the events do not change.
+- Triangle test: $\beta_1$ of the flag complex ≠ the cyclomatic number.
+- Key grouping of the schedule in `register_name_order` (`data.md`, 1.1).
 
-## S7. Динамическая SBM и осцилляторы
+## S7. Dynamic SBM and oscillators
 
-- SBM с расписанием слияния/деления сообществ.
-- Курамото и Рёсслер через `solve_ivp` с фиксированным `t_eval`.
-- Геометрический вариант семейства 2 (`geometric_loop`), перенесённый из S6. Спецификация
-  дописана — `method.md`, 2.1a: $\varepsilon = 0.8$ как середина окна в логарифмическом
-  масштабе, кусочно-линейная интерполяция `radius_schedule`, $n = 24$ под
-  `reference_max_nodes`, оба порога режима в перекрёстных проверках конфига. Закрытое
-  состояние дуги — $\delta = 2\pi/n$, а не ноль.
-- Перед генераторами: род истины (`truth_kind`) и правило ребра (`edge_rule`,
-  `edge_threshold`) отдельными полями, `format_version` 2 (`data.md`, 4.1 и 4.2).
-  Без первого нельзя построить SBM, без второго метрический набор читается наоборот.
-- Скользящее окно → динамический граф.
-- Тесты: нулевая связь → нулевые корреляции; восстановленная связность коррелирует
-  с истинным расписанием; проверка соотношения длины окна и длительности режима.
+- SBM with a schedule of community merges/splits.
+- Kuramoto and Rössler through `solve_ivp` with a fixed `t_eval`.
+- The geometric variant of family 2 (`geometric_loop`), carried over from S6. The specification
+  is completed in `method.md`, 2.1a: $\varepsilon = 0.8$ as the middle of the window on a
+  logarithmic scale, piecewise-linear interpolation of `radius_schedule`, $n = 24$ under
+  `reference_max_nodes`, both regime thresholds in the config cross-checks. The closed state of
+  the arc is $\delta = 2\pi/n$, not zero.
+- Before the generators: the kind of truth (`truth_kind`) and the edge rule (`edge_rule`,
+  `edge_threshold`) as separate fields, `format_version` 2 (`data.md`, 4.1 and 4.2). Without the
+  first the SBM cannot be built, without the second the metric dataset is read backwards.
+- Sliding window → dynamic graph.
+- Tests: zero coupling → zero correlations; recovered coupling correlates with the true schedule;
+  a check of the relation between window length and regime duration.
 
-## S8. Шум и нулевые модели
+## S8. Noise and null models
 
-- Джиттер весов, ложные и пропущенные рёбра, джиттер точек — по уровням из конфига.
-- ER и случайные геометрические графы с подбором плотности.
-- Тесты: монотонность bottleneck-расстояния по уровню шума, точность долей $p^\pm$,
-  отсутствие событий на нулевых моделях.
+- Weight jitter, spurious and missing edges, point jitter — at the levels from the config.
+- ER and random geometric graphs with density matching.
+- Tests: monotonicity of the bottleneck distance in the noise level, accuracy of the fractions
+  $p^\pm$, no events on the null models.
 
-## S9. CLI и сборка всех наборов
+## S9. CLI and building every dataset
 
-- Команда `python -m tdadyn.synthetic.build --config config.yaml [--family ...]`,
-  плюс `--output-root` и `--results`. Собирает 38 наборов (13 МБ) за секунды.
-- Слой «конфиг → генератор» перенесён из `tests/conftest.py` в `builders.py`: до S9
-  ничто в пакете не умело построить набор, а CLI нужен ровно он.
-- Раскладка семейства 4: **только возмущённый массив** (`data.md`, §1). Правило одно
-  на семейство и в обе стороны — иначе в каталоге оказывается пара, где производный
-  массив не отвечает возмущённому источнику.
-- Полная пересборка, `manifest.json` с sha256 массивов **и sha256 истины**: без второго
-  проверка не покрывала бы ожидаемые числа Бетти, лог событий и `notes`.
-- README с описанием наборов, примером и разделом «чего эти данные не делают».
-- Проверка: пересборка **в пределах одной среды** воспроизводит те же записи. Больше
-  обещать нельзя — Рёсслер хаотичен (`method.md`, §3.3).
-- Кривая устойчивости Результата 6 производится сборкой, а не тестами, и снимается
-  на окружности, торе и сфере (`method.md`, §4.2a).
+- The command `python -m tdadyn.synthetic.build --config config.yaml [--family ...]`, plus
+  `--output-root` and `--results`. Builds 38 datasets (13 MB) in seconds.
+- The "config → generator" layer moved from `tests/conftest.py` to `builders.py`: before S9
+  nothing in the package could build a dataset, and the CLI needs exactly that.
+- Family 4 layout: **only the perturbed array** (`data.md`, §1). One rule for the family and in
+  both directions — otherwise a directory ends up with a pair whose derived array does not match
+  the perturbed source.
+- A full rebuild, `manifest.json` with sha256 of the arrays **and sha256 of the truth**: without
+  the latter the check would not cover the expected Betti numbers, the event log and `notes`.
+- A README describing the datasets, with an example and a section "what these data do not do".
+- Check: a rebuild **within one environment** reproduces the same entries. More cannot be
+  promised — Rössler is chaotic (`method.md`, §3.3).
+- The stability curve of Result 6 is produced by the build, not by the tests, and is taken on the
+  circle, torus and sphere (`method.md`, §4.2a).
 
-## Что НЕ входит в эти сессии
+## What is NOT part of these sessions
 
-- Зигзаг-алгоритмы и временные диаграммы (Задача 2) — отдельный модуль.
-- Любая работа с реальными фМРТ-данными.
-- Оптимизация производительности сверх необходимого: приоритет — правильность и
-  читаемость, ускорение только там, где тесты не укладываются в разумное время.
+- Zigzag algorithms and temporal diagrams (Task 2) — a separate module.
+- Any work with real fMRI data.
+- Performance optimisation beyond what is necessary: the priority is correctness and readability,
+  speed-ups only where the tests do not fit in a reasonable time.
 
 
 ---
 
-## Задача 2. Зигзаг-персистентность и временные диаграммы
+## Task 2. Zigzag persistence and temporal diagrams
 
-Подпакет `src/tdadyn/zigzag/`. Спецификация — `docs/zigzag.md`. Источник истины — семейство 2
-(`dynamic_graph/`); Задача 2 — потребитель `method.md`, а не соавтор.
+Subpackage `src/tdadyn/zigzag/`. Specification — `docs/zigzag.md`. The source of truth is
+family 2 (`dynamic_graph/`); Task 2 is a consumer of `method.md`, not a co-author.
 
-| Сессия | Содержание | Критерий закрытия |
+| Session | Contents | Closing criterion |
 |---|---|---|
-| Z0 | Тег; переезд общего слоя в `tdadyn.core` и `tdadyn.reference`; документы; `[zigzag]` как необязательные зависимости; маркеры и три локальные цели | 484 теста зелены после переезда и до нового кода; `pip install -e .` и цель `fast` без `[zigzag]` |
-| Z1 | Снимки → комплексы → зигзаг-диаграмма → поток элементарных операций; слой индексов | Реплей потока даёт те же $K_i$ и $K_{i+1/2}$; каждый префикс — комплекс |
-| Z2 | Оракул в `reference/`: L1 Бетти, L2 ранги стрелок, L3 обобщённый ранг + Мёбиус; игрушки T1–T4 | Ручные барштрих-коды воспроизведены; пара 12↔41 вычислена; T4-пара различена |
-| Z3 | Адаптер Dionysus 2; перевод индексов | Двустороннее согласие оракул ↔ Dionysus, бар в бар, на `cycle_lifecycle` и `geometric_loop` |
-| Z4 | Барштрих-код → лог событий; метрики recall/precision/локализация; отрицательные контроли | **Результат 2**: метрики измерены, пара 12↔41 воспроизведена бэкендом |
-| Z5 | Нулевые модели (FPR на снимок с интервалом) и деградация по шуму | Таблицы с числом испытаний; ни одного «ноль» без интервала |
-| Z6 | CLI `--results`, артефакт, отчёт, тег | **Закрыто.** Артефакт производит сборка, не pytest; отчёт читает артефакт и исполняется командой |
+| Z0 | Tag; moving the shared layer to `tdadyn.core` and `tdadyn.reference`; documents; `[zigzag]` as optional dependencies; markers and three local targets | 484 tests green after the move and before any new code; `pip install -e .` and the `fast` target without `[zigzag]` |
+| Z1 | Snapshots → complexes → zigzag diagram → stream of elementary operations; the index layer | Replaying the stream gives the same $K_i$ and $K_{i+1/2}$; every prefix is a complex |
+| Z2 | Oracle in `reference/`: L1 Betti, L2 arrow ranks, L3 generalised rank + Möbius; toys T1–T4 | Hand-worked barcodes reproduced; the 12↔41 pair computed; the T4 pair distinguished |
+| Z3 | Dionysus 2 adapter; index translation | Two-sided agreement oracle ↔ Dionysus, bar for bar, on `cycle_lifecycle` and `geometric_loop` |
+| Z4 | Barcode → event log; recall/precision/localisation metrics; negative controls | **Result 2**: metrics measured, the 12↔41 pair reproduced by the backend |
+| Z5 | Null models (per-snapshot FPR with an interval) and degradation under noise | Tables with the number of trials; not a single "zero" without an interval |
+| Z6 | CLI `--results`, artefact, report, tag | **Closed.** The artefact is produced by the build, not by pytest; the report reads the artefact and is executed by a command |
 
-**Порядок нерушим в одном месте:** оракул (Z2) до бэкенда (Z3). Иначе бэкенд становится
-собственным эталоном, и первая же ошибка перевода индексов закрепляется как истина.
+**The order is inviolable in one place:** the oracle (Z2) before the backend (Z3). Otherwise the
+backend becomes its own reference, and the first index-translation error gets fixed as truth.
 
-**Что вынесено за рамки Задачи 2, и почему.**
+**What is left outside Task 2, and why.**
 
-**Vineyards** отслеживают перемещение точек диаграммы при **непрерывном** изменении
-фильтрации: точки ползут, пересекаются, меняются местами, и весь аппарат существует ради
-описания этого движения. Зигзаг семейства 2 дискретен по построению — множество индексов
-$I$ состоит из целых и полуцелых, и между соседними индексами не происходит ничего, что
-можно было бы отследить непрерывно. Это не отложенная работа, а **другой объект**, и нужен
-он там, где фильтрация непрерывна: в Задаче 3 (порог по корреляции пробегает отрезок) и в
-бифильтрации Результата 3. Переносится туда, а не «на потом».
+**Vineyards** track the movement of diagram points under a **continuous** change of the
+filtration: points crawl, cross and swap, and the whole apparatus exists to describe this
+motion. The zigzag of family 2 is discrete by construction — the index set $I$ consists of
+integers and half-integers, and nothing happens between neighbouring indices that could be
+tracked continuously. This is not postponed work but **a different object**, needed where the
+filtration is continuous: in Task 3 (the correlation threshold sweeps an interval) and in the
+bifiltration of Result 3. It moves there, not "to later".
 
-**Значимость бара в зигзаге**: `topology_check` не наследуется, замена не вводится в этой
-ветке. Замер Z5 показывает, что вопрос не академический — без критерия точность на шуме
-0.17%, а на нулевой модели срабатывает 98% снимков, — но решается он не подбором порога под
-precision.
+**Bar significance in the zigzag**: `topology_check` is not inherited, and no replacement is
+introduced in this branch. The Z5 measurement shows that the question is not academic — without a
+criterion the precision on noise is 0.17%, and on the null model 98% of snapshots fire — but it is
+not solved by tuning a threshold to precision.
 
-**Многопараметрическая персистентность** (Результат 3) — отдельная ветка, делит с зигзагом
-только раздел про инвариант.
+**Multiparameter persistence** (Result 3) is a separate branch that shares with the zigzag only
+the section on the invariant.
 
-**Открытый пункт бюджета.** Медленный прогон вырос за Задачу 2 с 10:10 до 10:48 при
-ориентире 15 минут. Z6 в него ничего не добавляет, но запаса осталось четыре минуты, и
-следующая сессия его пробьёт: лечить придётся делением целей, а не ослаблением проверок.
+**Open item: the budget.** The slow run grew during Task 2 from 10:10 to 10:48 against a guideline
+of 15 minutes. Z6 adds nothing to it, but four minutes of headroom are left, and the next session
+will exceed it: the cure will be to split targets, not to weaken the checks.
 
 ---
 
-## Ключи конфига, добавляемые Задачей 2
+## Config keys added by Task 2
 
-Схема валидации расширяется следующими ключами. Границу S6 соблюдаем: **в конфиг идёт то,
-что можно менять, не переписывая доказательство.**
+The validation schema is extended with the following keys. The S6 boundary holds: **what goes
+into the config is what can be changed without rewriting the proof.**
 
 ```yaml
 zigzag:
-  backend: reference          # reference | dionysus | fzz — реализация, не истина
-  max_homology_dim: 1         # комплекс строится до max_homology_dim + 1. Меньше, чем
-                              # у topology_check, — намеренно, ради стоимости; больше —
-                              # запрещено перекрёстной проверкой: выше потолка
-                              # генераторов истины нет, и бары нечем опровергнуть
-  coeff_field: 2              # при p != 2 — явная ошибка, как в reference/. Названо
-                              # как в topology_check: два написания одного понятия
-                              # в одном файле — приглашение прочитать не тот ключ
+  backend: reference          # reference | dionysus | fzz — an implementation, not the truth
+  max_homology_dim: 1         # the complex is built up to max_homology_dim + 1. Lower than
+                              # topology_check's, deliberately, for cost; higher is
+                              # forbidden by a cross-check: above the generators' ceiling
+                              # there is no truth, and the bars could not be refuted
+  coeff_field: 2              # p != 2 is an explicit error, as in reference/. Named as in
+                              # topology_check: two spellings of one concept in one file
+                              # invite reading the wrong key
   event_matching:
-    tolerance: 0              # допуск по индексу снимка при сопоставлении логов
+    tolerance: 0              # tolerance in snapshot index when matching logs
     match_dimension: true
     match_type: true
   oracle:
-    level: L3                 # L1 | L2 | L3 — глубина независимой проверки
-    max_index_count: 200      # выше — L3 только спот-проверками
+    level: L3                 # L1 | L2 | L3 — depth of the independent check
+    max_index_count: 200      # above this, L3 only as spot checks
   report:
     invisible_bars: true
     ephemeral_bars: true
@@ -232,13 +232,13 @@ zigzag:
     censored_bars: true
 ```
 
-**Чего в конфиге нет и почему.**
+**What is not in the config, and why.**
 
-- `union_rule` — от него зависит инвариант (`docs/zigzag.md` §2.2). Константа модуля
-  `UNION_RULE`; вторая конструкция существует только внутри измеряющего теста.
-- `index_convention` — от неё зависит перевод бара в событие. Константа; ключ приглашал бы
-  сдвинуть её на единицу и получить систематическую ошибку локализации, неотличимую от
-  ошибки алгоритма.
-- `significance` в любом виде — критерий значимости в зигзаге не определён, и ключ создавал бы
-  впечатление, что определён.
-- `edge_rule` — свойство набора, читается из истины, не настраивается потребителем.
+- `union_rule` — the invariant depends on it (`docs/zigzag.md` §2.2). A module constant
+  `UNION_RULE`; the second construction exists only inside the test that measures it.
+- `index_convention` — the translation of a bar into an event depends on it. A constant; a key
+  would invite shifting it by one and getting a systematic localisation error indistinguishable
+  from an error of the algorithm.
+- `significance` in any form — a significance criterion is not defined for the zigzag, and a key
+  would give the impression that it is.
+- `edge_rule` — a property of the dataset, read from the truth, not configured by the consumer.

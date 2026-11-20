@@ -1,652 +1,657 @@
-# Зигзаг-персистентность: формализация и контракт (Задачи 1–2)
+# Zigzag persistence: formalisation and contract (Tasks 1–2)
 
-Документ фиксирует: конструкцию зигзага из снимков семейства 2, инвариант и основание его
-однозначности, семантику событий, перевод баркода в лог событий и независимый способ
-проверки. Документ **не** описывает генераторы: их истина живёт в `method.md` и `data.md`,
-и Задача 2 — их читатель, а не соавтор. Правки в `method.md` из этой ветки не вносятся.
+This document fixes: the construction of the zigzag from family-2 snapshots, the invariant and
+the ground for its uniqueness, the semantics of events, the translation of a barcode into an
+event log, and an independent way of checking it. It does **not** describe the generators: their
+truth lives in `method.md` and `data.md`, and Task 2 is their reader, not a co-author. No edits to
+`method.md` are made from this branch.
 
-Поле, которого здесь нет: многопараметрическая персистентность (Результат 3). Она делит с
-этим документом только раздел про инвариант; бифильтрация (w, τ) описывается отдельно.
-
----
-
-### 0.1 Протокол изменения `method.md`
-
-Задача 2 `method.md` не правит: там лежит истина данных, а Задача 2 — её потребитель. Если
-алгоритм даёт 27↔41, а §2.2a говорит 12↔41, чинится алгоритм. Механика та же, что с
-таблицей чисел Бетти: документ, который потребитель вправе переписать, перестаёт быть
-проверкой для него.
-
-Проверка на принадлежность: **изменится ли от этой записи содержимое `data/`?** Нет — значит
-запись идёт в `zigzag.md`. Конструкция объединения, перевод бара в событие, оракул — это
-описание потребителя, не данных.
-
-Исключение одно: замер **на эталоне** показал дефект самих данных. Тогда порядок —
-эталон → генератор → `method.md` → лог истины → пересборка набора, **отдельным коммитом
-Задачи 5**. Триггером служит эталон, а не выход алгоритма.
+A field that is absent here: multiparameter persistence (Result 3). It shares with this document
+only the section on the invariant; the (w, τ) bifiltration is described separately.
 
 ---
 
-## 1. Вход
+### 0.1 Protocol for changing `method.md`
 
-### 1.1 Снимки
+Task 2 does not edit `method.md`: the truth of the data lives there, and Task 2 is its consumer.
+If the algorithm gives 27↔41 while §2.2a says 12↔41, the algorithm is fixed. The mechanics are the
+same as with the table of Betti numbers: a document that the consumer may rewrite stops being a
+check for it.
 
-Вход — набор семейства 2 (`dynamic_graph/`): последовательность снимков
-$G_0, \dots, G_{T-1}$ на фиксированном множестве вершин $V$, $|V| = n$, плюс лог истины.
+The membership test: **will this entry change the contents of `data/`?** No — then the entry goes
+into `zigzag.md`. The union construction, the translation of a bar into an event, the oracle —
+these describe the consumer, not the data.
 
-Правило ребра берётся из поля `edge_rule` набора и применяется **единственной реализацией**
-`core.contracts.adjacency_from_snapshot`:
+There is one exception: a measurement **on the reference** has shown a defect in the data
+themselves. Then the order is reference → generator → `method.md` → truth log → rebuild of the
+dataset, **in a separate Task 5 commit**. The trigger is the reference, not the output of the
+algorithm.
 
-| `edge_rule` | правило | строгость | наборы |
+---
+
+## 1. Input
+
+### 1.1 Snapshots
+
+The input is a family-2 dataset (`dynamic_graph/`): a sequence of snapshots
+$G_0, \dots, G_{T-1}$ on a fixed vertex set $V$, $|V| = n$, plus a truth log.
+
+The edge rule is taken from the dataset's `edge_rule` field and applied by **a single
+implementation**, `core.contracts.adjacency_from_snapshot`:
+
+| `edge_rule` | rule | strictness | datasets |
 |---|---|---|---|
-| `weight_above` | ребро при $w_{ij} > t$ | строгое | `cycle_lifecycle`, SBM, коннектом |
-| `distance_within` | ребро при $d_{ij} \le \varepsilon$ | нестрогое | `geometric_loop` |
+| `weight_above` | edge when $w_{ij} > t$ | strict | `cycle_lifecycle`, SBM, connectome |
+| `distance_within` | edge when $d_{ij} \le \varepsilon$ | non-strict | `geometric_loop` |
 
-Строгость — не небрежность записи (`method.md` §2.3): при $t = 0$ нестрогое сравнение
-сделало бы граф полным, а $\varepsilon$ есть радиус включения, а не порог превышения.
+The strictness is not sloppy notation (`method.md` §2.3): at $t = 0$ a non-strict comparison would
+make the graph complete, and $\varepsilon$ is an inclusion radius, not an exceedance threshold.
 
-Задача 2 **не имеет права** реализовать это правило второй раз. Ровно ради этого поле
-заводилось в S7; вторая реализация — тихая ошибка, при которой метрический набор читается
-как дополнение графа, и внутри пакета все тесты проходят.
+Task 2 **has no right** to implement this rule a second time. The field was introduced in S7
+precisely for this; a second implementation is a silent error in which the metric dataset is read
+as the complement of the graph, and inside the package every test passes.
 
-### 1.2 Комплекс на снимке
+### 1.2 The complex on a snapshot
 
-$K_i = \mathrm{Fl}_{\le k_{\max}+1}(G_i)$ — флаг-комплекс, обрезанный по размерности
-$k_{\max}+1$. Обрезка на единицу выше запрашиваемой размерности гомологий обязательна: без
-$\partial_{k+1}$ циклы размерности $k$ систематически переcчитываются (S2). Обрезка
-одинакова на снимковых и на промежуточных индексах; она функториальна относительно
-включений, поэтому диаграмма остаётся корректной.
+$K_i = \mathrm{Fl}_{\le k_{\max}+1}(G_i)$ — the flag complex truncated at dimension $k_{\max}+1$.
+Truncating one above the requested homology dimension is mandatory: without $\partial_{k+1}$,
+$k$-dimensional cycles are systematically overcounted (S2). The truncation is the same on snapshot
+and intermediate indices; it is functorial with respect to inclusions, so the diagram stays
+correct.
 
-**Где живёт построитель флаг-комплекса.** Он остаётся в `reference/` и разделяется на две
-ответственности, как в S2 разделялись движок гомологий и построитель комплекса:
+**Where the flag complex builder lives.** It stays in `reference/` and is split into two
+responsibilities, as the homology engine and the complex builder were split in S2:
 
-| Ответственность | Где | Вход |
+| Responsibility | Where | Input |
 |---|---|---|
-| Порогование: снимок → матрица смежности | `core.contracts.adjacency_from_snapshot` | веса/расстояния + `edge_rule` + порог |
-| Флаг-комплекс: смежность → список симплексов | `reference.flag_complex` | **уже построенный граф** |
+| Thresholding: snapshot → adjacency matrix | `core.contracts.adjacency_from_snapshot` | weights/distances + `edge_rule` + threshold |
+| Flag complex: adjacency → list of simplices | `reference.flag_complex` | **an already built graph** |
 
-Сигнатура вида `flag_complex(weights, threshold)` подлежит удалению, а не пометке
-устаревшей: она содержит вторую реализацию правила ребра, жёстко зашитую в направлении
-сходства, и на метрическом наборе строит комплекс **дополнения** графа.
+A signature of the form `flag_complex(weights, threshold)` is to be removed, not marked
+deprecated: it contains a second implementation of the edge rule, hard-wired in the similarity
+direction, and on the metric dataset it builds the complex of the **complement** of the graph.
 
-**Сделано в Z0.** Параметр `threshold` удалён у `flag_complex` и у
-`betti_numbers_of_graph`; вход — 0/1-матрица, а небинарная матрица **отвергается**, а не
-пороговится по умолчанию: единственный способ получить её здесь — пропустить шаг
-пороговния. Строгость сравнения проверяется там, где она теперь живёт, — на
-`adjacency_from_snapshot`. Рукописных бинаризаций в проекте после этого не осталось: третья
-жила в перекрёстной проверке семейства 1 (`tests/test_static_betti.py`) и тоже переведена
-на общую реализацию.
+**Done in Z0.** The `threshold` parameter was removed from `flag_complex` and from
+`betti_numbers_of_graph`; the input is a 0/1 matrix, and a non-binary matrix is **rejected**
+rather than thresholded by default: the only way to get one here is to skip the thresholding step.
+The strictness of the comparison is checked where it now lives — on `adjacency_from_snapshot`. No
+hand-written binarisations remained in the project after this: a third one lived in the family-1
+cross-check (`tests/test_static_betti.py`) and was also moved onto the common implementation.
 
 ---
 
-## 2. Зигзаг
+## 2. The zigzag
 
-### 2.1 Конструкция и индексы
+### 2.1 Construction and indices
 
 $$K_0 \hookrightarrow K_0 \cup K_1 \hookleftarrow K_1 \hookrightarrow K_1 \cup K_2
 \hookleftarrow \cdots \hookleftarrow K_{T-1}$$
 
-Множество индексов $I = \{0, \tfrac12, 1, \tfrac32, \dots, T-1\}$; полуцелые индексы —
-промежуточные объекты: $K_{i+1/2} := K_i \cup K_{i+1}$. Далее «снимковый индекс» — целый,
-«промежуточный» — полуцелый.
+The index set is $I = \{0, \tfrac12, 1, \tfrac32, \dots, T-1\}$; half-integer indices are
+intermediate objects: $K_{i+1/2} := K_i \cup K_{i+1}$. Below, a "snapshot index" is an integer
+one, an "intermediate" index a half-integer one.
 
-### 2.2 Объединение комплексов, а не флаг-комплекс объединения графов
+### 2.2 The union of complexes, not the flag complex of the union of graphs
 
-Это развилка, а не деталь записи. Всегда верно
+This is a fork, not a detail of notation. It is always true that
 $$\mathrm{Fl}(G_i) \cap \mathrm{Fl}(G_j) = \mathrm{Fl}(G_i \cap G_j),$$
-но для объединения — только включение
+but for the union only the inclusion holds,
 $$\mathrm{Fl}(G_i) \cup \mathrm{Fl}(G_j) \subseteq \mathrm{Fl}(G_i \cup G_j),$$
-вообще говоря строгое: три ребра, лежащие в разных снимках, порождают треугольник в
-$\mathrm{Fl}(G_i \cup G_j)$ и не порождают его в объединении комплексов.
+and it is strict in general: three edges lying in different snapshots generate a triangle in
+$\mathrm{Fl}(G_i \cup G_j)$ and do not generate it in the union of complexes.
 
-**Принято: $K_{i+1/2} = K_i \cup K_{i+1}$ (посимплексное объединение).** Причина: промежуточный
-объект не должен содержать симплекс, не существующий ни в одном снимке. Иначе треугольник,
-которого нет ни в $G_i$, ни в $G_{i+1}$, убивает цикл на промежуточном индексе, и в баркоде
-появляется пара «рождение–гибель», которой не соответствует ни одно состояние данных. Тест
-на такой баркод пройдёт: он самосогласован.
+**Adopted: $K_{i+1/2} = K_i \cup K_{i+1}$ (simplexwise union).** Reason: the intermediate object
+must not contain a simplex that exists in no snapshot. Otherwise a triangle present in neither
+$G_i$ nor $G_{i+1}$ kills a cycle at an intermediate index, and a "birth–death" pair appears in the
+barcode that corresponds to no state of the data. A test on such a barcode will pass: it is
+self-consistent.
 
-Обе конструкции совпадают на монотонных переходах (только добавления или только удаления).
-Где монотонность есть и где её нет, определяется геометрией наборов, а не общими словами:
+The two constructions coincide on monotone transitions (additions only or removals only). Where
+there is monotonicity and where there is not is determined by the geometry of the datasets, not by
+general words:
 
-- **`cycle_lifecycle`** — каждый переход есть добавление или удаление одного ребра, значит
-  все переходы монотонны и конструкции совпадают тождественно.
-- **`geometric_loop`, дыхание радиуса** (снимки 4, 43, 56) — точки масштабируются
-  однородно, все попарные расстояния умножаются на $R(t')/R(t)$, поэтому множество рёбер
-  вложено, и эти переходы тоже монотонны, несмотря на то что граф меняется существенно
-  ($72 \to 48$, $45 \to 66$, $48 \to 72$ рёбер).
-- **`geometric_loop`, смена $\delta$** (переходы $19 \to 20$ и $44 \to 45$) — угловые
-  положения $\theta_j = j(2\pi-\delta)/(n-1)$ меняются **все сразу**, поэтому рёбра могут
-  появляться и исчезать одновременно.
+- **`cycle_lifecycle`** — every transition adds or removes one edge, so all transitions are
+  monotone and the constructions coincide identically.
+- **`geometric_loop`, radius breathing** (snapshots 4, 43, 56) — the points scale uniformly, every
+  pairwise distance is multiplied by $R(t')/R(t)$, so the edge sets are nested, and these
+  transitions are monotone too, even though the graph changes substantially ($72 \to 48$,
+  $45 \to 66$, $48 \to 72$ edges).
+- **`geometric_loop`, change of $\delta$** (transitions $19 \to 20$ and $44 \to 45$) — the angular
+  positions $\theta_j = j(2\pi-\delta)/(n-1)$ change **all at once**, so edges can appear and
+  disappear simultaneously.
 
-**Замерено в Z1: немонотонен из них ровно один, а не два.** Прежняя редакция называла
-рискованными оба перехода смены $\delta$; замер это опровергает:
+**Measured in Z1: exactly one of them is non-monotone, not two.** An earlier edition called both
+$\delta$ transitions risky; the measurement refutes this:
 
-| Переход | Рёбер | Исчезло | Появилось | Итог |
+| Transition | Edges | Disappeared | Appeared | Result |
 |---|---|---|---|---|
-| $19 \to 20$, разрыв открывается | 48 → 45 | 3 | 0 | **вложение, монотонен** |
-| $44 \to 45$, разрыв закрывается | 66 → 48 | 21 | 3 | немонотонен |
+| $19 \to 20$, gap opens | 48 → 45 | 3 | 0 | **nested, monotone** |
+| $44 \to 45$, gap closes | 66 → 48 | 21 | 3 | non-monotone |
 
-На $19 \to 20$ исчезают ровно три хорды через разрыв — $(0,22)$, $(0,23)$, $(1,23)$, — и не
-появляется ничего. Причина асимметрии не в смене $\delta$ как таковой, а в том, по какую
-сторону от $\varepsilon$ стоит хорда **третьего соседа** при текущем радиусе: при
-$R = 1.258$ она равна 0.818 и не проходит $\varepsilon = 0.8$ ни в открытой конфигурации,
-ни в закрытой, а при $R = 1.203$ проходит в открытой и теряется при закрытии (21 ребро вида
-$(j, j{+}3)$).
+At $19 \to 20$ exactly three chords across the gap disappear — $(0,22)$, $(0,23)$, $(1,23)$ — and
+nothing appears. The cause of the asymmetry is not the change of $\delta$ as such but on which
+side of $\varepsilon$ the **third-neighbour** chord stands at the current radius: at $R = 1.258$ it
+equals 0.818 and fails $\varepsilon = 0.8$ in both the open and the closed configuration, while at
+$R = 1.203$ it passes in the open one and is lost on closing (21 edges of the form $(j, j{+}3)$).
 
-Следствие для Результата 2: оба события метрического набора по-прежнему приходятся на
-переходы 20 и 45, но **гибель $H_1$ на 20 происходит на монотонном переходе**, где
-конструкции совпадают тождественно и выбор правила объединения повлиять на неё не может
-в принципе. Под вопросом оставалась только локализация рождения на 45.
+Consequence for Result 2: both events of the metric dataset still fall on transitions 20 and 45,
+but **the death of $H_1$ at 20 happens on a monotone transition**, where the constructions coincide
+identically and the choice of union rule cannot influence it in principle. Only the localisation
+of the birth at 45 remained in question.
 
-**Разница измерена, и она нулевая.** По всем 59 переходам обоих наборов
-$\mathrm{Fl}(G_i \cup G_{i+1}) \setminus (K_i \cup K_{i+1}) = \varnothing$ — и при
-обрезке по размерности 2, и по размерности 3. Проверка не выхолощена: отрицательный контроль
-(три ребра треугольника, разложенные по двум снимкам) даёт ровно недостающий треугольник
-$\{(0,1,2)\}$, то есть умеет различать конструкции.
+**The difference was measured, and it is zero.** Over all 59 transitions of both datasets
+$\mathrm{Fl}(G_i \cup G_{i+1}) \setminus (K_i \cup K_{i+1}) = \varnothing$ — with truncation at
+dimension 2 and at dimension 3. The check is not hollow: a negative control (the three edges of a
+triangle spread over two snapshots) gives exactly the missing triangle $\{(0,1,2)\}$, i.e. it can
+tell the constructions apart.
 
-Это **замер**, а не утверждение о безразличии выбора. `UNION_RULE` остаётся посимплексным
-объединением по причине, изложенной выше и от замера не зависящей: промежуточный объект не
-должен содержать симплекс, которого нет ни в одном снимке. Правильный вывод, опирающийся на
-нулевую разницу, при первом же наборе с другой геометрией был бы снят вместе с ней.
+This is a **measurement**, not a claim that the choice is irrelevant. `UNION_RULE` remains the
+simplexwise union for the reason given above, which does not depend on the measurement: the
+intermediate object must not contain a simplex absent from every snapshot. A correct conclusion
+resting on the zero difference would be withdrawn together with it at the first dataset with
+different geometry.
 
-`UNION_RULE` — **константа модуля, не ключ конфига**: от неё зависит инвариант, а по границе
-из S6 в конфиг идёт только то, что можно менять, не переписывая доказательство. Вторая
-конструкция реализуется исключительно внутри измеряющего теста.
+`UNION_RULE` is **a module constant, not a config key**: the invariant depends on it, and by the S6
+boundary only what can be changed without rewriting the proof goes into the config. The second
+construction is implemented only inside the test that measures it.
 
-### 2.3 Элементарная последовательность операций
+### 2.3 The elementary sequence of operations
 
-Бэкенды принимают не диаграмму комплексов, а поток вставок и удалений одиночных симплексов.
-Развёртка:
+Backends take not a diagram of complexes but a stream of insertions and removals of single
+simplices. The unfolding:
 
-- переход $K_i \to K_{i+1/2}$: вставка симплексов $K_{i+1/2} \setminus K_i$ **по возрастанию
-  размерности**;
-- переход $K_{i+1/2} \to K_{i+1}$: удаление симплексов $K_{i+1/2} \setminus K_{i+1}$ **по
-  убыванию размерности**.
+- transition $K_i \to K_{i+1/2}$: insert the simplices of $K_{i+1/2} \setminus K_i$ **in increasing
+  dimension**;
+- transition $K_{i+1/2} \to K_{i+1}$: remove the simplices of $K_{i+1/2} \setminus K_{i+1}$ **in
+  decreasing dimension**.
 
-Иначе промежуточные состояния перестают быть симплициальными комплексами. Порядок внутри
-одной размерности произволен и на грубый баркод не влияет, но **влияет на эфемерные бары**
-(рождение и гибель внутри одного перехода). Эфемерные бары схлопываются в грубой индексации
-в интервал нулевой длины; они отбрасываются, но их **число протоколируется** — рост их числа
-на зашумлённых наборах есть содержательное измерение, а не шум реализации.
+Otherwise the intermediate states stop being simplicial complexes. The order within one dimension
+is arbitrary and does not affect the coarse barcode, but it **does affect ephemeral bars** (birth
+and death within one transition). Ephemeral bars collapse in the coarse indexing into an interval
+of zero length; they are discarded, but their **number is recorded** — the growth of their number
+on noisy datasets is a substantive measurement, not implementation noise.
 
-**Замерено в Z3, и число обязано публиковаться разложенным.** Эфемерные бары не видны
-грубому пути по построению — ни один индекс диаграммы их не застаёт, поэтому оракул выдать их
-не может в принципе. Видны они только на тонком пути, где бэкенду даётся по одному времени
-на операцию:
+**Measured in Z3, and the number must be published decomposed.** Ephemeral bars are invisible to
+the coarse path by construction — no index of the diagram catches them, so the oracle cannot output
+them in principle. They are visible only on the fine path, where the backend is given one time per
+operation:
 
-| Набор | $H_0$: пролог + вне | $H_1$: пролог + вне |
+| Dataset | $H_0$: prologue + outside | $H_1$: prologue + outside |
 |---|---|---|
 | `cycle_lifecycle` | 23 + **0** | 0 + **0** |
 | `geometric_loop` | 23 + **0** | 48 + **94** |
 
-Прологовая часть измеряет **порядок сборки $K_0$**, а не данные: построение 24-цикла из
-пустого комплекса рождает 24 компоненты и убивает 23 из них, и это следствие
-лексикографического порядка, зафиксированного выше и произвольного по существу.
-Опубликовать сумму как характеристику набора значило бы выдать этот порядок за свойство
-данных; содержателен второй столбец.
+The prologue part measures **the assembly order of $K_0$**, not the data: building a 24-cycle from
+the empty complex gives birth to 24 components and kills 23 of them, and this follows from the
+lexicographic order fixed above, which is arbitrary in substance. Publishing the sum as a
+characteristic of the dataset would pass this order off as a property of the data; the second
+column is the substantive one.
 
-**Замер Z5 это подтверждает: пролог постоянен, весь сигнал во второй половине.**
+**The Z5 measurement confirms this: the prologue is constant, all the signal is in the second
+half.**
 
-| База, механизм | 0.0 | 0.02 | 0.05 | 0.1 |
+| Base, mechanism | 0.0 | 0.02 | 0.05 | 0.1 |
 |---|---|---|---|---|
-| `cycle_lifecycle`, `spurious`: пролог | 23 | 23 | 25 | 28 |
-| — вне пролога | **0** | **54** | **334** | **857** |
-| `geometric_loop`, `spurious`: пролог | 71 | 75 | 80 | 87 |
-| — вне пролога | **94** | **253** | **566** | **1567** |
+| `cycle_lifecycle`, `spurious`: prologue | 23 | 23 | 25 | 28 |
+| — outside the prologue | **0** | **54** | **334** | **857** |
+| `geometric_loop`, `spurious`: prologue | 71 | 75 | 80 | 87 |
+| — outside the prologue | **94** | **253** | **566** | **1567** |
 
-Прологовая часть дрейфует на единицы, вторая растёт на порядки. При нулевом шуме сумма
-целиком состоит из пролога, поэтому без разложения нулевая точка отсчёта была бы ложной.
-У `cycle_lifecycle` под `missing_edges` эфемерных вне пролога ноль на всех уровнях: там нет
-треугольников, и рождаться внутри перехода нечему.
+The prologue part drifts by units, the second grows by orders of magnitude. At zero noise the sum
+consists entirely of the prologue, so without the decomposition the zero reference point would be
+false. For `cycle_lifecycle` under `missing_edges` there are zero ephemeral bars outside the
+prologue at every level: there are no triangles there, and nothing can be born inside a transition.
 
-Порядок внутри размерности **фиксирован лексикографически** (Z1), а не оставлен на
-усмотрение множества: Z5 сверяет барштрих-код на нулевом уровне шума с базовым побитово, и
-недетерминированный порядок сделал бы эту сверку бессмысленной. Произвольность выбора при
-этом сохраняется — фиксировано какое-то одно значение, а не выведено единственно верное.
+The order within a dimension is **fixed lexicographically** (Z1), not left to the set: Z5 compares
+the barcode at zero noise with the base bitwise, and a non-deterministic order would make that
+comparison meaningless. The arbitrariness of the choice is kept nonetheless — one value is fixed,
+not derived as the only correct one.
 
-Инвариант слоя: воспроизведение потока операций с нуля даёт побитово те же $K_i$ и
-$K_{i+1/2}$, что и прямое построение. Это тест, который ловит ошибки развёртки до того, как
-они станут ошибками баркода. Второй его половиной является проверка, что **каждый префикс
-потока — симплициальный комплекс**: она выполняется прямо, построением комплекса на каждом
-префиксе, поскольку при 448 операциях это доли секунды.
+The invariant of the layer: replaying the operation stream from scratch gives bitwise the same
+$K_i$ and $K_{i+1/2}$ as direct construction. This is the test that catches unfolding errors before
+they become barcode errors. Its second half is the check that **every prefix of the stream is a
+simplicial complex**: it is done directly, by building the complex at every prefix, since at 448
+operations it takes a fraction of a second.
 
-**Пролог.** Сборка $K_0$ из пустого комплекса тоже входит в поток (47 и 168 вставок), а не
-считается начальным состоянием: левая цензура бара, идущего с индекса 0 (§5.1a), видна
-только слою, который видел сборку первого комплекса.
+**Prologue.** The assembly of $K_0$ from the empty complex also enters the stream (47 and 168
+insertions) rather than being taken as an initial state: left censoring of a bar starting at index
+0 (§5.1a) is visible only to a layer that saw the first complex being assembled.
 
-### 2.4 Конвенция индекса
+### 2.4 Index convention
 
-Из `method.md` §2.2: `snapshot: k` означает, что $G_k$ **уже содержит** изменение, $G_{k-1}$
-— нет. Барный интервал записывается в грубых индексах $I$ как замкнутый $[b,d]$.
+From `method.md` §2.2: `snapshot: k` means that $G_k$ **already contains** the change and
+$G_{k-1}$ does not. A bar interval is written in the coarse indices $I$ as a closed $[b,d]$.
 
-Расхождение на единицу в этом месте выглядит в отчёте как систематическая ошибка локализации
-алгоритма и неотличимо от неё. Поэтому перевод «счётчик операций → грубый индекс» — отдельный
-слой с собственными тестами на игрушечных примерах (§5.1), а не строчка в адаптере.
+An off-by-one discrepancy here looks in the report like a systematic localisation error of the
+algorithm and is indistinguishable from one. So the translation "operation counter → coarse index"
+is a separate layer with its own tests on toy examples (§5.1), not a line in the adapter.
 
-**Замер Z1: счётчик операций не определяет грубый индекс, и это не краевой случай.**
-Подавляющее большинство переходов семейства 2 **пусты** — граф не меняется, симплексов не
-прибавляется и не убавляется, — поэтому несколько соседних индексов делят одно состояние и
-один счётчик, а бэкенд такого перехода не видит вовсе: операции нет.
+**Z1 measurement: the operation counter does not determine the coarse index, and this is not an
+edge case.** The overwhelming majority of family-2 transitions are **empty** — the graph does not
+change, no simplices are added or removed — so several neighbouring indices share one state and one
+counter, and the backend does not see such a transition at all: there is no operation.
 
-| Набор | Пустых переходов | Различных счётчиков на 119 контрольных точках | Самая длинная группа индексов с одним состоянием |
+| Dataset | Empty transitions | Distinct counters over 119 checkpoints | Longest group of indices sharing a state |
 |---|---|---|---|
-| `cycle_lifecycle` | 113 из 119 (95%) | 6 | 30 |
-| `geometric_loop` | 112 из 119 (94%) | 7 | 45 |
+| `cycle_lifecycle` | 113 of 119 (95%) | 6 | 30 |
+| `geometric_loop` | 112 of 119 (94%) | 7 | 45 |
 
-Поэтому слой переводит счётчик не в индекс, а в **замкнутый диапазон** индексов с этим
-состоянием (`CoarseSpan`), и потребитель, которому нужен один индекс, обязан назвать конец:
-левый для рождения, правый для гибели. Функция, возвращающая один индекс, выбирала бы конец
-молча, а ошибка выбора сдвигает бар **до 45 индексов** — на порядок дальше того расхождения
-на единицу, о котором предупреждает этот раздел, и так же неотличимо от дефекта алгоритма.
+So the layer translates a counter not into an index but into a **closed range** of indices with
+that state (`CoarseSpan`), and a consumer that needs a single index must name the end: the left one
+for a birth, the right one for a death. A function returning one index would choose the end
+silently, and a wrong choice shifts a bar **by up to 45 indices** — an order of magnitude further
+than the off-by-one this section warns about, and just as indistinguishable from a defect of the
+algorithm.
 
-Отдельно фиксируется поведение счётчика **внутри** непустого блока: там состояние является
-промежуточным и не равно никакому $K$, поэтому диапазон заканчивается последним уже
-достигнутым индексом. Так отображение остаётся всюду определённым и монотонным.
+The behaviour of the counter **inside** a non-empty block is fixed separately: there the state is
+intermediate and equal to no $K$, so the range ends at the last index already reached. This keeps
+the mapping everywhere defined and monotone.
 
 ---
 
-## 3. Инвариант и его однозначность
+## 3. The invariant and its uniqueness
 
-### 3.1 Разложение
+### 3.1 Decomposition
 
-Зигзаг-модуль $V: I \to \mathrm{Vect}_{\mathbb{Z}/2}$ — представление колчана типа $A_N$,
-$N = 2T-1$, с произвольной ориентацией стрелок. По теореме Габриэля неразложимые
-представления $A_N$ — в точности интервальные модули $\mathbb{I}[b,d]$; по Круллю–Шмидту
-кратности определены однозначно. Следовательно барштрих-код
+The zigzag module $V: I \to \mathrm{Vect}_{\mathbb{Z}/2}$ is a representation of a quiver of type
+$A_N$, $N = 2T-1$, with arbitrary orientation of the arrows. By Gabriel's theorem the
+indecomposable representations of $A_N$ are exactly the interval modules $\mathbb{I}[b,d]$; by
+Krull–Schmidt the multiplicities are uniquely determined. Hence the barcode
 $$V \cong \bigoplus_{[b,d]} \mathbb{I}[b,d]^{\oplus m_{[b,d]}}$$
-корректно определён и не зависит от алгоритма. Ориентация стрелок при этом на список
-неразложимых не влияет — влияет только на то, какие интервалы возникают.
+is well defined and does not depend on the algorithm. The orientation of the arrows does not affect
+the list of indecomposables — only which intervals arise.
 
-Ссылки: Carlsson–de Silva (zigzag persistence), Carlsson–de Silva–Morozov (zigzag diamond),
+References: Carlsson–de Silva (zigzag persistence), Carlsson–de Silva–Morozov (zigzag diamond),
 Gabriel.
 
-### 3.2 Область действия правила старшинства
+### 3.2 Scope of the seniority rule
 
-Правило старшинства из `method.md` §2.2 сформулировано для гибели $H_0$ при слиянии
-компонент и в этой области **действует**: два класса претендуют на одну гибель, включения
-инъективны, разложение модуля даёт выживание старшего. В `cycle_lifecycle` это проверяемо —
-на 55 умирает бар, рождённый на 48, а не бар, идущий с нуля.
+The seniority rule of `method.md` §2.2 is stated for the death of $H_0$ when components merge, and
+in that domain it **holds**: two classes compete for one death, the inclusions are injective, and
+the decomposition of the module makes the elder survive. In `cycle_lifecycle` this is checkable —
+at 55 the bar born at 48 dies, not the bar running from zero.
 
-Оно **не переносится** на гибель $H_1$ при удалении ребра: там нет двух классов,
-претендующих на одну гибель, и парность определяется разложением, а не возрастом.
-Эталонный случай — `cycle_lifecycle`, где гибель на 41 спарена с рождением на 12,
-а не на 27 (`method.md` §2.2a). Интуиция «хорда породила два цикла, ломаем один — умирает
-молодой» неверна; ответ зависит от того, какое ребро удалено.
+It **does not carry over** to the death of $H_1$ when an edge is removed: there are no two classes
+competing for one death, and the pairing is determined by the decomposition, not by age. The
+reference case is `cycle_lifecycle`, where the death at 41 is paired with the birth at 12, not at
+27 (`method.md` §2.2a). The intuition "the chord made two cycles, break one and the younger dies"
+is wrong; the answer depends on which edge is removed.
 
-**Алгоритм обязан воспроизвести пару 12↔41. Если он даёт 27↔41 — ошибка в нём, а не в логе.**
+**The algorithm must reproduce the 12↔41 pair. If it gives 27↔41, the error is in it, not in the
+log.**
 
-### 3.3 Обобщённый ранг и обращение Мёбиуса — вычислимый оракул
+### 3.3 Generalised rank and Möbius inversion — a computable oracle
 
-Для $b \le d$ в $I$ определим ограничение $V|_{[b,d]}$ и
+For $b \le d$ in $I$ define the restriction $V|_{[b,d]}$ and
 $$r(b,d) := \mathrm{rank}\bigl(\varinjlim V|_{[b,d]} \;\longleftarrow\; \varprojlim V|_{[b,d]}\bigr)$$
-— ранг канонического отображения предела в копредел (обобщённый ранговый инвариант,
-Ким–Мемоли). Поскольку всякий модуль над $A_N$ интервально разложим,
-$$r(b,d) = \#\{\text{бары} \supseteq [b,d]\},$$
-и кратности восстанавливаются обращением Мёбиуса на интервалах:
+— the rank of the canonical map from the limit to the colimit (the generalised rank invariant,
+Kim–Mémoli). Since every module over $A_N$ is interval-decomposable,
+$$r(b,d) = \#\{\text{bars} \supseteq [b,d]\},$$
+and the multiplicities are recovered by Möbius inversion on intervals:
 $$m_{[b,d]} = r(b,d) - r(b^-,d) - r(b,d^+) + r(b^-,d^+),$$
-где $b^-$ и $d^+$ — соседние индексы слева и справа ($r := 0$ при выходе за границы $I$).
+where $b^-$ and $d^+$ are the neighbouring indices on the left and right ($r := 0$ beyond the
+bounds of $I$).
 
-Над $\mathbb{Z}/2$ предел — подпространство совместимых наборов в $\bigoplus V_i$, копредел —
-фактор; обе конструкции суть ранги матриц. Это даёт баркод **без единой библиотеки
-персистентности** и без реализации зигзаг-алгоритма — то есть настоящий независимый оракул,
-а не вторую копию проверяемого кода.
+Over $\mathbb{Z}/2$ the limit is the subspace of compatible tuples in $\bigoplus V_i$, the colimit
+a quotient; both constructions come down to ranks of matrices. This gives the barcode **without a
+single persistence library** and without implementing a zigzag algorithm — i.e. a genuinely
+independent oracle, not a second copy of the code under test.
 
-### 3.4 Почему покрытий недостаточно
+### 3.4 Why coverings are not enough
 
-Соблазн проверять алгоритм по числу баров, живущих на каждом индексе, и по числу баров,
-пересекающих каждую стрелку. Оба числа необходимы и вместе **недостаточны**:
+It is tempting to check the algorithm by the number of bars living at each index and the number of
+bars crossing each arrow. Both numbers are necessary and together **insufficient**:
 
-$$\{[1,4],\,[2,3]\} \quad\text{и}\quad \{[1,3],\,[2,4]\}$$
+$$\{[1,4],\,[2,3]\} \quad\text{and}\quad \{[1,3],\,[2,4]\}$$
 
-дают одинаковое покрытие вершин $(1,2,2,1)$ и одинаковое покрытие рёбер $(1,2,1)$, но это
-разные барштрих-коды. Покрытие вершин фиксирует число рождений и гибелей в каждой точке, но
-не спаривание рождений с гибелями.
+give the same vertex covering $(1,2,2,1)$ and the same edge covering $(1,2,1)$, but they are
+different barcodes. The vertex covering fixes the number of births and deaths at each point, but
+not the pairing of births with deaths.
 
-Это ровно тот же класс ошибки, что слепота кривой Бетти к парности в S6, только на уровень
-выше. Проверка уровня L3 (§5.1) обязательна; L1 и L2 — быстрые фильтры, а не критерий.
+This is exactly the same class of error as the Betti curve's blindness to pairing in S6, only one
+level up. The L3 check (§5.1) is mandatory; L1 and L2 are fast filters, not the criterion.
 
 ---
 
-## 4. Семантика событий
+## 4. Semantics of events
 
-### 4.1 Типы
+### 4.1 Types
 
-`Event.type` принимает только `birth` и `death` — как в семействе 2. Слияния и разделения
-классов в барштрих-коде не существует как операции; интуитивное описание идёт в `narrative`.
-Слияние двух компонент выглядит как гибель одного бара при выживании другого, и **какой
-именно умирает, определяется разложением**, а не порядком появления (§3.2).
+`Event.type` takes only `birth` and `death` — as in family 2. Merging and splitting of classes do
+not exist as operations in a barcode; the intuitive description goes into `narrative`. A merge of
+two components looks like the death of one bar while the other survives, and **which one dies is
+determined by the decomposition**, not by the order of appearance (§3.2).
 
-### 4.2 Барштрих-код → лог событий
+### 4.2 Barcode → event log
 
-Для бара $[b,d]$ в размерности $k$:
+For a bar $[b,d]$ in dimension $k$:
 
-| условие | событие |
+| condition | event |
 |---|---|
-| носитель бара содержит целый индекс, $b > 0$ | `birth` на **первом снимковом индексе** $\ge b$ |
-| носитель бара содержит целый индекс, $d < T-1$ | `death` на **первом снимковом индексе** $> d$ |
-| $d = T-1$ | правая цензура, событие не порождается |
-| $b = 0$ | левая цензура, `birth` помечается `censored: true` |
-| носитель не содержит ни одного целого индекса | невидимый бар (§4.3), события не порождает |
+| the support of the bar contains an integer index, $b > 0$ | `birth` at **the first snapshot index** $\ge b$ |
+| the support of the bar contains an integer index, $d < T-1$ | `death` at **the first snapshot index** $> d$ |
+| $d = T-1$ | right censoring, no event is generated |
+| $b = 0$ | left censoring, the `birth` is marked `censored: true` |
+| the support contains no integer index | invisible bar (§4.3), generates no events |
 
-Прежняя редакция таблицы различала целые и полуцелые концы и отправляла вторые в
-`birth_in_transition` / `death_in_transition`. **Замер Z2 показал, что так лог не
-восстанавливается**: у `cycle_lifecycle` оба $H_1$-бара имеют полуцелые концы ($[11½,40½]$,
-$[26½,59]$), и правило дало бы «в переходе» там, где лог истины записывает обычные рождение
-на 12 и гибель на 41. Правило выше проверено на **всех семи** событиях обоих наборов
-семейства 2 и сходится везде:
+An earlier edition of the table distinguished integer and half-integer ends and sent the latter to
+`birth_in_transition` / `death_in_transition`. **The Z2 measurement showed that the log is not
+recovered this way**: in `cycle_lifecycle` both $H_1$ bars have half-integer ends ($[11½,40½]$,
+$[26½,59]$), and the rule would have given "in transition" where the truth log records an ordinary
+birth at 12 and death at 41. The rule above was checked on **all seven** events of both family-2
+datasets and agrees everywhere:
 
-| Бар | рождение | гибель | Лог истины |
+| Bar | birth | death | Truth log |
 |---|---|---|---|
 | `cl` $H_1$ $[11½, 40½]$ | 12 | 41 | 12 / 41 |
-| `cl` $H_1$ $[26½, 59]$ | 27 | цензура | 27 |
+| `cl` $H_1$ $[26½, 59]$ | 27 | censored | 27 |
 | `cl` $H_0$ $[48, 54]$ | 48 | 55 | 48 / 55 |
-| `gl` $H_1$ $[0, 19½]$ | цензура | 20 | 20 |
-| `gl` $H_1$ $[44½, 59]$ | 45 | цензура | 45 |
+| `gl` $H_1$ $[0, 19½]$ | censored | 20 | 20 |
+| `gl` $H_1$ $[44½, 59]$ | 45 | censored | 45 |
 
-Сдвиг $d \mapsto d+1$ для гибели при целом $d$ — частный случай «первого снимкового индекса
-$> d$», а не отдельное правило. Это по-прежнему единственное место, где сдвиг вводится, и
-оно тестируется отдельно.
+The shift $d \mapsto d+1$ for a death at integer $d$ is a special case of "the first snapshot index
+$> d$", not a separate rule. It is still the only place where the shift is introduced, and it is
+tested separately.
 
-**Полуцелые концы не округляются — и это не то же самое, что правило выше.** Запрет введён
-ради баров, у которых **весь** носитель полуцелый: такой класс не существует ни в одном
-снимке, и приписать ему снимковое время значило бы выдумать событие. Такие бары считаются и
-протоколируются (§4.3), но событий не порождают. У бара с длинным целым носителем полуцелым
-является только конец, и «первый снимковый индекс $\ge b$» не округляет его, а называет тот
-снимок, в котором класс впервые виден в данных.
+**Half-integer ends are not rounded — and that is not the same as the rule above.** The prohibition
+was introduced for bars whose **whole** support is half-integer: such a class exists in no snapshot,
+and assigning it a snapshot time would invent an event. Such bars are counted and recorded (§4.3)
+but generate no events. For a bar with a long integer support only the end is half-integer, and
+"the first snapshot index $\ge b$" does not round it but names the snapshot in which the class is
+first visible in the data.
 
-### 4.3 Невидимые бары
+### 4.3 Invisible bars
 
-Бар, носитель которого не содержит ни одного целого индекса, не соответствует никакому
-состоянию данных. Такие бары **считаются и протоколируются**, а не отбрасываются молча: в
-метрике §6 они являются ложными срабатываниями по построению, и их число — характеристика
-конструкции объединения, которую надо знать до переноса на коннектомы.
+A bar whose support contains no integer index corresponds to no state of the data. Such bars are
+**counted and recorded**, not silently discarded: in the metric of §6 they are false positives by
+construction, and their number is a characteristic of the union construction that must be known
+before transferring to connectomes.
 
-**Замерено в Z5.** На чистых наборах их ноль (Z3), под шумом появляются:
+**Measured in Z5.** On clean datasets there are none (Z3); under noise they appear:
 
-| База, механизм | 0.0 | 0.02 | 0.05 | 0.1 |
+| Base, mechanism | 0.0 | 0.02 | 0.05 | 0.1 |
 |---|---|---|---|---|
 | `cycle_lifecycle`, `missing` | 0 | 0 | 19 | **36** |
 | `cycle_lifecycle`, `spurious` | 0 | 6 | 8 | 4 |
 | `geometric_loop`, `missing` | 0 | 0 | 0 | 3 |
 | `geometric_loop`, `spurious` | 0 | 0 | 0 | 0 |
 
-До Z5 величина была известна только там, где равна нулю, то есть не была измерена ни разу.
+Before Z5 the quantity was known only where it equals zero, i.e. it had never been measured.
 
 ---
 
-## 5. Проверка
+## 5. Verification
 
-### 5.1 Три уровня и слои
+### 5.1 Three levels and layers
 
-`reference/` уже содержит слой, считающий ранги граничных матриц над $\mathbb{Z}/2$ без
-библиотек персистентности. Зигзаг-оракул строится **в этом слое**, не в `zigzag/`.
+`reference/` already contains a layer that computes ranks of boundary matrices over $\mathbb{Z}/2$
+without persistence libraries. The zigzag oracle is built **in that layer**, not in `zigzag/`.
 
-| уровень | что считается | статус |
+| level | what is computed | status |
 |---|---|---|
-| L1 | $\beta_k(K_i)$ и $\beta_k(K_{i+1/2})$ на всех индексах | необходимо, недостаточно |
-| L2 | ранги индуцированных отображений на каждой стрелке (число баров через стрелку) | необходимо, недостаточно (§3.4) |
-| L3 | $r(b,d)$ + обращение Мёбиуса → полный барштрих-код | достаточно |
+| L1 | $\beta_k(K_i)$ and $\beta_k(K_{i+1/2})$ at every index | necessary, insufficient |
+| L2 | ranks of the induced maps on each arrow (number of bars across the arrow) | necessary, insufficient (§3.4) |
+| L3 | $r(b,d)$ + Möbius inversion → the full barcode | sufficient |
 
-Игрушечные примеры с барштрих-кодом, вычисляемым руками, — обязательный вход в L3 до
-всякого запуска на наборах:
+Toy examples with a barcode computed by hand are a mandatory input to L3 before any run on the
+datasets:
 
-- **T1.** Две вершины, ребро есть только на снимке 1. $H_0$: покрытие $(2,1,1,1,2)$ по
-  индексам $0,\tfrac12,1,\tfrac32,2$; барштрих-код $\{[0,2], [0,0], [2,2]\}$.
-- **T2.** Граница треугольника появляется и исчезает: один бар в $H_1$ с известными концами.
-- **T3.** Тета-граф с удалением ребра — минимальная версия развилки §3.2, спаривание
-  вычисляется на трёх строках.
-- **T4.** Модуль $\{[1,4],[2,3]\}$, собранный руками: оракул обязан отличить его от
-  $\{[1,3],[2,4]\}$. Это тест **на различающую силу оракула**, а не на данные.
+- **T1.** Two vertices, the edge present only at snapshot 1. $H_0$: covering $(2,1,1,1,2)$ over
+  indices $0,\tfrac12,1,\tfrac32,2$; barcode $\{[0,2], [0,0], [2,2]\}$.
+- **T2.** The boundary of a triangle appears and disappears: one bar in $H_1$ with known ends.
+- **T3.** A theta graph with an edge removed — a minimal version of the fork of §3.2; the pairing
+  is computed in three lines.
+- **T4.** The module $\{[1,4],[2,3]\}$ assembled by hand: the oracle must tell it apart from
+  $\{[1,3],[2,4]\}$. This is a test **of the oracle's discriminating power**, not of the data.
 
-### 5.1a Предсказанные барштрих-коды семейства 2
+### 5.1a Predicted barcodes of family 2
 
-Выводятся из `method.md` §2.1, §2.1a, §2.2a — то есть **до** запуска алгоритма. Оракул
-обязан их воспроизвести; если оракул даёт другое, сначала проверяется оракул.
+Derived from `method.md` §2.1, §2.1a, §2.2a — i.e. **before** running the algorithm. The oracle must
+reproduce them; if the oracle gives something else, the oracle is checked first.
 
-**Прежняя редакция этого раздела была неверна на полшага, и это исправлено замером (Z2).**
-Бары записывались снимковыми индексами, тогда как барштрих-код живёт на $I$, где между
-снимками стоят объединения. Ниже — измеренные носители; кривая Бетти по всем 119 индексам
-посчитана независимым слоем `reference`, барштрих-код — оракулом.
+**An earlier edition of this section was wrong by half a step, and this was corrected by
+measurement (Z2).** Bars were written in snapshot indices, while the barcode lives on $I$, where
+unions stand between the snapshots. Below are the measured supports; the Betti curve over all 119
+indices was computed by the independent `reference` layer, the barcode by the oracle.
 
-**`cycle_lifecycle`** ($T = 60$; события: рождение 12 в $H_1$, рождение 27 в $H_1$, гибель
-41 в $H_1$, рождение 48 в $H_0$, гибель 55 в $H_0$):
+**`cycle_lifecycle`** ($T = 60$; events: birth 12 in $H_1$, birth 27 in $H_1$, death 41 in $H_1$,
+birth 48 in $H_0$, death 55 in $H_0$):
 
-| dim | бары | комментарий |
+| dim | bars | comment |
 |---|---|---|
-| $H_0$ | $[0,59]$, $[48,54]$ | второй — компонента $\{4,5,6\}$, отделённая удалением $(3,4)$ |
-| $H_1$ | $[11\tfrac12,\,40\tfrac12]$, $[26\tfrac12,\,59]$ | парность из §2.2a: первый бар кончается на $40\tfrac12$, а не тянется до 59 |
+| $H_0$ | $[0,59]$, $[48,54]$ | the second is the component $\{4,5,6\}$ detached by removing $(3,4)$ |
+| $H_1$ | $[11\tfrac12,\,40\tfrac12]$, $[26\tfrac12,\,59]$ | pairing from §2.2a: the first bar ends at $40\tfrac12$ rather than running to 59 |
 
-**Почему у $H_1$ концы полуцелые, а у $H_0$ целые.** Замыкание пути на снимке 12 —
-**добавление** ребра, поэтому $K_{11½} = K_{11}\cup K_{12} = K_{12}$, и класс существует уже
-на $11½$. Удаление $(6,7)$ на 41 — **удаление**, поэтому $K_{40½} = K_{40}$, и умирающий
-класс доживает до $40½$. У $H_0$ знаки противоположны: рождение приходит от удаления ребра
-(отделение $\{4,5,6\}$ на 48), гибель — от добавления (восстановление $(3,4)$ на 55), и
-объединение в обоих случаях совпадает с *предыдущим* снимком, а не со следующим. Отсюда
-целые концы $[48,54]$.
+**Why the $H_1$ ends are half-integer and the $H_0$ ends integer.** Closing the path at snapshot 12
+is an **addition** of an edge, so $K_{11½} = K_{11}\cup K_{12} = K_{12}$, and the class already
+exists at $11½$. Removing $(6,7)$ at 41 is a **removal**, so $K_{40½} = K_{40}$, and the dying class
+survives to $40½$. For $H_0$ the signs are opposite: the birth comes from removing an edge
+(detaching $\{4,5,6\}$ at 48), the death from adding one (restoring $(3,4)$ at 55), and in both cases
+the union coincides with the *previous* snapshot, not the next. Hence the integer ends $[48,54]$.
 
-То есть полуцелый конец — не погрешность и не выбор, а следствие того, в какую сторону
-монотонен переход. Это же объясняет, почему §2.2 стоило измерить: там монотонность
-переходов и определяется.
+That is, a half-integer end is neither an error nor a choice but a consequence of the direction in
+which the transition is monotone. This also explains why §2.2 was worth measuring: monotonicity of
+the transitions is determined there.
 
-Пять событий и четыре бара сходятся: три рождения (12, 27, 48) видимы, рождение бара
-$[0,59]$ левоцензурировано, гибели баров $[26½,59]$ и $[0,59]$ правоцензурированы.
+Five events and four bars agree: three births (12, 27, 48) are visible, the birth of the bar
+$[0,59]$ is left-censored, the deaths of the bars $[26½,59]$ and $[0,59]$ are right-censored.
 
-**`geometric_loop`** ($T = 60$; $\beta$: $(1,1,0)$ на 0–19, $(1,0,0)$ на 20–44, $(1,1,0)$ на
+**`geometric_loop`** ($T = 60$; $\beta$: $(1,1,0)$ on 0–19, $(1,0,0)$ on 20–44, $(1,1,0)$ on
 45–59):
 
-| dim | бары | комментарий |
+| dim | bars | comment |
 |---|---|---|
-| $H_0$ | $[0,59]$ | граф связен на всех снимках |
-| $H_1$ | $[0,\,19\tfrac12]$, $[44\tfrac12,\,59]$ | левоцензурирован и правоцензурирован соответственно |
+| $H_0$ | $[0,59]$ | the graph is connected on every snapshot |
+| $H_1$ | $[0,\,19\tfrac12]$, $[44\tfrac12,\,59]$ | left-censored and right-censored respectively |
 
-Второй бар $H_1$ **не может** быть продолжением первого: между 20 и 44 класса нет, а
-интервалы связны. Это и есть содержательное различие между «петля вернулась» на языке
-графов и двумя разными классами на языке гомологий.
+The second $H_1$ bar **cannot** be a continuation of the first: there is no class between 20 and
+44, and intervals are connected. This is the substantive difference between "the loop came back" in
+the language of graphs and two different classes in the language of homology.
 
-**Кривая Бетти не различает спаривание, и на `cycle_lifecycle` это видно прямо.** Концы
-$H_1$-баров образуют множества $\{11½, 26½\}$ и $\{40½, 59\}$, и **обе** раскладки —
-$\{[11½,40½],[26½,59]\}$ и $\{[11½,59],[26½,40½]\}$ — дают ту же кривую и те же ранги
-стрелок. Выбирает L3. Это §3.4 не на построенном примере, а на данных проекта.
+**The Betti curve does not distinguish pairing, and on `cycle_lifecycle` this is directly visible.**
+The ends of the $H_1$ bars form the sets $\{11½, 26½\}$ and $\{40½, 59\}$, and **both** layouts —
+$\{[11½,40½],[26½,59]\}$ and $\{[11½,59],[26½,40½]\}$ — give the same curve and the same arrow
+ranks. L3 decides. This is §3.4 not on a constructed example but on the project's data.
 
-Оба набора имеют по одному бесконечному (двусторонне цензурированному) бару в $H_0$
-(`method.md` §5). Он считается явно; выброшенный как «тривиальный», он даёт $\beta_0$ на
-единицу меньше.
+Both datasets have one infinite (two-sidedly censored) bar in $H_0$ (`method.md` §5). It is counted
+explicitly; thrown away as "trivial", it makes $\beta_0$ one smaller.
 
-### 5.2 Алгебраическая проверка парности
+### 5.2 Algebraic check of the pairing
 
-Пара 12↔41 проверяется вычислением, а не сверкой с документом: вектор 24-цикла **не лежит** в
-$Z_1(G_{41})$, а $c_2$ лежит. Тест на тождество класса писать нельзя — базис $H_1$ тета-графа
-не канонический.
+The 12↔41 pair is checked by computation, not by comparison with the document: the vector of the
+24-cycle **does not lie** in $Z_1(G_{41})$, while $c_2$ does. A test on the identity of a class must
+not be written — the basis of $H_1$ of the theta graph is not canonical.
 
-Ожидание в тесте **вычисляется**. Транскрипция ожиданий из `method.md` проверяет соответствие
-кода документу, а не сам документ (регламент S6–S9).
+The expectation in the test is **computed**. Transcribing expectations from `method.md` checks that
+the code matches the document, not the document itself (the S6–S9 rule).
 
-### 5.3 Согласие бэкендов
+### 5.3 Agreement of backends
 
-Dionysus 2 (`zigzag_homology_persistence`) сверяется с оракулом **бар в бар**, а не по числу
-баров. Расхождение считается дефектом адаптера (перевод индексов, порядок операций), пока не
-доказано обратное. Адаптер валидируется сперва на T1–T4, где ответ известен руками, и только
-потом на наборах.
+Dionysus 2 (`zigzag_homology_persistence`) is compared with the oracle **bar for bar**, not by the
+number of bars. A discrepancy is considered a defect of the adapter (index translation, order of
+operations) until proven otherwise. The adapter is validated first on T1–T4, where the answer is
+known by hand, and only then on the datasets.
 
-**Согласие двустороннее, и третьей стороны не требуется.** Проверкой здесь является оракул:
-он вычисляет барштрих-код независимо — через обобщённый ранг и обращение Мёбиуса, — то есть
-другим способом, а не другой реализацией того же способа. Второй бэкенд (fast-zigzag)
-повторяет тот же класс алгоритма и при расхождении с первым не скажет, кто прав; он даёт
-голос, а не независимое вычисление. Его ценность — скорость на 60 снимках, а скорость в
-критерий Результата 2 не входит.
+**The agreement is two-sided, and no third party is needed.** The check here is the oracle: it
+computes the barcode independently — through the generalised rank and Möbius inversion — i.e. by a
+different method, not a different implementation of the same method. A second backend
+(fast-zigzag) repeats the same class of algorithm, and when it disagrees with the first it cannot
+say which is right; it adds a vote, not an independent computation. Its value is speed on 60
+snapshots, and speed is not part of the criterion of Result 2.
 
-Поэтому fzz необязателен: на PyPI его нет, из исходников он собирается только если Dionysus
-не уложится в бюджет времени, и тогда это отдельная работа со своей ценой.
+So fzz is optional: it is not on PyPI, it is built from source only if Dionysus does not fit the
+time budget, and then that is separate work with its own cost.
 
-**Замерено в Z3: согласие полное, расхождений ноль.** Совпали игрушки T1–T3 и оба набора
-семейства 2 в обеих размерностях, бар в бар с кратностями. **Z6 расширил сверку на все 18
-наборов, включая зашумлённые: 3192 бара, 0 расхождений.** Проверять согласие только там, где
-барштрих-код состоит из четырёх баров, — слабейшая версия утверждения; ошибка адаптера
-вероятнее проявится там, где набор даёт девятьсот. T3 при этом играет для бэкенда
-роль T4: у него две раскладки с одинаковыми покрытиями вершин и стрелок, и Dionysus выбирает
-верную, то есть проходит развилку §3.4. Сам T4 адаптеру недоступен — это модуль, собранный из
-матриц, комплексов за ним нет.
+**Measured in Z3: the agreement is complete, zero discrepancies.** The toys T1–T3 and both family-2
+datasets agreed in both dimensions, bar for bar with multiplicities. **Z6 extended the comparison to
+all 18 datasets, noisy ones included: 3192 bars, 0 discrepancies.** Checking agreement only where the
+barcode has four bars is the weakest version of the claim; an adapter error is more likely to show
+up where a dataset gives nine hundred. T3 plays the role of T4 for the backend here: it has two
+layouts with identical vertex and arrow coverings, and Dionysus picks the right one, i.e. it passes
+the fork of §3.4. T4 itself is unavailable to the adapter — it is a module assembled from matrices,
+with no complexes behind it.
 
-Конвенция перевода, проверенная сперва на T1, где барштрих-код выписан руками: позиция $p$
-идёт временем $p$; симплекс, присутствующий на позициях $[a,b]$, отдаётся как $[a,\,b{+}1)$
-по одному интервалу на каждый отрезок присутствия; бар возвращается полуоткрытым и становится
-замкнутым $[b,\,d-1]$, бесконечная гибель — последней позицией. Отрицательный контроль стоит
-рядом: сдвинутая на единицу конвенция даёт расхождение, то есть сверка не сравнивает что-то
-с самим собой.
+The translation convention, checked first on T1, where the barcode is written out by hand: position
+$p$ goes as time $p$; a simplex present at positions $[a,b]$ is passed as $[a,\,b{+}1)$, one interval
+per run of presence; a bar comes back half-open and becomes the closed $[b,\,d-1]$, an infinite death
+becomes the last position. A negative control stands next to it: a convention shifted by one gives a
+discrepancy, i.e. the comparison does not compare something with itself.
 
-**Размерность $k_{\max}+1$ бэкенд возвращает, и публиковать её нельзя.** На `geometric_loop`
-Dionysus выдаёт **69 баров в $H_2$** при комплексах, обрезанных по размерности 2: там нет
-$\partial_3$, и каждая замкнутая 2-цепь засчитывается как полость (`method.md` §2.3,
-следствие 2).
+**The backend returns dimension $k_{\max}+1$, and it must not be published.** On `geometric_loop`
+Dionysus outputs **69 bars in $H_2$** for complexes truncated at dimension 2: there is no
+$\partial_3$, and every closed 2-chain is counted as a cavity (`method.md` §2.3, consequence 2).
 
-То, что это артефакты, — не утверждение об отсутствии гомологии, которую никто не считал.
-Генератор строил свои комплексы на размерность выше (`topology_check.max_homology_dim`
-равен 2, то есть до размерности 3, с $\partial_3$) и записал в `betti_curve` значение
-$\beta_2 = 0$ на каждом снимке обоих наборов. 69 баров противоречат числу, которое **было**
-посчитано правильно, — этим они и отличаются от находки.
+That these are artefacts is not a claim about the absence of homology nobody computed. The generator
+built its complexes one dimension higher (`topology_check.max_homology_dim` is 2, i.e. up to
+dimension 3, with $\partial_3$) and recorded $\beta_2 = 0$ in `betti_curve` on every snapshot of both
+datasets. The 69 bars contradict a number that **was** computed correctly — that is what sets them
+apart from a finding.
 
-Адаптер отсекает их сам, а не оставляет вызывающему: у `cycle_lifecycle` треугольников нет
-вовсе и ни одного такого бара не появляется, так что проверка на одном наборе их бы не
-поймала.
+The adapter cuts them off itself rather than leaving it to the caller: `cycle_lifecycle` has no
+triangles at all and produces not a single such bar, so a check on one dataset would not have caught
+them.
 
-**Стоимость.** 16 мс на набор, 0.30 с на все 19 динамических наборов — против секунд у
-оракула. Скорость бэкендом не является проблемой, и это ещё раз подтверждает, что второй
-бэкенд не нужен.
+**Cost.** 16 ms per dataset, 0.30 s for all 19 dynamic datasets — against seconds for the oracle.
+Speed is not a problem with the backend, which once more confirms that a second backend is not
+needed.
 
-### 5.4 Отрицательные контроли
+### 5.4 Negative controls
 
-- `geometric_loop`, снимки **4, 43, 56**: граф меняется, $\beta$ не меняется. Алгоритм не
-  должен порождать событий на этих переходах. Тест пишется против них **поимённо**.
-- `cycle_lifecycle`, повтор состояния на 55: состояние совпадает со снимками 41–47. Конвейер
-  не должен схлопывать снимки по идентичности графа. При рефакторинге дедупликации не «чинить».
-- Нулевые наборы (`null/`): не проверка на ноль, а измерение частоты ложных срабатываний (§6).
+- `geometric_loop`, snapshots **4, 43, 56**: the graph changes, $\beta$ does not. The algorithm must
+  not generate events on these transitions. The test is written against them **by name**.
+- `cycle_lifecycle`, the repeated state at 55: the state coincides with snapshots 41–47. The
+  pipeline must not collapse snapshots by graph identity. Do not "fix" this when refactoring
+  deduplication.
+- Null datasets (`null/`): not a check for zero but a measurement of the false positive rate (§6).
 
-### 5.5 Инвариантность
+### 5.5 Invariance
 
-Перестановка меток вершин обязана давать тот же барштрих-код (в семействе 2 перестановка в
-данные не вносится, поэтому проверяется тестом). Барштрих-код не зависит от порядка симплексов
-одной размерности внутри перехода — с точностью до эфемерных баров (§2.3).
+Relabelling the vertices must give the same barcode (in family 2 the relabelling is not applied to
+the data, so it is checked by a test). The barcode does not depend on the order of simplices of one
+dimension within a transition — up to ephemeral bars (§2.3).
 
 ---
 
-## 6. Метрики (критерий Результата 2)
+## 6. Metrics (the criterion of Result 2)
 
-Сопоставление предсказанного лога с истинным:
+Matching the predicted log against the true one:
 
-- сопоставление только внутри пары (`type`, `dim`); разные размерности и типы не матчатся;
-- допуск $\tau$ по индексу снимка, по умолчанию $\tau = 0$; матчинг жадный по возрастанию
-  $|\Delta t|$, при равенстве — по возрастанию времени истинного события;
-- отчётные величины: recall, precision, средняя и максимальная ошибка локализации $|\Delta t|$,
-  раздельно по размерностям;
-- отдельными строками: число невидимых баров, число эфемерных баров, число событий,
-  **выведенных из полуцелого конца бара**, число цензурированных баров.
+- matching only within a (`type`, `dim`) pair; different dimensions and types are not matched;
+- a tolerance $\tau$ in snapshot index, $\tau = 0$ by default; matching is greedy in increasing
+  $|\Delta t|$, ties broken by increasing time of the true event;
+- reported quantities: recall, precision, mean and maximum localisation error $|\Delta t|$,
+  separately by dimension;
+- as separate rows: the number of invisible bars, the number of ephemeral bars, the number of events
+  **derived from a half-integer end of a bar**, the number of censored bars.
 
-**Замерено в Z4.** На чистых наборах recall и precision равны единице при $\tau = 0$:
+**Measured in Z4.** On the clean datasets recall and precision equal one at $\tau = 0$:
 
-| Набор | Предсказано | В истине | recall | precision | $H_0$ | $H_1$ |
+| Dataset | Predicted | In truth | recall | precision | $H_0$ | $H_1$ |
 |---|---|---|---|---|---|---|
 | `cycle_lifecycle` | 5 | 5 | 1.0 | 1.0 | 2/2 | 3/3 |
 | `geometric_loop` | 2 | 2 | 1.0 | 1.0 | — | 2/2 |
 
-Это **ожидаемый исход, а не достижение**: наборы построены, алгоритм точен. Ценность метрики
-в том, что под шумом она единицей быть перестаёт — спот-замер даёт precision 4/120 на
-`spurious_edges` уровня 0.02, — и говорить об этом обязан отчёт, а не читатель.
+This is **an expected outcome, not an achievement**: the datasets are constructed, the algorithm is
+exact. The value of the metric lies in the fact that under noise it stops being one — a spot
+measurement gives precision 4/120 on `spurious_edges` at level 0.02 — and the report, not the reader,
+must say so.
 
-**Лог событий слеп к спариванию, и Результат 2 обязан это сказать.** Две раскладки $H_1$ у
-`cycle_lifecycle` дают **один и тот же** лог: рождение 12, рождение 27, гибель 41. Событие не
-помнит, из какого бара выведено, поэтому recall и precision **пару 12↔41 не проверяют**; её
-проверяет сверка барштрих-кодов — в Z2 алгеброй, в Z3 бэкендом против оракула. Это та же
-слепота, что у кривой Бетти в S6 и у покрытий в §3.4, на уровень дальше: кривая → покрытия →
-**лог событий**.
+**The event log is blind to pairing, and Result 2 must say so.** The two $H_1$ layouts of
+`cycle_lifecycle` give **the same** log: birth 12, birth 27, death 41. An event does not remember
+which bar it was derived from, so recall and precision **do not check the 12↔41 pair**; the barcode
+comparison checks it — algebraically in Z2, backend against oracle in Z3. This is the same blindness
+as the Betti curve in S6 and the coverings in §3.4, one level further: curve → coverings → **event
+log**.
 
-**Ошибка локализации при $\tau = 0$ тождественно нулевая**: сматчиться может только точное
-совпадение. Она публикуется, потому что этого требует список выше, но информативной
-величиной не является. Замер: на восьми зашумлённых наборах поднятие $\tau$ с 0 до 1
-возвращает одно событие в **одном** из них, то есть под шумом отказ — пропуск и наводнение
-ложными, а не смещение. Умолчание $\tau = 0$ остаётся.
+**The localisation error at $\tau = 0$ is identically zero**: only an exact coincidence can match.
+It is published because the list above requires it, but it is not an informative quantity.
+Measured: on eight noisy datasets raising $\tau$ from 0 to 1 recovers one event in **one** of them,
+i.e. under noise the failure is omission and a flood of false events, not displacement. The default
+$\tau = 0$ stays.
 
-**Цензурированные события помечаются и в метрики не входят.** Цензурированное рождение не
-заявляет, что класс родился, — оно говорит, что класс уже был, когда окно открылось. Считать
-его ложным срабатыванием значило бы штрафовать алгоритм за конечность наблюдения; считать
-попаданием — требовать от лога истины записи, которой там намеренно нет.
+**Censored events are marked and do not enter the metrics.** A censored birth does not claim that a
+class was born — it says that the class already existed when the window opened. Counting it as a
+false positive would penalise the algorithm for the finiteness of observation; counting it as a hit
+would demand from the truth log a record that is deliberately absent there.
 
-**Строка «события на полуцелых индексах» перечитана.** После правки §4.2 событий на полуцелых
-индексах не бывает вовсе: правило переводит их на снимковые. Считается то, что имеет смысл, —
-сколько событий **выведено** из полуцелого конца бара, и это 3 из 5 у `cycle_lifecycle` и
-2 из 2 у `geometric_loop`. Диагностика конструкции объединения, а не дефект.
+**The row "events at half-integer indices" was reread.** After the revision of §4.2 there are no
+events at half-integer indices at all: the rule moves them to snapshot ones. What is counted is what
+makes sense — how many events are **derived** from a half-integer end of a bar, and that is 3 of 5
+for `cycle_lifecycle` and 2 of 2 for `geometric_loop`. A diagnostic of the union construction, not a
+defect.
 
-Измеренные строки отчёта: цензурированных концов 3 и 4, невидимых баров **0 и 0**, эфемерных
-— см. §2.3, разложенными на пролог и остальное.
+Measured report rows: censored ends 3 and 4, invisible bars **0 and 0**, ephemeral — see §2.3,
+decomposed into the prologue and the rest.
 
-На нулевых наборах отчётная величина — частота ложных срабатываний **на снимок** с
-доверительным интервалом (Уилсон либо правило трёх при нуле промахов). Три сида, давшие ноль,
-означают верхнюю границу 63%, а не ноль — урок S8.
+On the null datasets the reported quantity is the false positive rate **per snapshot** with a
+confidence interval (Wilson, or the rule of three at zero misses). Three seeds that gave zero mean an
+upper bound of 63%, not zero — the S8 lesson.
 
-**Замерено в Z5, и ответ не «редко ошибается».** 60 реализаций ER (3 калибровочных сида ×
-20) при плотности `cycle_lifecycle`, $p = 0.0833$:
+**Measured in Z5, and the answer is not "rarely wrong".** 60 ER realisations (3 calibration seeds ×
+20) at the density of `cycle_lifecycle`, $p = 0.0833$:
 
-| Знаменатель | Частота | 95% Уилсон | Испытаний |
+| Denominator | Rate | 95% Wilson | Trials |
 |---|---|---|---|
-| на снимок | **0.9833** | [0.9786, 0.9870] | 3540 из 3600 |
-| на реализацию | 1.0000 | [0.9398, 1.0000] | 60 из 60 |
-| событий на снимок | **12.9** | — | 46 323 события ($H_0$ 25 710, $H_1$ 20 613) |
+| per snapshot | **0.9833** | [0.9786, 0.9870] | 3540 of 3600 |
+| per realisation | 1.0000 | [0.9398, 1.0000] | 60 of 60 |
+| events per snapshot | **12.9** | — | 46 323 events ($H_0$ 25 710, $H_1$ 20 613) |
 
-**Каждый снимок нулевой модели есть топологическое событие.** Это не дефект алгоритма:
-`method.md` §4.2 прямо говорит, что случайный граф при этой плотности честно имеет
-$\beta_0 = 4\ldots5$ и $\beta_1 = 2\ldots5$ на каждом снимке, а рёбра перерисовываются
-независимо, поэтому классы рождаются и умирают непрерывно.
+**Every snapshot of the null model is a topological event.** This is not a defect of the algorithm:
+`method.md` §4.2 says plainly that a random graph at this density honestly has
+$\beta_0 = 4\ldots5$ and $\beta_1 = 2\ldots5$ on every snapshot, and the edges are redrawn
+independently, so classes are born and die continuously.
 
-Публикуются **оба знаменателя**, потому что ни один в отдельности не честен. На снимок —
-то, что требует список выше, но испытания там не независимы: соседние комплексы делят рёбра,
-и интервал уже истинного. На реализацию — испытания независимы, но их шестьдесят, и интервал
-широк. Число событий на снимок идёт третьей строкой: частота 0.98 насыщена и о масштабе
-не говорит.
+**Both denominators** are published, because neither on its own is honest. Per snapshot is what the
+list above requires, but the trials there are not independent: neighbouring complexes share edges,
+and the interval is narrower than the true one. Per realisation the trials are independent, but there
+are sixty of them, and the interval is wide. The number of events per snapshot goes as a third row:
+the rate of 0.98 is saturated and says nothing about scale.
 
-**Порог `null_models.max_false_positive_rate` сюда не применяется.** Он откалиброван для
-критерия значимости на облаках семейства 1 (`method.md` §1.2a) — доля реализаций, где
-критерий выдумал признак, 1.5% при границе 4.3%. Зигзаг меряет долю снимков со
-срабатыванием. Сравнить их значило бы объявить провал, измеряя разные величины.
+**The threshold `null_models.max_false_positive_rate` does not apply here.** It was calibrated for
+the significance criterion on family-1 clouds (`method.md` §1.2a) — the fraction of realisations in
+which the criterion invented a feature, 1.5% with a bound of 4.3%. The zigzag measures the fraction
+of snapshots that fire. Comparing them would declare failure while measuring different quantities.
 
-**Деградация под шумом** (16 динамических наборов `noisy/`; восемь остальных построены на
-облаке и снимков не имеют):
+**Degradation under noise** (16 dynamic datasets in `noisy/`; the other eight are built on a cloud
+and have no snapshots):
 
-| База, механизм | 0.0 | 0.02 | 0.05 | 0.1 |
+| Base, mechanism | 0.0 | 0.02 | 0.05 | 0.1 |
 |---|---|---|---|---|
 | `cycle_lifecycle`, `spurious`: recall | 1.00 | 0.80 | 0.60 | 0.60 |
 | — precision | 1.00 | 0.0078 | 0.0027 | **0.0017** |
 | `geometric_loop`, `spurious`: recall | 1.00 | **1.00** | **1.00** | **1.00** |
 | — precision | 1.00 | 0.0051 | 0.0026 | 0.0021 |
 
-`geometric_loop` держит recall на единице при всех уровнях — оба его события находятся
-всегда, портится только точность; `cycle_lifecycle` теряет события. `spurious_edges` вреднее
-`missing_edges` на порядок. Уровень 0.0 воспроизводит чистый набор на всех четырёх
-сочетаниях.
+`geometric_loop` keeps recall at one at every level — both of its events are always found, only the
+precision deteriorates; `cycle_lifecycle` loses events. `spurious_edges` is an order of magnitude
+more harmful than `missing_edges`. Level 0.0 reproduces the clean dataset in all four combinations.
 
-**Столбца ошибки локализации в таблице нет** по причине, разобранной выше: при $\tau = 0$
-она тождественно нулевая, и столбец нулей читался бы как результат.
-
----
-
-## 7. Границы применимости
-
-- **Барштрих-код зависит от конвенции объединения (§2.2).** Барштрих-коды, полученные при
-  разных конвенциях, несравнимы; при публикации конвенция указывается.
-- **Обрезка комплекса.** Бары размерности $k_{\max}$ достоверны; размерность $k_{\max}+1$ не
-  вычисляется, и её отсутствие в выводе не есть утверждение о её отсутствии в данных
-  (случай $\beta_3$ у $\mathrm{VR}(S^1)$ из S7).
-- **Метрическое семейство.** $\mathrm{VR}(S^1; r)$ не становится стягиваемым с ростом
-  масштаба, а последовательно эквивалентен $S^1, S^3, S^5, \dots$ (Адамашек–Адамс, порог
-  $\varepsilon < R\sqrt3$). Режим $\varepsilon$ — качественный выбор, зафиксированный в
-  генераторе; Задача 2 его наследует и не переопределяет.
-- **Параметры `topology_check` (0.07, 1.55) сюда не переносятся.** Они откалиброваны на
-  облаках семейства 1 и, кроме того, критерий значимости не инвариантен к перепараметризации
-  фильтрации. В зигзаге вопрос значимости бара ставится заново и в этой ветке не решается.
-- **Сложность.** 60 снимков плотных комплексов на 24 узлах — оракул L3 квадратичен по числу
-  индексов; на больших наборах он остаётся спот-проверкой, а не регрессионным тестом.
+**There is no localisation error column in the table** for the reason worked out above: at $\tau = 0$
+it is identically zero, and a column of zeros would read as a result.
 
 ---
 
-## 8. Ссылки
+## 7. Limits of applicability
+
+- **The barcode depends on the union convention (§2.2).** Barcodes obtained under different
+  conventions are not comparable; the convention is stated on publication.
+- **Truncation of the complex.** Bars of dimension $k_{\max}$ are reliable; dimension $k_{\max}+1$ is
+  not computed, and its absence from the output is not a claim of its absence in the data (the case
+  of $\beta_3$ for $\mathrm{VR}(S^1)$ from S7).
+- **The metric family.** $\mathrm{VR}(S^1; r)$ does not become contractible as the scale grows but is
+  successively equivalent to $S^1, S^3, S^5, \dots$ (Adamaszek–Adams, threshold
+  $\varepsilon < R\sqrt3$). The regime of $\varepsilon$ is a qualitative choice fixed in the
+  generator; Task 2 inherits it and does not redefine it.
+- **The `topology_check` parameters (0.07, 1.55) do not carry over here.** They were calibrated on
+  family-1 clouds, and, moreover, the significance criterion is not invariant under reparametrisation
+  of the filtration. In the zigzag the question of bar significance is posed anew and is not solved
+  in this branch.
+- **Complexity.** 60 snapshots of dense complexes on 24 nodes — the L3 oracle is quadratic in the
+  number of indices; on larger datasets it remains a spot check, not a regression test.
+
+---
+
+## 8. References
 
 1. G. Carlsson, V. de Silva. Zigzag persistence.
 2. G. Carlsson, V. de Silva, D. Morozov. Zigzag persistent homology and real-valued functions.

@@ -1,63 +1,63 @@
-# Постановка задачи
+# Problem statement
 
-## Место в проекте
+## Place in the project
 
-Задача 5 первого этапа: «Создание синтетических и эталонных наборов данных для валидации
-методов». Генераторы обслуживают три потребителя:
+Task 5 of the first stage: "Creation of synthetic and reference datasets for validating
+methods". The generators serve three consumers:
 
-| Потребитель | Что должен проверить на этих данных |
+| Consumer | What it must verify on these data |
 |---|---|
-| Задача 3 — персистентные инварианты полносвязных взвешенных сетей | Восстанавливает ли статический пайплайн известные числа Бетти |
-| Задача 2 — «временные диаграммы персистентности» (зигзаг) | Обнаруживает ли алгоритм заранее известные топологические события |
-| Результат 6 — устойчивость и сложность | Как деградируют диаграммы при контролируемом шуме; нет ли ложных срабатываний на нулевых моделях |
+| Task 3 — persistent invariants of fully connected weighted networks | Does the static pipeline recover known Betti numbers |
+| Task 2 — "temporal persistence diagrams" (zigzag) | Does the algorithm detect topological events known in advance |
+| Result 6 — stability and complexity | How diagrams degrade under controlled noise; are there false positives on null models |
 
-Порядок в дорожной карте этапа неслучаен: данные (Зад. 5) делаются **раньше**
-алгоритмов (Зад. 2), иначе валидировать будет нечем и появится соблазн объявить
-истиной то, что выдал алгоритм.
+The order in the stage roadmap is not accidental: the data (Task 5) are made **before**
+the algorithms (Task 2); otherwise there would be nothing to validate against, and the
+temptation would appear to declare as truth whatever the algorithm produced.
 
-## Что требуется сделать
+## What is required
 
-Библиотеку `tdadyn.synthetic`, генерирующую четыре семейства наборов данных.
-Каждый набор сопровождается машиночитаемым описанием истины (ground-truth).
+A library `tdadyn.synthetic` that generates four families of datasets. Every dataset comes
+with a machine-readable description of its truth (ground truth).
 
-**Семейство 1 — статические облака точек и сети с известными числами Бетти.**
-Выборки с многообразий, топология которых известна аналитически (окружность, две
-окружности, восьмёрка, тор, сфера, бутылка Клейна, зацепление Хопфа). Из облака
-строится взвешенная сеть. Истина: числа Бетти β₀, β₁, β₂.
+**Family 1 — static point clouds and networks with known Betti numbers.** Samples from
+manifolds whose topology is known analytically (circle, two circles, figure eight, torus,
+sphere, Klein bottle, Hopf link). A weighted network is built from the cloud. Truth: Betti
+numbers β₀, β₁, β₂.
 
-**Семейство 2 — динамические графы с запланированными топологическими событиями.**
-Последовательность снимков графа, в которой в заранее заданные моменты происходят
-рождение, слияние, разделение и гибель топологических признаков. Истина: лог событий
-плюс независимо вычисленная кривая Бетти по снимкам.
+**Family 2 — dynamic graphs with scheduled topological events.** A sequence of graph
+snapshots in which, at moments fixed in advance, topological features are born, merge,
+split and die. Truth: the event log plus an independently computed Betti curve over the
+snapshots.
 
-**Семейство 3 — динамическая SBM и мультивариативные ряды связанных осцилляторов.**
-Синтетический аналог фМРТ: ряды с ИЗВЕСТНЫМ расписанием связи, из которых скользящим
-окном строится динамический взвешенный граф. Валидирует всю цепочку
-«временной ряд → сеть → персистентность» там, где ответ известен.
+**Family 3 — dynamic SBM and multivariate series of coupled oscillators.** A synthetic
+analogue of fMRI: series with a KNOWN coupling schedule, from which a sliding window builds a
+dynamic weighted graph. It validates the whole chain "time series → network → persistence"
+where the answer is known.
 
-**Семейство 4 — шумовые и нулевые модели.** Контролируемое зашумление эталонных
-наборов и графы без топологической структуры. Истина: уровень шума как параметр;
-для нулевых моделей — отсутствие событий.
+**Family 4 — noise and null models.** Controlled corruption of the reference datasets and
+graphs with no topological structure. Truth: the noise level as a parameter; for null
+models, the absence of events.
 
-## Границы задачи
+## Scope of the task
 
-- Реальные данные фМРТ здесь не участвуют — это отдельный модуль проекта.
-  Ни один генератор не читает нейровизуализационные данные.
-- Задача — генерация и её проверка, а не разработка самих зигзаг-алгоритмов.
-  Персистентные вычисления используются здесь только для верификации генераторов.
-- Никаких чувствительных данных: наборы полностью синтетические, поэтому на содержимое
-  файлов и на среду, где ведётся работа, ограничений нет.
+- Real fMRI data play no part here — that is a separate module of the project. No generator
+  reads neuroimaging data.
+- The task is generation and its verification, not the development of zigzag algorithms
+  themselves. Persistent computations are used here only to verify the generators.
+- No sensitive data: the datasets are fully synthetic, so there are no restrictions on file
+  contents or on the environment where the work is done.
 
-## Что уже решено и не подлежит пересмотру без обсуждения
+## Already decided and not to be revisited without discussion
 
-- Коэффициенты гомологий по умолчанию — поле Z/2 (ripser работает над Z/p; выбор
-  влияет на бутылку Клейна, см. `docs/method.md`).
-- Максимальная размерность гомологий — 2.
-- Проверка идёт по **персистентным** числам Бетти со значимостью баров, а не по
-  числам Бетти отдельного комплекса при фиксированном пороге.
+- The default homology coefficients are the field Z/2 (ripser works over Z/p; the choice
+  affects the Klein bottle, see `docs/method.md`).
+- The maximum homology dimension is 2.
+- Verification uses **persistent** Betti numbers with bar significance, not the Betti
+  numbers of a single complex at a fixed threshold.
 
-## Критерий готовности задачи в целом
+## Completion criterion for the task as a whole
 
-Воспроизводимый по seed набор датасетов с метаданными истины, покрывающий все
-проверочные сценарии (статика, динамические события, аналог рядов, шум, нулевые
-модели), и проходящий полный набор тестов корректности из `docs/validation.md`.
+A seed-reproducible collection of datasets with truth metadata, covering every verification
+scenario (static, dynamic events, series analogue, noise, null models), that passes the full
+correctness test suite of `docs/validation.md`.

@@ -1,417 +1,413 @@
-# План Задачи 2 по сессиям (Z0–Z6)
+# Plan of Task 2 by session (Z0–Z6)
 
-Задача 2 первого этапа: вычислительные методы построения «временных диаграмм
-персистентности». Критерий из заявки — корректное обнаружение заранее известных событий
-(рождение, слияние, исчезновение циклов) на синтетических графах с контролируемой динамикой;
-метрики — recall/precision событий и ошибка локализации во времени.
+Task 2 of the first stage: computational methods for building "temporal persistence diagrams".
+The criterion from the proposal is correct detection of events known in advance (birth, merging,
+disappearance of cycles) on synthetic graphs with controlled dynamics; the metrics are event
+recall/precision and the localisation error in time.
 
-Размещение: `src/tdadyn/zigzag/` рядом с `src/tdadyn/synthetic/`, один пакет.
-Спецификация — `docs/zigzag.md`.
+Placement: `src/tdadyn/zigzag/` next to `src/tdadyn/synthetic/`, one package. Specification —
+`docs/zigzag.md`.
 
-**Посылка, на которой это решение стояло, опровергнута замером; вывод остался, но держится
-теперь на другом.** Единственным настоящим аргументом против одного пакета была цена
-зигзаг-зависимостей: сборка из исходников и Boost. Про Dionysus это оказалось неверно —
-в Z0 замерено, что 2.2.3 ставится **готовым колесом**, Boost не нужен, и `pip install`
-проходит в чистом venv за секунды. Дорог из исходников только fast-zigzag (fzz), которого
-на PyPI нет вовсе.
+**The premise on which this decision stood was refuted by measurement; the conclusion survived but
+now rests on something else.** The only real argument against a single package was the cost of the
+zigzag dependencies: a build from source and Boost. For Dionysus this turned out to be false — Z0
+measured that 2.2.3 installs **as a prebuilt wheel**, Boost is not needed, and `pip install`
+finishes in a clean venv in seconds. Only fast-zigzag (fzz) is expensive from source, and it is not
+on PyPI at all.
 
-Вывод не меняется — необязательные зависимости, импорт внутри функции, быстрая цель без
-`[zigzag]`, — но записывается он теперь через fzz, а не через Dionysus. Правильный вывод на
-ложной посылке опаснее неверного: при следующем пересмотре кто-то проверит посылку, увидит,
-что Boost не нужен, и снимет ограничение, которое верно по другой причине.
+The conclusion does not change — optional dependencies, import inside the function, a fast target
+without `[zigzag]` — but it is now written in terms of fzz, not Dionysus. A correct conclusion on a
+false premise is more dangerous than a wrong one: at the next review someone checks the premise,
+sees that Boost is not needed, and removes a restriction that is right for a different reason.
 
-Общее свойство всех развилок ниже то же, что в S6–S9: **неверный выбор не роняет тест**, он
-даёт правдоподобный барштрих-код с неверной истиной. Отсюда порядок сессий: сначала
-независимый оракул, потом бэкенд, и никогда наоборот.
+The common property of all the forks below is the same as in S6–S9: **a wrong choice does not break
+a test**, it gives a plausible barcode with wrong truth. Hence the order of the sessions: first the
+independent oracle, then the backend, and never the other way round.
 
 ---
 
-## Z0 — Фундамент. Ни строки алгоритма
+## Z0 — Foundation. Not a line of algorithm
 
-**Что делать.**
+**What to do.**
 
-1. Поставить тег на текущее состояние (`synthetic-v1`). Отчёт и статья заявляют
-   воспроизводимость; заявление имеет смысл только как указание на фиксированный коммит, и
-   это же будет ссылка в статье.
-2. Поднять наверх **два разных пакета**, отдельным коммитом, без нового кода:
-   - `tdadyn.core` — `rng_for`, разбор конфига, `contracts`, чтение наборов;
-   - `tdadyn.reference` — эталон; наверх он переезжает, но **частью `core` не становится**.
-     `core` есть общая утилита, которую импортируют все; `reference` есть эталон, ценность
-     которого в том, что он не делит код с пайплайном. Внутри `core` он немедленно оброс бы
-     обратными связями.
+1. Tag the current state (`synthetic-v1`). The report and the paper claim reproducibility; the claim
+   makes sense only as a pointer to a fixed commit, and this will also be the reference in the
+   paper.
+2. Lift **two different packages** to the top level, in a separate commit, with no new code:
+   - `tdadyn.core` — `rng_for`, config parsing, `contracts`, reading datasets;
+   - `tdadyn.reference` — the reference; it moves up but **does not become part of `core`**. `core`
+     is a common utility imported by everyone; `reference` is a reference whose value lies in not
+     sharing code with the pipeline. Inside `core` it would immediately grow back-links.
 
-   Генераторы, сборку, CLI и манифест не трогать: у них один потребитель, и он останется один.
-   **Реэкспорты в `tdadyn.synthetic` не оставлять** — см. ниже.
-3. Внести `docs/zigzag.md`; добавить раздел Задачи 2 в `docs/roadmap.md`; добавить ключи
-   Задачи 2 в схему валидации конфига. `method.md` не править.
-4. Упаковка бэкендов: необязательные зависимости `pip install tdadyn[zigzag]`, импорт
-   бэкенда внутри функции, отдельная работа в CI, падение которой не красит основную.
-   Маркер `slow_zigzag` для медленных прогонов.
+   Do not touch the generators, the build, the CLI or the manifest: they have one consumer, and it
+   will stay one. **Do not leave re-exports in `tdadyn.synthetic`** — see below.
+3. Add `docs/zigzag.md`; add a Task 2 section to `docs/roadmap.md`; add the Task 2 keys to the config
+   validation schema. Do not edit `method.md`.
+4. Packaging of the backends: optional dependencies `pip install tdadyn[zigzag]`, the backend
+   imported inside a function, a separate CI job whose failure does not colour the main one. A
+   `slow_zigzag` marker for slow runs.
 
-**Проверка после переезда** (одна строка, до всякого нового кода):
+**Check after the move** (one line, before any new code):
 
 ```
 grep -rn "from tdadyn.synthetic import \(rng_for\|load_config\|adjacency_from_snapshot\|load_dataset\)" src tests
 ```
 
-Должно вернуть пусто. Именно эту проверку и ломают реэкспорты: с ними импорт потребителя из
-`synthetic` становится невидимым, а это ровно то направление зависимости, которое запрещено.
-Шимы совместимости нужны внешним пользователям; их у пакета пока нет, а внутренние
-потребители правятся тем же коммитом.
+It must return nothing. This is exactly the check that re-exports break: with them a consumer's
+import from `synthetic` becomes invisible, and that is precisely the forbidden direction of
+dependency. Compatibility shims are for external users; the package has none yet, and internal
+consumers are fixed in the same commit.
 
-**Критерий.** 484 теста зелены **после** переезда и **до** любого нового кода;
-`pip install -e .` работает в окружении без зигзаг-бэкендов; быстрая цель прогоняется в
-таком окружении и проходит.
+**Criterion.** 484 tests green **after** the move and **before** any new code; `pip install -e .`
+works in an environment without zigzag backends; the fast target runs in such an environment and
+passes.
 
-Формулировка «без Dionysus и Boost» заменена: Boost для Dionysus не нужен (замер Z0), и
-критерий, ссылающийся на несуществующее препятствие, проверяет не то. Проверяется отсутствие
-**необязательных зависимостей как таковых**, а дорога из них одна — fzz.
+The wording "without Dionysus and Boost" was replaced: Dionysus does not need Boost (Z0
+measurement), and a criterion referring to a non-existent obstacle checks the wrong thing. What is
+checked is the absence of **optional dependencies as such**, and only one of them is expensive —
+fzz.
 
-**Ловушка.** Смешать переезд с новым кодом. При поломке будет неясно, что сломалось.
+**Trap.** Mixing the move with new code. If something breaks, it will be unclear what.
 
-**Про «разделение CI» при отсутствии `.github/` и remote.** CI сейчас нет, значит критерий
-«зелёный CI» в Z0 недостижим и подлежит замене на то, что проверяемо локально. Разделение —
-это не workflow-файл, а свойство прогона: **быстрая цель не должна зависеть от
-необязательных бэкендов.** Поэтому в Z0 заводятся три цели (Makefile или `scripts/`):
+**On "splitting CI" without `.github/` and a remote.** There is no CI now, so the criterion "green
+CI" is unreachable in Z0 and must be replaced by what can be checked locally. The split is not a
+workflow file but a property of the run: **the fast target must not depend on optional backends.**
+So Z0 introduces three targets (Makefile or `scripts/`):
 
-| Цель | Что делает | Окружение |
+| Target | What it does | Environment |
 |---|---|---|
-| `fast` | `pytest -q -m "not slow and not slow_zigzag"` | без `[zigzag]` |
-| `slow` | `pytest -m slow` | без `[zigzag]` |
-| `zigzag` | `pytest -m slow_zigzag` | с `[zigzag]` |
+| `fast` | `pytest -q -m "not slow and not slow_zigzag"` | without `[zigzag]` |
+| `slow` | `pytest -m slow` | without `[zigzag]` |
+| `zigzag` | `pytest -m slow_zigzag` | with `[zigzag]` |
 
-`.github/workflows/` добавляется в тот момент, когда появится remote, и только вызывает эти
-же цели. До тех пор **«зелёный CI» остаётся открытым пунктом Результата 4**, а не Z0: он
-входит в критерий готовности пакета из заявки наравне с pip-установкой и документацией.
-Это же касается URL репозитория в статье (открытый пункт 3 раздела 4 `HANDOFF_S6-S9.md`):
-для работы, чей аргумент — воспроизводимость, отсутствие публичной ссылки бьёт по главному
-тезису.
+`.github/workflows/` is added when a remote appears, and only calls these same targets. Until then
+**"green CI" stays an open item of Result 4**, not of Z0: it belongs to the package readiness
+criterion of the proposal on a par with pip installation and documentation. The same goes for the
+repository URL in the paper (open item 3 of section 4 of `HANDOFF_S6-S9.md`): for work whose
+argument is reproducibility, the absence of a public link hits the main thesis.
 
-**Закрыто после Z6, частично.** Remote появился: `github.com/Semyon-ksa/tdadyn`, вместе с
-ним `.github/workflows/tests.yml`, который вызывает `make fast` и только её, в окружении без
-`[zigzag]`. Первый прогон зелёный: 577 пройдено, 2 пропущено явно (модули, требующие
-Dionysus) — те же числа, что в чистом клоне со свежим venv перед коммитом. `slow` и
-`zigzag` в CI не входят и остаются локальными целями.
+**Closed after Z6, partially.** A remote appeared: `github.com/Semyon-ksa/tdadyn`, and with it
+`.github/workflows/tests.yml`, which calls `make fast` and only that, in an environment without
+`[zigzag]`. The first run is green: 577 passed, 2 skipped explicitly (modules that need Dionysus) —
+the same numbers as in a clean clone with a fresh venv before the commit. `slow` and `zigzag` are not
+part of CI and remain local targets.
 
-Открытым остаётся второе: репозиторий **приватный**, поэтому ссылки для статьи всё ещё нет.
-Перед открытием история переписана — автор коммитов был записан именем машины, — деревья
-файлов на всех 68 коммитах и трёх тегах сверены с прежними и совпадают, но хеши коммитов
-другие. Ссылаться в статье следует на теги, а не на хеши.
+The second part stays open: the repository is **private**, so there is still no link for the paper.
+Before publishing, the history was rewritten — the commit author had been recorded by the machine
+name — the file trees on all 68 commits and three tags were compared with the previous ones and
+match, but the commit hashes are different. The paper should refer to tags, not to hashes.
 
-Тег ставится локально и обретает смысл при первом push. Если локального git-репозитория нет
-вовсе, первым действием Z0 становится `git init` и коммит текущего состояния — и тогда в
-README пишется честно, что история S1–S9 в репозиторий не переносилась.
+The tag is set locally and gains meaning on the first push. If there is no local git repository at
+all, the first action of Z0 becomes `git init` and a commit of the current state — and then the
+README says honestly that the S1–S9 history was not carried into the repository.
 
 ---
 
-## Z1 — Снимки → зигзаг-диаграмма. Без персистентности
+## Z1 — Snapshots → zigzag diagram. No persistence
 
-**Что делать.**
+**What to do.**
 
-- Чтение семейства 2 через `core.contracts.adjacency_from_snapshot`; `edge_rule` не
-  реализуется заново.
-- $K_i$, обрезка по $k_{\max}+1$, множество индексов $I$ с полуцелыми промежуточными.
-- Конструкция объединения — `UNION_RULE = COMPLEX_UNION`, константа модуля (`docs/zigzag.md`
-  §2.2). Альтернатива реализуется только внутри измеряющего теста.
-- Развёртка в поток элементарных операций: вставки по возрастанию размерности, удаления по
-  убыванию.
-- Слой перевода «счётчик операций ↔ грубый индекс» — отдельный, со своими тестами.
+- Read family 2 through `core.contracts.adjacency_from_snapshot`; `edge_rule` is not implemented
+  anew.
+- $K_i$, truncation at $k_{\max}+1$, the index set $I$ with half-integer intermediates.
+- The union construction — `UNION_RULE = COMPLEX_UNION`, a module constant (`docs/zigzag.md` §2.2).
+  The alternative is implemented only inside the test that measures it.
+- Unfolding into a stream of elementary operations: insertions in increasing dimension, removals in
+  decreasing dimension.
+- The translation layer "operation counter ↔ coarse index" — separate, with its own tests.
 
-**Замеры этой сессии — исполнены.**
+**Measurements of this session — done.**
 
-- **Расхождение конструкций объединения нулевое на всех 59 переходах** обоих наборов, и при
-  обрезке по размерности 2, и по размерности 3. Отрицательный контроль (три ребра
-  треугольника по разным снимкам) даёт ровно недостающий треугольник, то есть проверка
-  различает конструкции и ноль не тавтологичен.
-- **Монотонность проверена поимённо, и документ был неправ.** `zigzag.md` §2.2 называл
-  немонотонными оба перехода смены $\delta$; немонотонен **один** — $44 \to 45$. На
-  $19 \to 20$ исчезают ровно три хорды через разрыв и не появляется ничего. Причина не
-  в смене $\delta$, а в положении хорды третьего соседа относительно $\varepsilon$ при
-  текущем радиусе. Следствие: гибель $H_1$ на 20 происходит на монотонном переходе, где
-  выбор правила объединения повлиять на неё не может. §2.2 исправлен.
-- **Размеры и поток.** $\lvert I\rvert = 119$ у обоих наборов; $\lvert K_i\rvert$ 47–49 и
-  91–168; операций 52 и 448; построение всех комплексов 0.07 с. По всем 19 динамическим
-  наборам на диске (включая `null/` и 16 наборов `noisy/`) поток не превышает 4853 операций.
-  Бюджет Z3 и Z5 под угрозой не находится, и это отдельно подтверждает решение по fzz:
-  скорость здесь не является проблемой, которую надо решать вторым бэкендом.
-- **Счётчик операций не определяет грубый индекс.** 95% переходов пусты, до 45 индексов
-  делят одно состояние; слой переводит счётчик в диапазон, а не в индекс. Разбор — в
-  `zigzag.md` §2.4.
+- **The difference between the union constructions is zero on all 59 transitions** of both datasets,
+  with truncation at dimension 2 and at dimension 3. A negative control (three edges of a triangle
+  in different snapshots) gives exactly the missing triangle, i.e. the check tells the constructions
+  apart and the zero is not tautological.
+- **Monotonicity was checked by name, and the document was wrong.** `zigzag.md` §2.2 called both
+  $\delta$ transitions non-monotone; **one** is — $44 \to 45$. At $19 \to 20$ exactly three chords
+  across the gap disappear and nothing appears. The cause is not the change of $\delta$ but the
+  position of the third-neighbour chord relative to $\varepsilon$ at the current radius.
+  Consequence: the death of $H_1$ at 20 happens on a monotone transition, where the choice of union
+  rule cannot influence it. §2.2 is corrected.
+- **Sizes and the stream.** $\lvert I\rvert = 119$ for both datasets; $\lvert K_i\rvert$ 47–49 and
+  91–168; 52 and 448 operations; building all complexes takes 0.07 s. Over all 19 dynamic datasets on
+  disk (including `null/` and the 16 `noisy/` datasets) the stream does not exceed 4853 operations.
+  The Z3 and Z5 budgets are not at risk, which separately confirms the decision on fzz: speed is not a
+  problem here to be solved by a second backend.
+- **The operation counter does not determine the coarse index.** 95% of transitions are empty, up to
+  45 indices share one state; the layer translates the counter into a range, not an index. Analysis
+  — `zigzag.md` §2.4.
 
-**Проверка унаследованного дефекта — исполнена в Z0, до переезда.** `flag_complex`
-действительно применял `> threshold` сам, поэтому требовалось выяснить, каким путём
-измерялись числа `geometric_loop` в `method.md` §2.1a. Снимок 0 пересобран через
-`core.contracts` (`distance_within`, порог 0.8):
+**Check of the inherited defect — done in Z0, before the move.** `flag_complex` did apply
+`> threshold` itself, so it had to be established by which path the `geometric_loop` numbers in
+`method.md` §2.1a were measured. Snapshot 0 was rebuilt through `core.contracts`
+(`distance_within`, threshold 0.8):
 
-| Прочтение | Грани |
+| Reading | Faces |
 |---|---|
 | `adjacency_from_snapshot` → `flag_complex` | **(24, 72, 72, 24)** |
-| `method.md` §2.1a ожидает | (24, 72, 72, 24) |
-| дополнение: сырые расстояния, $d > 0.8$ | (24, 204, 728, 990) |
+| `method.md` §2.1a expects | (24, 72, 72, 24) |
+| complement: raw distances, $d > 0.8$ | (24, 204, 728, 990) |
 
-Совпало точно; 72 ребра, минимальное попарное расстояние 0.261 — тоже как в §2.1a.
-Дополнение расходится втрое по рёбрам и в сорок раз по тетраэдрам, так что совпадение
-не случайно. **Путь был верный, дефект только в сигнатуре**: `method.md` не правится,
-выбор $\varepsilon = 0.8$ под вопрос не попадает, порядок работ не меняется.
+Exact match; 72 edges, minimum pairwise distance 0.261 — also as in §2.1a. The complement differs
+threefold in edges and fortyfold in tetrahedra, so the match is not accidental. **The path was right,
+the defect was only in the signature**: `method.md` is not edited, the choice $\varepsilon = 0.8$ is
+not called into question, the order of work does not change.
 
-**Критерий.** Воспроизведение потока операций с нуля даёт ровно те же $K_i$ и $K_{i+1/2}$,
-что прямое построение, на всех наборах семейства 2. Каждый префикс потока — симплициальный
-комплекс (проверяется явно, не подразумевается).
-
----
-
-## Z2 — Независимый оракул в `reference/`
-
-**Что делать.**
-
-- L1: $\beta_k$ на всех индексах $I$.
-- L2: ранги индуцированных отображений на каждой стрелке.
-- L3: обобщённый ранг $r(b,d) = \mathrm{rank}(\varprojlim \to \varinjlim)$ над $\mathbb{Z}/2$
-  и обращение Мёбиуса $m_{[b,d]} = r(b,d) - r(b^-,d) - r(b,d^+) + r(b^-,d^+)$.
-- Игрушки T1–T4 из `docs/zigzag.md` §5.1, включая T4 — тест на различающую силу оракула
-  ($\{[1,4],[2,3]\}$ против $\{[1,3],[2,4]\}$ при одинаковых покрытиях).
-- Алгебраическая проверка парности 12↔41: ожидание **вычисляется**, не транскрибируется.
-
-**Критерий — выполнен.** Оракул воспроизводит ручные барштрих-коды T1–T3; отличает
-T4-пару; на `cycle_lifecycle` выдаёт $H_1$-бары $[11½,40½]$ и $[26½,59]$, из которых пара
-12↔41 следует, а не постулируется. Прогон помечен `slow_zigzag` — это первый его
-потребитель.
-
-**Замеры Z2 — исполнены.**
-
-- **§5.1a была неверна на полшага в $H_1$** обоих наборов: бары записывались снимковыми
-  индексами, тогда как барштрих-код живёт на $I$. Измерено и исправлено; у $H_0$ обе строки
-  верны, и причина асимметрии — направление монотонности перехода.
-- **Правило перевода бара в событие переписано** (§4.2) и проверено на всех семи событиях
-  семейства 2. Прежнее отправляло полуцелые концы в `*_in_transition` и лог не
-  восстанавливало.
-- **Стоимость L3.** 20 221 пара с ненулевым носителем, около 81 000 исключений Гаусса, все
-  системы не шире 132 столбцов. Прогон: 6.2 с и 2.2 с на `cycle_lifecycle` ($H_0$ и $H_1$),
-  5.8 с и 0.3 с на `geometric_loop` — 15 с суммарно против верхней оценки 80 с. Сокращение
-  одно и точное: при $r(b,d) = 0$ все большие $d$ пропускаются по монотонности $r$.
-
-**Ловушки.**
-
-- Оракул не должен переиспользовать код `zigzag/`. Иначе это не оракул, а вторая копия.
-  Решено тем, что оракул **принимает** комплексы и говорит позициями, а не грубыми
-  индексами; связывает их тест.
-- Стоимость L3 квадратична по $|I|$; на больших наборах он остаётся спот-проверкой.
+**Criterion.** Replaying the operation stream from scratch gives exactly the same $K_i$ and
+$K_{i+1/2}$ as direct construction, on every family-2 dataset. Every prefix of the stream is a
+simplicial complex (checked explicitly, not assumed).
 
 ---
 
-## Z3 — Бэкенды и адаптеры
+## Z2 — Independent oracle in `reference/`
 
-**Что делать.**
+**What to do.**
 
-- Адаптер Dionysus 2 (`zigzag_homology_persistence`).
-- Перевод индексов: полуоткрытые интервалы бэкенда → замкнутые грубые. Валидация **сперва на
-  T1–T4**, где ответ известен руками, и только потом на наборах.
-- Двустороннее согласие: оракул ↔ Dionysus, бар в бар.
+- L1: $\beta_k$ at every index of $I$.
+- L2: ranks of the induced maps on each arrow.
+- L3: the generalised rank $r(b,d) = \mathrm{rank}(\varprojlim \to \varinjlim)$ over $\mathbb{Z}/2$
+  and Möbius inversion $m_{[b,d]} = r(b,d) - r(b^-,d) - r(b,d^+) + r(b^-,d^+)$.
+- Toys T1–T4 from `docs/zigzag.md` §5.1, including T4 — a test of the oracle's discriminating power
+  ($\{[1,4],[2,3]\}$ against $\{[1,3],[2,4]\}$ with identical coverings).
+- Algebraic check of the 12↔41 pairing: the expectation is **computed**, not transcribed.
 
-**Критерий — выполнен.** Барштрих-коды совпадают полностью на `cycle_lifecycle` и
-`geometric_loop`, обе размерности, бар в бар с кратностями. Расхождений ноль, поэтому
-регламент «расхождение считается дефектом адаптера, пока не доказано обратное» не
-понадобился ни разу; он остаётся в силе.
+**Criterion — met.** The oracle reproduces the hand-worked barcodes of T1–T3; distinguishes the T4
+pair; on `cycle_lifecycle` it outputs the $H_1$ bars $[11½,40½]$ and $[26½,59]$, from which the
+12↔41 pair follows rather than being postulated. The run is marked `slow_zigzag` — its first
+consumer.
 
-**Замеры Z3 — исполнены.**
+**Z2 measurements — done.**
 
-- **Согласие полное** на T1–T3 и обоих наборах. T3 играет для бэкенда роль T4: две раскладки
-  с одинаковыми покрытиями, Dionysus выбирает верную. Сам T4 адаптеру недоступен — модуль
-  без данных за ним.
-- **Пара 12↔41 воспроизведена бэкендом**, то есть клауз Результата 2, который Z2 закрыть не
-  мог, закрыт.
-- **Размерность $k_{\max}+1$ отсекается адаптером.** На `geometric_loop` Dionysus возвращает
-  69 баров в $H_2$ при отсутствующем $\partial_3$; у `cycle_lifecycle` треугольников нет, и
-  проверка на одном наборе их бы не поймала.
-- **Эфемерные бары измерены** (открытый пункт 4 закрыт): 23+0 и 0+0 у `cycle_lifecycle`,
-  23+0 и 48+94 у `geometric_loop`, где первое слагаемое — пролог. Видны они только на тонком
-  пути; грубому пути и оракулу они недоступны по построению.
-- **Невидимых баров нет** ни на одном наборе.
-- **Стоимость.** 16 мс на набор, 0.30 с на все 19 динамических наборов. Бюджет Z5 бэкендом
-  не расходуется; дорог оракул.
+- **§5.1a was wrong by half a step in $H_1$** of both datasets: bars were written in snapshot
+  indices, while the barcode lives on $I$. Measured and corrected; for $H_0$ both rows are right, and
+  the cause of the asymmetry is the direction of monotonicity of the transition.
+- **The rule translating a bar into an event was rewritten** (§4.2) and checked on all seven events
+  of family 2. The old one sent half-integer ends to `*_in_transition` and did not recover the log.
+- **Cost of L3.** 20 221 pairs with non-zero support, about 81 000 Gaussian eliminations, no system
+  wider than 132 columns. Run time: 6.2 s and 2.2 s on `cycle_lifecycle` ($H_0$ and $H_1$), 5.8 s and
+  0.3 s on `geometric_loop` — 15 s in total against an upper estimate of 80 s. There is one shortcut,
+  and it is exact: when $r(b,d) = 0$ all larger $d$ are skipped by monotonicity of $r$.
 
-**fzz понижен до необязательного, и не ради удобства.** Вторым бэкендом проверка никогда и
-не была: проверкой является **оракул**, который вычисляет ответ независимо, через обобщённый
-ранг и обращение Мёбиуса. Второй бэкенд повторяет тот же класс алгоритма, и при расхождении
-с первым не скажет, кто из них прав, — он добавляет голос, а не независимое вычисление.
-Ценность fzz была в скорости на 60 снимках, а скорость в критерий Результата 2 не входит.
+**Traps.**
 
-Отсюда порядок: fzz собирается из исходников **только если Dionysus не уложится в бюджет**,
-и тогда это отдельная работа со своей ценой, а не пункт Z3.
-
-**Ловушка.** Сравнивать «число баров» или кривые Бетти. Покрытий недостаточно
-(`docs/zigzag.md` §3.4) — ровно та же слепота, что у кривой Бетти к парности в S6.
-
-**SBM в эту сессию не входит:** у неё `truth_kind` — разбиение, а не барштрих-код; она может
-служить только проверкой самосогласованности бэкендов, и это надо назвать вслух, а не
-получить нечаянно.
+- The oracle must not reuse code from `zigzag/`. Otherwise it is not an oracle but a second copy.
+  Solved by the oracle **taking** complexes and speaking in positions, not coarse indices; a test
+  links the two.
+- The cost of L3 is quadratic in $|I|$; on large datasets it remains a spot check.
 
 ---
 
-## Z4 — Временные диаграммы и события. Это Результат 2
+## Z3 — Backends and adapters
 
-**Что делать.**
+**What to do.**
 
-- Барштрих-код → лог событий по таблице `docs/zigzag.md` §4.2, включая сдвиг $d \mapsto d+1$
-  для гибели (единственное место, где сдвиг вводится).
-- Полуцелые концы, невидимые бары, эфемерные бары, цензура — считаются и протоколируются, не
-  отбрасываются.
-- Сопоставление с логом истины и метрики §6: recall, precision, ошибка локализации,
-  раздельно по размерностям.
-- Отрицательные контроли поимённо: `geometric_loop` 4/43/56, повтор состояния 55 в
+- The Dionysus 2 adapter (`zigzag_homology_persistence`).
+- Index translation: the backend's half-open intervals → closed coarse ones. Validation **first on
+  T1–T4**, where the answer is known by hand, and only then on the datasets.
+- Two-sided agreement: oracle ↔ Dionysus, bar for bar.
+
+**Criterion — met.** The barcodes coincide completely on `cycle_lifecycle` and `geometric_loop`,
+both dimensions, bar for bar with multiplicities. Zero discrepancies, so the rule "a discrepancy is
+considered a defect of the adapter until proven otherwise" was never needed; it remains in force.
+
+**Z3 measurements — done.**
+
+- **Complete agreement** on T1–T3 and both datasets. T3 plays the role of T4 for the backend: two
+  layouts with identical coverings, Dionysus picks the right one. T4 itself is unavailable to the
+  adapter — a module with no data behind it.
+- **The 12↔41 pair is reproduced by the backend**, i.e. the clause of Result 2 that Z2 could not
+  close is closed.
+- **Dimension $k_{\max}+1$ is cut off by the adapter.** On `geometric_loop` Dionysus returns 69 bars
+  in $H_2$ with $\partial_3$ absent; `cycle_lifecycle` has no triangles, and a check on one dataset
+  would not have caught them.
+- **Ephemeral bars are measured** (open item 4 closed): 23+0 and 0+0 for `cycle_lifecycle`, 23+0 and
+  48+94 for `geometric_loop`, where the first term is the prologue. They are visible only on the fine
+  path; the coarse path and the oracle cannot see them by construction.
+- **There are no invisible bars** on any dataset.
+- **Cost.** 16 ms per dataset, 0.30 s for all 19 dynamic datasets. The backend does not consume the
+  Z5 budget; the oracle is the expensive part.
+
+**fzz was demoted to optional, and not for convenience.** A second backend was never the check: the
+check is **the oracle**, which computes the answer independently, through the generalised rank and
+Möbius inversion. A second backend repeats the same class of algorithm and, when it disagrees with
+the first, cannot say which is right — it adds a vote, not an independent computation. The value of
+fzz was speed on 60 snapshots, and speed is not part of the criterion of Result 2.
+
+Hence the order: fzz is built from source **only if Dionysus does not fit the budget**, and then that
+is separate work with its own cost, not an item of Z3.
+
+**Trap.** Comparing "the number of bars" or Betti curves. Coverings are not enough
+(`docs/zigzag.md` §3.4) — exactly the same blindness as the Betti curve's to pairing in S6.
+
+**SBM is not part of this session:** its `truth_kind` is a partition, not a barcode; it can serve
+only as a self-consistency check of the backends, and this has to be said out loud rather than
+obtained by accident.
+
+---
+
+## Z4 — Temporal diagrams and events. This is Result 2
+
+**What to do.**
+
+- Barcode → event log by the table of `docs/zigzag.md` §4.2, including the shift $d \mapsto d+1$ for
+  a death (the only place where the shift is introduced).
+- Half-integer ends, invisible bars, ephemeral bars, censoring — counted and recorded, not discarded.
+- Matching against the truth log and the metrics of §6: recall, precision, localisation error,
+  separately by dimension.
+- Negative controls by name: `geometric_loop` 4/43/56, the repeated state at 55 in
   `cycle_lifecycle`.
 
-**Критерий (заявка) — выполнен.** На `cycle_lifecycle` и `geometric_loop` recall и precision
-при $\tau = 0$ равны единице, раздельно по размерностям; ошибка локализации ноль; пара 12↔41
-воспроизведена бэкендом ещё в Z3.
+**Criterion (proposal) — met.** On `cycle_lifecycle` and `geometric_loop` recall and precision at
+$\tau = 0$ equal one, separately by dimension; the localisation error is zero; the 12↔41 pair was
+already reproduced by the backend in Z3.
 
-**Замеры Z4 — исполнены.**
+**Z4 measurements — done.**
 
-- **Единицы — ожидаемый исход, а не достижение**, и это записано в §6: наборы построены,
-  алгоритм точен. Под шумом precision падает до 4/120 (спот-замер, число принадлежит Z5).
-- **Лог событий слеп к спариванию.** Обе раскладки $H_1$ дают один и тот же лог, поэтому
-  метрики Результата 2 пару 12↔41 **не проверяют** — её проверяет сверка барштрих-кодов.
-  Граница закреплена тестом, а не оставлена читателю.
-- **Открытый пункт 2 закрыт**: цензурированные события помечаются и в метрики не входят.
-- **Открытый пункт 3 закрыт**: $\tau = 0$ достижимо на чистых данных, а поднятие до 1
-  возвращает одно событие в одном наборе из восьми зашумлённых. Умолчание остаётся, а ошибка
-  локализации при $\tau = 0$ тождественно нулевая и информативной не является.
-- **Строки §6**: цензурированных концов 3 и 4, невидимых баров 0 и 0, событий из полуцелого
-  конца 3 из 5 и 2 из 2.
+- **The ones are an expected outcome, not an achievement**, and this is written in §6: the datasets
+  are constructed, the algorithm is exact. Under noise the precision falls to 4/120 (a spot
+  measurement; the number belongs to Z5).
+- **The event log is blind to pairing.** Both $H_1$ layouts give the same log, so the metrics of
+  Result 2 **do not check** the 12↔41 pair — the barcode comparison does. The boundary is fixed by a
+  test, not left to the reader.
+- **Open item 2 closed**: censored events are marked and do not enter the metrics.
+- **Open item 3 closed**: $\tau = 0$ is achievable on clean data, and raising it to 1 recovers one
+  event in one of eight noisy datasets. The default stays, and the localisation error at $\tau = 0$
+  is identically zero and not informative.
+- **Rows of §6**: censored ends 3 and 4, invisible bars 0 and 0, events from a half-integer end 3 of
+  5 and 2 of 2.
 
-**Метрики считаются раздельно по размерностям, и это не формальность.** Пять событий
-`cycle_lifecycle` распределены как три в $H_1$ (рождения 12 и 27, гибель 41) и два в $H_0$
-(рождение 48 при отделении $\{4,5,6\}$, гибель 55 при восстановлении $(3,4)$). Сводный
-recall по всем размерностям скрыл бы алгоритм, который безупречен в $H_0$ и слеп в $H_1$.
-
----
-
-## Z5 — Нулевые модели и шум
-
-**Что делать.**
-
-- `null/`: частота ложных срабатываний **на снимок**, с доверительным интервалом (Уилсон;
-  правило трёх при нуле промахов). Это измерение, а не проверка на ноль.
-- `noisy/` (24 набора, четыре механизма): деградация recall/precision и ошибки локализации
-  как функция уровня шума.
-- Число невидимых и эфемерных баров как функция уровня шума — характеристика конструкции
-  объединения, нужная перед переносом на коннектомы.
-- Уровень 0.0 — бесплатная проверка: барштрих-код на нулевом уровне обязан совпадать с
-  базовым побитово.
-
-**Критерий — выполнен.** Таблицы с измеренными числами и интервалами в `zigzag.md` §6,
-§2.3 и §4.3. Ни одного «ноль» без числа испытаний: `FalsePositiveRate` невозможно построить
-без знаменателя, и он переживает печать.
-
-**Замеры Z5 — исполнены.**
-
-- **Нулевая модель срабатывает почти всюду**: 0.9833 на снимок, 95% [0.9786, 0.9870],
-  3600 испытаний; 12.9 события на снимок. Публикуются оба знаменателя — на снимок
-  (испытания коррелированы, интервал оптимистичен) и на реализацию (независимы, но их 60).
-- **Деградация**: recall падает медленно, precision обваливается до 0.0017. `geometric_loop`
-  держит recall на единице при всех уровнях, `cycle_lifecycle` теряет события.
-  `spurious_edges` вреднее `missing_edges` на порядок.
-- **Невидимые бары измерены впервые не на нуле**: до 36 под шумом при нуле на чистых.
-- **Эфемерные: пролог постоянен**, часть вне пролога растёт на порядки — открытый вопрос
-  Z3 закрыт, и разложение оправдано.
-- **Уровень 0.0 воспроизводит чистый набор** на всех четырёх сочетаниях.
-- **Границы теперь вычисляются, а не цитируются**: `wilson_interval` воспроизводит 4.3% и
-  10.2% из `method.md` §1.2a, `zero_hits_upper_bound` — 63% для трёх сидов.
-- **Порог `null_models.max_false_positive_rate` не применяется**: он про критерий значимости
-  на облаках семейства 1, а не про долю снимков со срабатыванием.
+**Metrics are computed separately by dimension, and this is not a formality.** The five events of
+`cycle_lifecycle` split into three in $H_1$ (births 12 and 27, death 41) and two in $H_0$ (birth 48
+when $\{4,5,6\}$ detaches, death 55 when $(3,4)$ is restored). A pooled recall over all dimensions
+would hide an algorithm that is flawless in $H_0$ and blind in $H_1$.
 
 ---
 
-## Z6 — Сборка, отчёт, закрытие результата
+## Z5 — Null models and noise
 
-**Что делать.**
+**What to do.**
 
-- CLI `python -m tdadyn.zigzag.run --results` производит `results/zigzag_events.json` и
-  таблицы. **Артефакт производит сборка, а не pytest** — иначе отчётное число Результата 2
-  есть побочный эффект медленного прогона тестов (правило S9).
-- Запись в манифест, хеш канонической сериализации, тег.
-- Отчёт: каждое число в прозе — вывод исполненной ячейки. Где полный расчёт слишком долог,
-  это указано явно как цитата из `docs/zigzag.md`. Урок из отчёта S9 (три места, два разных
-  числа) действует.
-- `docs/roadmap.md` обновляется; vineyards переносятся с явной причиной, а не молча.
+- `null/`: the false positive rate **per snapshot**, with a confidence interval (Wilson; the rule of
+  three at zero misses). This is a measurement, not a check for zero.
+- `noisy/` (24 datasets, four mechanisms): degradation of recall/precision and of the localisation
+  error as a function of the noise level.
+- The number of invisible and ephemeral bars as a function of the noise level — a characteristic of
+  the union construction, needed before transferring to connectomes.
+- Level 0.0 is a free check: the barcode at zero level must coincide with the base bitwise.
 
-**Критерий — выполнен**, с одной поправкой к формулировке. «Зелёный CI» перенесён в открытые
-пункты Результата 4 ещё в Z0: ни CI, ни remote тогда не было, и критерий, ссылающийся на
-то, чего негде запустить, проверяет не то. После Z6 оба появились, и цель `fast` в CI
-зелёная (§Z0). Проверяемая часть выполнена:
+**Criterion — met.** Tables with measured numbers and intervals in `zigzag.md` §6, §2.3 and §4.3.
+Not a single "zero" without the number of trials: a `FalsePositiveRate` cannot be built without a
+denominator, and the denominator survives printing.
 
-- **воспроизводимый артефакт** — `data/synthetic/results/zigzag_events.json`, 207 КБ,
-  производится `python -m tdadyn.results --results`; пересборка даёт тот же
-  `content_sha256`, меняется только `generated_at`;
-- **отчёт** — `notebooks/zigzag_report.ipynb`, собирается и **исполняется** целью
-  `make report-zigzag`, и читает числа из артефакта, а не считает их заново;
-- **медленный прогон в бюджете** — 10:48 при ориентире 15 минут.
+**Z5 measurements — done.**
 
-**Замеры Z6 — исполнены.**
-
-- **Артефакт стоит около пяти минут**, и почти всё это — сверка оракула с бэкендом. Она
-  входит намеренно: утверждение Результата 2 включает согласие двух независимых вычислений.
-  Первая версия сверяла только два чистых набора (7 баров, 43 с), и чеклист это отверг:
-  ошибка адаптера вероятнее проявится там, где зашумлённый набор даёт девятьсот баров.
-  Стало **3192 бара на 18 наборах, 0 расхождений**; замерено, что на зашумлённом оракул
-  местами дешевле, чем на чистом, — дело было не в цене.
-- **Зигзаг-цель прогона — 5:43**, из них 4:46 — единственная пересборка артефакта в тесте
-  на воспроизводимость хеша. Остальные тесты читают закоммиченный файл.
-- **CLI пришлось поднять над слоями.** Модуль начинался как `tdadyn.zigzag.run`, и сторож
-  слоёв его отверг: нулевые реализации требуют вызова генераторов, то есть зигзага,
-  делающего себе данные. Артефакту нужны оба слоя, поэтому он живёт над обоими —
-  `tdadyn.results`, единственный композиционный корень, и сторож это закрепляет.
-- **`.gitignore` игнорировал артефакт молча** — исключения пофайловые, ровно как с
-  `manifest.json`. Проверка идёт через `git check-ignore`.
-- **Три дефекта поймали собственные тесты**: пустой список событий в артефакте, верхняя
-  граница Уилсона 0.9999999999999998 при $\hat p = 1$, и упомянутое `.gitignore`.
-- **События зашумлённых наборов не сериализуются**: 450 КБ из 609. Остаются барштрих-код,
-  `n_events` и счётчики.
+- **The null model fires almost everywhere**: 0.9833 per snapshot, 95% [0.9786, 0.9870], 3600
+  trials; 12.9 events per snapshot. Both denominators are published — per snapshot (trials are
+  correlated, the interval is optimistic) and per realisation (independent, but there are 60).
+- **Degradation**: recall falls slowly, precision collapses to 0.0017. `geometric_loop` keeps recall
+  at one at every level, `cycle_lifecycle` loses events. `spurious_edges` is an order of magnitude
+  more harmful than `missing_edges`.
+- **Invisible bars measured for the first time at a non-zero value**: up to 36 under noise, zero on
+  the clean datasets.
+- **Ephemeral: the prologue is constant**, the part outside the prologue grows by orders of magnitude
+  — the open question of Z3 is closed, and the decomposition is justified.
+- **Level 0.0 reproduces the clean dataset** in all four combinations.
+- **The bounds are now computed, not quoted**: `wilson_interval` reproduces the 4.3% and 10.2% of
+  `method.md` §1.2a, `zero_hits_upper_bound` the 63% for three seeds.
+- **The threshold `null_models.max_false_positive_rate` does not apply**: it concerns the
+  significance criterion on family-1 clouds, not the fraction of snapshots that fire.
 
 ---
 
-## Бюджет времени тестов
+## Z6 — Build, report, closing the result
 
-Замер на `synthetic-v1`: быстрый прогон 429 тестов за 15.5 с, медленный 55 тестов за
-**610 с (10:10)** при ориентире 15 минут. Запас — меньше пяти минут, и три теста съедают
-половину: 108 с частота ложных срабатываний нулевой модели, 73 с геодезические числа Бетти,
-51 с отказ старого критерия.
+**What to do.**
 
-Зигзаг на 60 снимках этот запас пробьёт, а оракул L3 квадратичен по числу индексов. Лечение
-планируется в Z0, а не тогда, когда прогон встанет: маркеры (`slow`, `slow_zigzag`),
-разделение целей прогона, полный L3 — на `cycle_lifecycle`, спот-проверки — на остальных.
+- The CLI `python -m tdadyn.zigzag.run --results` produces `results/zigzag_events.json` and tables.
+  **The artefact is produced by the build, not by pytest** — otherwise the reported number of Result
+  2 is a side effect of the slow test run (the S9 rule).
+- A manifest entry, a hash of the canonical serialisation, a tag.
+- Report: every number in the prose is the output of an executed cell. Where the full computation is
+  too long, this is stated explicitly as a quotation from `docs/zigzag.md`. The lesson of the S9
+  report (three places, two different numbers) applies.
+- `docs/roadmap.md` is updated; vineyards are moved with an explicit reason, not silently.
+
+**Criterion — met**, with one amendment to the wording. "Green CI" was moved to the open items of
+Result 4 already in Z0: there was neither CI nor a remote then, and a criterion referring to
+something with nowhere to run checks the wrong thing. After Z6 both appeared, and the `fast` target
+is green in CI (§Z0). The checkable part is done:
+
+- **a reproducible artefact** — `data/synthetic/results/zigzag_events.json`, 207 KB, produced by
+  `python -m tdadyn.results --results`; a rebuild gives the same `content_sha256`, only
+  `generated_at` changes;
+- **the report** — `notebooks/zigzag_report.ipynb`, built and **executed** by the target
+  `make report-zigzag`, and it reads the numbers from the artefact rather than recomputing them;
+- **the slow run within budget** — 10:48 against a guideline of 15 minutes.
+
+**Z6 measurements — done.**
+
+- **The artefact costs about five minutes**, and almost all of it is the oracle–backend comparison.
+  It is included deliberately: the claim of Result 2 includes the agreement of two independent
+  computations. The first version compared only the two clean datasets (7 bars, 43 s), and the
+  checklist rejected it: an adapter error is more likely to show up where a noisy dataset gives nine
+  hundred bars. It became **3192 bars on 18 datasets, 0 discrepancies**; measured, the oracle is in
+  places cheaper on a noisy dataset than on a clean one — cost was not the reason.
+- **The zigzag test target takes 5:43**, of which 4:46 is the single rebuild of the artefact in the
+  hash reproducibility test. The other tests read the committed file.
+- **The CLI had to be lifted above the layers.** The module began as `tdadyn.zigzag.run`, and the
+  layering guard rejected it: the null realisations require calling the generators, i.e. a zigzag
+  making its own data. The artefact needs both layers, so it lives above both — `tdadyn.results`, the
+  single composition root, and the guard enforces this.
+- **`.gitignore` silently ignored the artefact** — the exceptions are per file, exactly as with
+  `manifest.json`. The check uses `git check-ignore`.
+- **Three defects were caught by the tests themselves**: an empty event list in the artefact, an
+  upper Wilson bound of 0.9999999999999998 at $\hat p = 1$, and the `.gitignore` mentioned above.
+- **Events of the noisy datasets are not serialised**: 450 KB out of 609. The barcode, `n_events` and
+  the counters remain.
 
 ---
 
-## Список того, что я уже считаю недоспецифицированным
+## Test time budget
 
-Каждая сессия начинается с плана, в конце которого перечислены места, где спецификацию
-пришлось бы додумывать. Этот список — для сверки с тем; расхождение в обе стороны
-информативно.
+Measured on `synthetic-v1`: the fast run is 429 tests in 15.5 s, the slow one 55 tests in **610 s
+(10:10)** against a guideline of 15 minutes. The headroom is under five minutes, and three tests eat
+half of it: 108 s the false positive rate of the null model, 73 s the geodesic Betti numbers, 51 s the
+failure of the old criterion.
 
-1. ~~Совпадают ли конструкции объединения на переходах 20 и 45~~ — **замерено в Z1:
-   совпадают, и не только там, а на всех 59 переходах обоих наборов.** Попутно выяснилось,
-   что сама постановка была неточной: немонотонен один переход из двух названных.
-2. ~~Поведение алгоритма на цензурированных барах~~ — **закрыто в Z4**: событие
-   порождается и помечается `censored`, но в recall и precision не входит. Цензурированное
-   рождение не заявляет, что класс родился; оно говорит, что класс уже был, когда окно
-   открылось. Ответ один на весь проект.
-3. ~~Значение допуска $\tau$ по умолчанию~~ — **замерено в Z4**: на чистых данных $\tau = 0$
-   даёт единичные recall и precision, а на восьми зашумлённых наборах поднятие до 1
-   возвращает одно событие в одном. Под шумом отказ — пропуск и наводнение ложными, а не
-   смещение; $\tau$ остаётся настройкой с умолчанием 0.
-4. ~~Судьба эфемерных баров~~ — **измерено в Z3**: 23 у `cycle_lifecycle` и 165 у
-   `geometric_loop`, из них 71 вне пролога. Число публикуется разложенным на пролог и
-   остальное: прологовая часть измеряет порядок сборки $K_0$, а не данные. Останется ли она
-   постоянной под шумом — вопрос Z5.
-5. ~~Участвует ли SBM в Задаче 2 вообще~~ — **закрыто в Z1 пределом, а не решением.**
-   У `dynamic_sbm` 60 узлов при `reference_max_nodes: 30`, поэтому построитель
-   флаг-комплекса её отвергает: комплексы для неё построить нечем. Остальные 19 динамических
-   наборов на диске строятся.
-6. Значимость бара в зигзаге: `topology_check` не переносится, замены нет, и в этой ветке она
-   не вводится. **Z5 дал измеренное основание тому, что вопрос не академический**: без
-   критерия значимости точность на шуме падает до 0.17%, а на нулевой модели срабатывает
-   98% снимков при 12.9 события на снимок. Решать всё равно не подбором порога под
-   precision.
-7. Как проверяется вклад обрезки $k_{\max}+1$ на метрическом наборе, где $\beta_3$ существует,
-   но не вычисляется.
+A zigzag on 60 snapshots will break through this headroom, and the L3 oracle is quadratic in the
+number of indices. The cure is planned in Z0, not when the run stalls: markers (`slow`,
+`slow_zigzag`), split run targets, full L3 on `cycle_lifecycle`, spot checks on the rest.
+
+---
+
+## What I already consider underspecified
+
+Each session begins with a plan that ends with a list of places where the specification would have
+to be guessed. This list is for comparison with that one; a discrepancy in either direction is
+informative.
+
+1. ~~Whether the union constructions coincide on transitions 20 and 45~~ — **measured in Z1: they
+   coincide, and not only there but on all 59 transitions of both datasets.** Along the way it turned
+   out that the question itself was imprecise: one of the two named transitions is non-monotone.
+2. ~~Behaviour of the algorithm on censored bars~~ — **closed in Z4**: an event is generated and
+   marked `censored`, but it does not enter recall and precision. A censored birth does not claim the
+   class was born; it says the class already existed when the window opened. One answer for the whole
+   project.
+3. ~~The default value of the tolerance $\tau$~~ — **measured in Z4**: on clean data $\tau = 0$ gives
+   unit recall and precision, and on eight noisy datasets raising it to 1 recovers one event in one.
+   Under noise the failure is omission and a flood of false events, not displacement; $\tau$ remains a
+   setting with default 0.
+4. ~~The fate of ephemeral bars~~ — **measured in Z3**: 23 for `cycle_lifecycle` and 165 for
+   `geometric_loop`, of which 94 lie outside the prologue. The number is published decomposed into the
+   prologue and the rest: the prologue part measures the assembly order of $K_0$, not the data.
+   Whether it stays constant under noise is a question for Z5.
+5. ~~Whether SBM takes part in Task 2 at all~~ — **closed in Z1 by a limit, not a decision.**
+   `dynamic_sbm` has 60 nodes with `reference_max_nodes: 30`, so the flag complex builder rejects it:
+   there is nothing to build its complexes with. The other 19 dynamic datasets on disk do build.
+6. Bar significance in the zigzag: `topology_check` does not carry over, there is no replacement, and
+   none is introduced in this branch. **Z5 gave a measured ground for the question not being
+   academic**: without a significance criterion the precision on noise falls to 0.17%, and on the null
+   model 98% of snapshots fire at 12.9 events per snapshot. Still, it is not to be solved by tuning a
+   threshold to precision.
+7. How the contribution of the $k_{\max}+1$ truncation is checked on the metric dataset, where
+   $\beta_3$ exists but is not computed.

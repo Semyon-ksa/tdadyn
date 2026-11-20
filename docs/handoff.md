@@ -1,27 +1,27 @@
-# Передача в Задачу 2: временные диаграммы персистентности
+# Handoff to Task 2: temporal persistence diagrams
 
-Этот документ пишется для того, кто начинает Задачу 2 (зигзаг-алгоритмы и локализация
-топологических событий) и берёт данные из `tdadyn.synthetic` как вход. Он не пересказывает
-`method.md` — он говорит, **что гарантировано, что измерено, и на чём алгоритм ошибётся
-так, что это будет выглядеть его собственным дефектом**.
+This document is written for whoever starts Task 2 (zigzag algorithms and localisation of
+topological events) and takes the data from `tdadyn.synthetic` as input. It does not retell
+`method.md`; it says **what is guaranteed, what is measured, and where an algorithm will go
+wrong in a way that looks like its own defect**.
 
-Все числа ниже проверены прогоном на текущем HEAD.
+Every number below was checked by a run on the current HEAD.
 
-## 1. Что брать
+## 1. What to take
 
 ```bash
 .venv/bin/python -m tdadyn.synthetic.build --config config.yaml
 ```
 
-38 наборов, 13 МБ, несколько секунд. Задаче 2 нужны прежде всего эти:
+38 datasets, 13 MB, a few seconds. Task 2 needs these above all:
 
-| Набор | Каталог | Что в нём |
+| Dataset | Directory | What it holds |
 |---|---|---|
-| `cycle_lifecycle` | `dynamic_graph/` | пять запланированных событий, истина предсказана конструкцией |
-| `geometric_loop` | `dynamic_graph/` | два события, **метрическая** фильтрация |
-| `dynamic_sbm` | `dynamic_graph/` | истина-разбиение, гомологических событий **нет** |
-| `erdos_renyi` | `null/` | нулевая модель: расписания нет, лог пуст |
-| `spurious_edges`, `missing_edges` | `noisy/` | те же сценарии под шумом рёбер |
+| `cycle_lifecycle` | `dynamic_graph/` | five scheduled events, truth predicted by the construction |
+| `geometric_loop` | `dynamic_graph/` | two events, **metric** filtration |
+| `dynamic_sbm` | `dynamic_graph/` | partition truth, **no** homological events |
+| `erdos_renyi` | `null/` | null model: no schedule, empty log |
+| `spurious_edges`, `missing_edges` | `noisy/` | the same scenarios under edge noise |
 
 ```python
 from tdadyn.core import load_dataset, adjacency_from_snapshot
@@ -31,123 +31,128 @@ gt = d.ground_truth
 graph = adjacency_from_snapshot(d.snapshots[0], edge_rule=gt.edge_rule, edge_threshold=gt.edge_threshold)
 ```
 
-## 2. Что именно гарантировано
+## 2. What exactly is guaranteed
 
-Обязательность полей истины определяется **`truth_kind`**, а не каталогом (`data.md`, §4.1).
-Это существенно: `dynamic_sbm` лежит как динамический граф и баркода не имеет вовсе.
+Which truth fields are mandatory is determined by **`truth_kind`**, not by the directory
+(`data.md`, §4.1). This matters: `dynamic_sbm` is stored as a dynamic graph and has no
+barcode at all.
 
-| `truth_kind` | Что гарантировано |
+| `truth_kind` | What is guaranteed |
 |---|---|
-| `betti_curve` | кривая Бетти **и** лог событий; согласованы и проверены |
-| `partition` | метки сообществ по времени и расписание; кривой нет |
-| `none` | расписания нет, `events == []` |
-| `noise_level` | механизм, уровень и `base` — идентификатор чистого набора |
+| `betti_curve` | the Betti curve **and** the event log; consistent and checked |
+| `partition` | community labels over time and the schedule; no curve |
+| `none` | no schedule, `events == []` |
+| `noise_level` | mechanism, level and `base` — the identifier of the clean dataset |
 
-**Предсказано конструкцией только у семейства 2.** У `cycle_lifecycle` и `geometric_loop`
-кривая Бетти и посчитана эталоном по записанным снимкам, и предсказана конструкцией, и
-тест сверяет два источника. Больше нигде такого нет: у SBM и у нулевых моделей кривой
-в истине **нет намеренно** — измеренная кривая под именем истины была бы истиной как
-выходом пайплайна (`method.md`, §3.1 и §4.2).
+**Only family 2 is predicted by its construction.** For `cycle_lifecycle` and
+`geometric_loop` the Betti curve is both computed by the reference implementation from the
+recorded snapshots and predicted by the construction, and a test compares the two sources.
+Nowhere else is this so: SBM and the null models **deliberately** carry no curve in their
+truth — a measured curve under the name of truth would be truth as pipeline output
+(`method.md`, §3.1 and §4.2).
 
-## 3. Ловушки, на которых алгоритм будет выглядеть сломанным
+## 3. Traps on which the algorithm will look broken
 
-Это главный раздел. Каждый пункт — расхождение, которое проявится как систематическая
-ошибка вашего алгоритма, хотя причина в чтении данных.
+This is the main section. Each item is a discrepancy that will show up as a systematic error
+of your algorithm, although the cause is in how the data were read.
 
-**Конвенция индекса.** `snapshot: k` означает, что $G_k$ **уже содержит** изменение,
-а $G_{k-1}$ — ещё нет; скачок кривой приходится на переход $k-1 \to k$. Альтернативное
-прочтение даёт сдвиг на единицу по всему логу и выглядит как систематическая ошибка
-локализации (`method.md`, §2.1).
+**Index convention.** `snapshot: k` means that $G_k$ **already contains** the change and
+$G_{k-1}$ does not yet; the jump of the curve falls on the transition $k-1 \to k$. The
+alternative reading shifts the whole log by one and looks like a systematic localisation
+error (`method.md`, §2.1).
 
-**Парность гибели.** В `cycle_lifecycle` гибель на снимке 41 спарена с рождением на 12
-(`h1_a`), а не с рождением на 27. Это **не конвенция**: разложение зигзаг-модуля на
-интервалы однозначно, и умирает класс, рождённый при замыкании пути. Интуитивное «хорда
-породила два цикла, ломаем один — умирает молодой» здесь неверно (`method.md`, §2.2a).
+**Pairing of the death.** In `cycle_lifecycle` the death at snapshot 41 is paired with the
+birth at 12 (`h1_a`), not with the birth at 27. This is **not a convention**: the
+decomposition of a zigzag module into intervals is unique, and the class that dies is the one
+born when the path closed. The intuitive "the chord made two cycles, break one and the
+younger dies" is wrong here (`method.md`, §2.2a).
 
-Важно: **кривая Бетти парность не видит**. Инверсия пары в логе не роняет ни одну проверку
-внутри семейства 2 — это измерено. Если ваш алгоритм рапортует другую пару, сверяйтесь
-с §2.2a, а не с кривой.
+Important: **the Betti curve does not see pairing.** Inverting the pair in the log breaks no
+check inside family 2 — this was measured. If your algorithm reports a different pair,
+consult §2.2a, not the curve.
 
-**Направление порога противоположно у двух сценариев одного семейства.**
+**The threshold direction is opposite in two scenarios of one family.**
 
-| Набор | `edge_rule` | Порог | Что в снимке |
+| Dataset | `edge_rule` | Threshold | What a snapshot holds |
 |---|---|---|---|
-| `cycle_lifecycle` | `weight_above` | 0.5, строго | сходства |
-| `geometric_loop` | `distance_within` | 0.8, нестрого | **расстояния** |
+| `cycle_lifecycle` | `weight_above` | 0.5, strict | similarities |
+| `geometric_loop` | `distance_within` | 0.8, non-strict | **distances** |
 
-Применение правила сходства к метрическому набору даёт **дополнение** графа — связное,
-правдоподобное и неверное, без единой ошибки. Читайте `edge_rule` из истины и применяйте
-через `adjacency_from_snapshot`; это единственное место в проекте, где правило
-применяется (`method.md`, §2.3).
+Applying the similarity rule to the metric dataset yields the **complement** of the graph —
+connected, plausible and wrong, without a single error. Read `edge_rule` from the truth and
+apply it through `adjacency_from_snapshot`; this is the only place in the project where the
+rule is applied (`method.md`, §2.3).
 
-**Повтор состояния намеренный.** В `cycle_lifecycle` пять различных графов на 60 снимков,
-в `geometric_loop` — четыре. Снимки 41–47 и 55–59 первого совпадают побайтово. Конвейер
-**не должен** схлопывать состояния по идентичности графа: рождение и гибель $H_0$ на 48
-и 55 обязаны быть отрапортованы отдельно.
+**The repeated state is intentional.** `cycle_lifecycle` has five distinct graphs over 60
+snapshots, `geometric_loop` four. Snapshots 41–47 and 55–59 of the former are byte-for-byte
+identical. The pipeline **must not** collapse states by graph identity: the birth and death
+of $H_0$ at 48 and 55 must be reported separately.
 
-**Дыхание радиуса меняет граф, не меняя $\beta$.** В `geometric_loop` граф меняется на
-снимках 4, 43 и 56 (72→48, 45→66, 48→72 рёбер), и событий там нет. Это сильнейший
-отрицательный контроль набора: детектор, срабатывающий на смену комплекса, поймается здесь.
+**Radius breathing changes the graph without changing $\beta$.** In `geometric_loop` the
+graph changes at snapshots 4, 43 and 56 (72→48, 45→66, 48→72 edges), and there are no events
+there. This is the strongest negative control of the dataset: a detector that fires on a
+change of complex will be caught here.
 
-**Слияние сообществ — не гомологическое событие.** В SBM блоки прошиты десятками рёбер
-(7–41 межблочных на снимке), граф связен, и слияние на снимке 20 не меняет ничего в
-гомологиях. $\beta_0$ при этом гуляет между 1 и 2 — из-за случайных изолированных вершин,
-не из-за сообществ. Устойчивое утверждение: после удаления изолированных вершин граф
-связен на **всех** снимках.
+**A community merge is not a homological event.** In the SBM the blocks are stitched together
+by dozens of edges (7–41 inter-block edges per snapshot), the graph is connected, and the
+merge at snapshot 20 changes nothing in homology. $\beta_0$ meanwhile wanders between 1 and 2
+— because of random isolated vertices, not communities. The robust statement: after removing
+isolated vertices the graph is connected on **every** snapshot.
 
-**У нулевой модели $\beta$ дрожит, и это не дефект.** ER при плотности `cycle_lifecycle`
-($p = 0.087$) даёт $\beta_0 = 4\ldots5$ и $\beta_1 = 2\ldots5$ по пяти реализациям;
-чистое $(1,0,0)$ надёжно достигается только при $p \gtrsim 0.8$, то есть на почти полном
-графе. Разброс по реализациям здесь и есть ответ: одного «типичного» значения у нулевой
-модели не существует. Случайный граф честно имеет циклы — это
-нулевое распределение, относительно которого вы измеряете (`method.md`, §4.2).
+**The null model's $\beta$ fluctuates, and that is not a defect.** ER at the density of
+`cycle_lifecycle` ($p = 0.087$) gives $\beta_0 = 4\ldots5$ and $\beta_1 = 2\ldots5$ over five
+realisations; a clean $(1,0,0)$ is reliably reached only at $p \gtrsim 0.8$, i.e. on an almost
+complete graph. The spread over realisations is the answer here: a null model has no single
+"typical" value. A random graph honestly has cycles — that is the null distribution against
+which you measure (`method.md`, §4.2).
 
-## 4. Что должна измерить Задача 2, а генератор не может
+## 4. What Task 2 must measure and the generator cannot
 
-**Частоту ложных срабатываний алгоритма локализации.** Нулевые наборы существуют ровно
-для этого: они не утверждают ноль, они дают распределение, на котором частоту можно
-померить. Публикуется в Результате 6.
+**The false positive rate of the localisation algorithm.** The null datasets exist exactly
+for this: they do not claim zero, they provide a distribution on which the rate can be
+measured. It is published in Result 6.
 
-Ориентир для сравнения: у **критерия значимости** на равномерных облаках частота
-ложных срабатываний 1.5% при рабочем размере (3 промаха из 200, 95% сверху 4.3%,
-`method.md`, §1.2a). Это нижняя планка — вклад самого критерия, до всякого зигзага.
+A reference point for comparison: the **significance criterion** on uniform clouds has a
+false positive rate of 1.5% at the working size (3 misses out of 200, 95% upper bound 4.3%,
+`method.md`, §1.2a). This is a floor — the contribution of the criterion itself, before any
+zigzag.
 
-## 5. Чего наследовать нельзя
+## 5. What must not be inherited
 
-**Параметры `topology_check` не переносятся.** `gap_noise_floor_ratio` 0.07 и
-`gap_min_ratio` 1.55 откалиброваны на облаках семейства 1 в $\mathbb{R}^3$ и
-$\mathbb{R}^4$. На коннектомы Задачи 3 и на любые другие данные — только после повторной
-калибровки, а там её негде взять: нет известного $\beta_k$, относительно которого
-калиброваться (`method.md`, §1.2a).
+**The `topology_check` parameters do not transfer.** `gap_noise_floor_ratio` 0.07 and
+`gap_min_ratio` 1.55 were calibrated on family-1 clouds in $\mathbb{R}^3$ and $\mathbb{R}^4$.
+For the connectomes of Task 3 and any other data — only after recalibration, and there is
+nothing to calibrate against: no known $\beta_k$ (`method.md`, §1.2a).
 
-**Критерий не инвариантен к перепараметризации фильтрации.** Монотонное преобразование
-сходство → расстояние сохраняет структуру диаграммы, но искажает персистентности, а
-критерий сравнивает именно их. Выбор между $d = 1-|r|$ и $d = \sqrt{2(1-r)}$ сдвинет
-значимость (`method.md`, §1.3).
+**The criterion is not invariant under reparametrisation of the filtration.** A monotone
+similarity → distance transform preserves the structure of the diagram but distorts the
+persistences, and the criterion compares exactly those. Choosing between $d = 1-|r|$ and
+$d = \sqrt{2(1-r)}$ will shift significance (`method.md`, §1.3).
 
-**Граница устойчивости — $d_B \le 2\,d_H$, а не $d_H$.** Двойка из параметризации Рипса
-диаметром. Измерено: без неё 9 из 12 комбинаций нарушают границу, отношение до 1.33.
-В $H_0$ обе формы выполняются, поэтому проверка обязана идти по $H_1$ (`method.md`, §4.1).
+**The stability bound is $d_B \le 2\,d_H$, not $d_H$.** The factor two comes from
+parametrising Rips by diameter. Measured: without it 9 of 12 combinations violate the bound,
+with ratios up to 1.33. In $H_0$ both forms hold, so the check must use $H_1$
+(`method.md`, §4.1).
 
-## 6. Открытое
+## 6. Open questions
 
-- **Какие случаи задают границы плато критерия** — по-прежнему не зафиксировано.
-  Известна одна граница: ветвь $\beta_k = 0$ отказывает, когда над шумовым полом уцелел
-  ровно один бар и сравнивать его не с чем (`method.md`, §1.2a).
-- **Мера расхождения диаграмм одна — bottleneck.** Wasserstein в проекте не считается
-  и больше не обещан. Если Задаче 2 понадобится он, `persim.wasserstein` доступен
-  в зависимостях, но границы устойчивости из §4.1 сформулированы для bottleneck и на
-  него не переносятся.
-- **Воспроизводимость Рёсслера — в пределах одной среды.** При $c = 5.7$ система хаотична,
-  и смена версии scipy, метода или допусков уводит ряд целиком. Для семейства 2 это
-  неактуально: там `solve_ivp` не участвует.
+- **Which cases set the boundaries of the criterion's plateau** — still not recorded. One
+  boundary is known: the $\beta_k = 0$ branch fails when exactly one bar survives above the
+  noise floor and there is nothing to compare it with (`method.md`, §1.2a).
+- **There is one measure of diagram discrepancy — bottleneck.** Wasserstein is not computed in
+  the project and is no longer promised. If Task 2 needs it, `persim.wasserstein` is available
+  among the dependencies, but the stability bounds of §4.1 are stated for bottleneck and do not
+  carry over to it.
+- **Rössler reproducibility holds within one environment.** At $c = 5.7$ the system is
+  chaotic, and a change of scipy version, method or tolerances moves the whole series. This
+  does not concern family 2: `solve_ivp` plays no part there.
 
-## 7. Где что искать
+## 7. Where to look
 
 | | |
 |---|---|
-| `docs/method.md` §2 | конструкции семейства 2, конвенции, парность |
-| `docs/method.md` §1.2a | критерий значимости, его калибровка и границы |
-| `docs/validation.md` §3 | обязательные тесты, в том числе те, что ловят эти ловушки |
-| `docs/data.md` §4 | схема истины, `truth_kind`, `edge_rule` |
-| `tests/test_dynamic_events.py` | как сверять скачки кривой с логом событий |
+| `docs/method.md` §2 | family-2 constructions, conventions, pairing |
+| `docs/method.md` §1.2a | the significance criterion, its calibration and limits |
+| `docs/validation.md` §3 | mandatory tests, including those that catch these traps |
+| `docs/data.md` §4 | truth schema, `truth_kind`, `edge_rule` |
+| `tests/test_dynamic_events.py` | how to match curve jumps against the event log |

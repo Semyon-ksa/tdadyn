@@ -1,925 +1,894 @@
-# Метод: конструкции, формулы, эталонные значения
+# Method: constructions, formulas, reference values
 
-## 0. Обозначения
+## 0. Notation
 
-### Топология
+### Topology
 
-| Символ | Значение | Пояснение |
+| Symbol | Meaning | Explanation |
 |---|---|---|
-| $S^n$ | $n$-мерная сфера | Индекс — размерность **поверхности**, не объемлющего пространства. $S^1$ — окружность в $\mathbb{R}^2$; $S^2$ — сферическая оболочка в $\mathbb{R}^3$ (без внутренности, отсюда $\beta_2=1$) |
-| $T^2$ | Тор | Поверхность бублика, двумерна |
-| $H_k$ | $k$-я группа гомологий | $H_k = \ker\partial_k / \operatorname{im}\partial_{k+1}$ |
-| $\beta_k$ | $k$-е число Бетти | $\beta_k = \dim H_k$ — количество независимых дырок размерности $k$: $\beta_0$ компоненты, $\beta_1$ петли, $\beta_2$ полости |
-| $\partial_k$ | Граничный оператор | Сопоставляет $k$-симплексу его границу. Для $H_2$ необходим $\partial_3$, то есть 3-симплексы |
-| $\mathrm{VR}_\varepsilon(X)$ | Комплекс Вьеториса–Рипса | Флаг-комплекс графа близости при масштабе $\varepsilon$ |
-| $X$, $d$, $\mathrm{diam}(X)$ | Облако точек, евклидово расстояние, диаметр | $\mathrm{diam}(X)=\max_{i,j} d(x_i,x_j)$ |
+| $S^n$ | $n$-dimensional sphere | The index is the dimension of the **surface**, not of the ambient space. $S^1$ is a circle in $\mathbb{R}^2$; $S^2$ is a spherical shell in $\mathbb{R}^3$ (without the interior, hence $\beta_2=1$) |
+| $T^2$ | Torus | The surface of a doughnut, two-dimensional |
+| $H_k$ | $k$-th homology group | $H_k = \ker\partial_k / \operatorname{im}\partial_{k+1}$ |
+| $\beta_k$ | $k$-th Betti number | $\beta_k = \dim H_k$ — the number of independent holes of dimension $k$: $\beta_0$ components, $\beta_1$ loops, $\beta_2$ cavities |
+| $\partial_k$ | Boundary operator | Maps a $k$-simplex to its boundary. $H_2$ requires $\partial_3$, i.e. 3-simplices |
+| $\mathrm{VR}_\varepsilon(X)$ | Vietoris–Rips complex | The flag complex of the proximity graph at scale $\varepsilon$ |
+| $X$, $d$, $\mathrm{diam}(X)$ | Point cloud, Euclidean distance, diameter | $\mathrm{diam}(X)=\max_{i,j} d(x_i,x_j)$ |
 
-### Графы
+### Graphs
 
-| Символ | Значение |
+| Symbol | Meaning |
 |---|---|
-| $K_n$ | Полный граф на $n$ вершинах (все соединены со всеми). $K_4$ — 4 вершины, 6 рёбер |
-| $K_{n_1,n_2,\dots}$ | Полный многодольный граф: рёбра между долями, внутри доли — нет. $K_{2,2,2}$ = октаэдр |
-| $G(t)$, $G_i$ | Снимок динамического графа в момент $t$ (индекс $i$) |
-| $m$, $n$, $c$ | Число рёбер, вершин, компонент связности |
+| $K_n$ | Complete graph on $n$ vertices (everyone connected to everyone). $K_4$ — 4 vertices, 6 edges |
+| $K_{n_1,n_2,\dots}$ | Complete multipartite graph: edges between parts, none within a part. $K_{2,2,2}$ = octahedron |
+| $G(t)$, $G_i$ | Snapshot of a dynamic graph at time $t$ (index $i$) |
+| $m$, $n$, $c$ | Number of edges, vertices, connected components |
 
-### Комплексы и фильтрации
+### Complexes and filtrations
 
-| Символ | Значение |
+| Symbol | Meaning |
 |---|---|
-| $K$, $K_i$ | Симплициальный комплекс (от нем. *Komplex*). $K_i$ — комплекс, построенный по снимку $G_i$ |
-| $K_i \hookrightarrow K_i \cup K_{i+1} \hookleftarrow K_{i+1}$ | Union-зигзаг: включения с чередованием направления |
-| $w$, $\tau$ | Параметры бифильтрации: сила связи и временная стабильность |
+| $K$, $K_i$ | Simplicial complex (from German *Komplex*). $K_i$ is the complex built from snapshot $G_i$ |
+| $K_i \hookrightarrow K_i \cup K_{i+1} \hookleftarrow K_{i+1}$ | Union zigzag: inclusions with alternating direction |
+| $w$, $\tau$ | Bifiltration parameters: coupling strength and temporal stability |
 
-### Внимание: буква K занята трижды
+### Warning: the letter K is taken three times
 
-В проекте она означает **полный граф** ($K_4$), **симплициальный комплекс** ($K_i$) и
-**константу связи в модели Курамото** (`K` в `config.yaml`). В формулах контекст разводит
-эти смыслы, в коде — нет. Поэтому в идентификаторах буква K не используется:
+In the project it means the **complete graph** ($K_4$), a **simplicial complex** ($K_i$) and the
+**coupling constant of the Kuramoto model** (`K` in `config.yaml`). In formulas context separates
+these meanings; in code it does not. So the letter K is not used in identifiers:
 
-| Смысл | Как называть в коде |
+| Meaning | What to call it in code |
 |---|---|
-| Полный граф | `complete_graph(n)` |
-| Полный многодольный | `complete_multipartite_graph([2, 2, 2])` |
-| Симплициальный комплекс снимка | `snapshot_complex`, `complex_at(t)` |
-| Константа связи Курамото | `coupling_strength` |
-| Размерность гомологий | `hom_dim`, `k` допустим только как индекс цикла |
+| Complete graph | `complete_graph(n)` |
+| Complete multipartite | `complete_multipartite_graph([2, 2, 2])` |
+| Simplicial complex of a snapshot | `snapshot_complex`, `complex_at(t)` |
+| Kuramoto coupling constant | `coupling_strength` |
+| Homology dimension | `hom_dim`, `k` is allowed only as a loop index |
 
 ---
 
-## 1. Семейство 1: статические облака с известной топологией
+## 1. Family 1: static clouds with known topology
 
-Схема общая для всех генераторов:
+The scheme common to all generators:
 
-1. выбрать $N$ точек с многообразия $M$ (по возможности равномерно по площади/длине);
-2. добавить гауссов шум $\mathcal{N}(0,\sigma^2 I)$ в объемлющем пространстве;
-3. матрица попарных расстояний → фильтрация Вьеториса–Рипса → диаграмма персистентности;
-4. сравнить число значимых баров в каждой размерности с эталонной таблицей.
+1. choose $N$ points on a manifold $M$ (as uniformly by area/length as possible);
+2. add Gaussian noise $\mathcal{N}(0,\sigma^2 I)$ in the ambient space;
+3. pairwise distance matrix → Vietoris–Rips filtration → persistence diagram;
+4. compare the number of significant bars in each dimension with the reference table.
 
-### 1.1. Параметризации
+### 1.1. Parametrisations
 
-**Окружность $S^1$** $\subset\mathbb{R}^2$: $\theta\sim U(0,2\pi)$, $(r\cos\theta, r\sin\theta)$.
-Равномерно по $\theta$ = равномерно по длине дуги.
+**Circle $S^1$** $\subset\mathbb{R}^2$: $\theta\sim U(0,2\pi)$, $(r\cos\theta, r\sin\theta)$.
+Uniform in $\theta$ = uniform in arc length.
 
-**Две непересекающиеся окружности:** две копии $S^1$ радиуса $r$ с центрами на расстоянии
-$s > 2r$. Параметр $s$ задаёт «время жизни» второй компоненты в $H_0$.
+**Two disjoint circles:** two copies of $S^1$ of radius $r$ with centres at distance $s > 2r$.
+The parameter $s$ sets the "lifetime" of the second component in $H_0$.
 
-**Восьмёрка (клин двух окружностей):** лемниската,
-$x = \cos t$, $y = \sin t\cos t$, $t\sim U(0,2\pi)$; либо `tadasets.infty_sign`.
-Внимание: равномерность по $t$ не даёт равномерности по длине дуги — плотность падает
-у точки самопересечения. Допустимо, но должно быть отмечено в метаданных.
+**Figure eight (wedge of two circles):** the lemniscate, $x = \cos t$, $y = \sin t\cos t$,
+$t\sim U(0,2\pi)$; or `tadasets.infty_sign`. Note: uniformity in $t$ does not give uniformity in
+arc length — the density drops near the self-intersection point. Acceptable, but must be noted in
+the metadata.
 
-**Тор $T^2$** $\subset\mathbb{R}^3$:
+**Torus $T^2$** $\subset\mathbb{R}^3$:
 $$((R + r\cos\varphi)\cos\theta,\ (R + r\cos\varphi)\sin\theta,\ r\sin\varphi),\quad R > r.$$
-Наивная выборка $\theta,\varphi\sim U(0,2\pi)$ **не** равномерна по площади: элемент площади
-пропорционален $(R + r\cos\varphi)$, поэтому внутренний обод оказывается пересэмплирован.
-Нужна выборка с отклонением (rejection sampling): принять $\varphi$ с вероятностью
-$(R + r\cos\varphi)/(R + r)$. Неравномерность искажает фильтрацию и способна съесть бар $\beta_2$.
+Naive sampling $\theta,\varphi\sim U(0,2\pi)$ is **not** uniform by area: the area element is
+proportional to $(R + r\cos\varphi)$, so the inner rim is oversampled. Rejection sampling is
+needed: accept $\varphi$ with probability $(R + r\cos\varphi)/(R + r)$. Non-uniformity distorts
+the filtration and can eat the $\beta_2$ bar.
 
-**Сфера $S^2$:** метод Мюллера — взять $g\sim\mathcal{N}(0,I_3)$ и нормировать $g/\|g\|$.
-Наивная выборка равномерных сферических углов сгущает точки у полюсов.
+**Sphere $S^2$:** Muller's method — take $g\sim\mathcal{N}(0,I_3)$ and normalise $g/\|g\|$. Naive
+sampling of uniform spherical angles clusters points at the poles.
 
-**Бутылка Клейна.** Вложение в $\mathbb{R}^4$ (в $\mathbb{R}^3$ существует лишь погружение
-с самопересечением, что портит ground-truth). Принята «трубчатая» параметризация,
-$u, v \in [0, 2\pi)$, параметры $a > b > 0$:
+**Klein bottle.** An embedding in $\mathbb{R}^4$ (in $\mathbb{R}^3$ there is only an immersion with
+self-intersection, which spoils the ground truth). The "tubular" parametrisation is adopted,
+$u, v \in [0, 2\pi)$, parameters $a > b > 0$:
 $$x = (a + b\cos v)\cos u,\quad y = (a + b\cos v)\sin u,$$
 $$z = b\sin v\,\cos\tfrac{u}{2},\quad w = b\sin v\,\sin\tfrac{u}{2}.$$
 
-Отображение корректно факторизуется через отождествление $(u,v) \sim (u + 2\pi,\,-v)$,
-то есть это именно бутылка Клейна, а не тор: проверено численно (расхождение порядка
-$10^{-15}$), самопересечений нет. Условие $a > b$ обязательно, иначе множитель
-$(a + b\cos v)$ обращается в ноль и поверхность вырождается.
+The map factors correctly through the identification $(u,v) \sim (u + 2\pi,\,-v)$, i.e. it is
+indeed a Klein bottle and not a torus: checked numerically (discrepancy of order $10^{-15}$), no
+self-intersections. The condition $a > b$ is mandatory, otherwise the factor $(a + b\cos v)$
+vanishes and the surface degenerates.
 
-**Сэмплирование — rejection, как у тора.** Здесь $|\partial_v| = b$ постоянна и
-$\partial_u \perp \partial_v$, поэтому элемент площади равен
+**Sampling — rejection, as for the torus.** Here $|\partial_v| = b$ is constant and
+$\partial_u \perp \partial_v$, so the area element equals
 $$b\,\sqrt{(a + b\cos v)^2 + \tfrac{b^2\sin^2 v}{4}}.$$
-При $a=1.8$, $b=1.0$ он меняется по $v$ от 0.8 до 2.8 — в 3.5 раза, так что наивная
-выборка $v \sim U(0,2\pi)$ неравномерна по площади. Замер: rejection увеличивает разрыв
-в $H_2$ с 4.19x до 5.31x (600 точек).
+At $a=1.8$, $b=1.0$ it varies in $v$ from 0.8 to 2.8 — a factor of 3.5, so naive sampling
+$v \sim U(0,2\pi)$ is not uniform by area. Measured: rejection increases the gap in $H_2$ from
+4.19x to 5.31x (600 points).
 
-**Зацепление Хопфа:** окружность 1 в плоскости $xy$ с центром в начале координат,
-окружность 2 в плоскости $xz$ с центром $(r,0,0)$ — они сцеплены, но не пересекаются.
+**Hopf link:** circle 1 in the $xy$ plane centred at the origin, circle 2 in the $xz$ plane centred
+at $(r,0,0)$ — they are linked but do not intersect.
 
-### 1.2. Эталонные числа Бетти (коэффициенты Z/2)
+### 1.2. Reference Betti numbers (Z/2 coefficients)
 
-| Объект | β₀ | β₁ | β₂ | Примечание |
+| Object | β₀ | β₁ | β₂ | Note |
 |---|---|---|---|---|
-| Окружность $S^1$ | 1 | 1 | 0 | базовый тест |
-| Две непересекающиеся окружности | 2 | 2 | 0 | тест на $H_0$ |
-| Восьмёрка (клин двух окружностей) | 1 | 2 | 0 | плотность у самопересечения |
-| Тор $T^2$ | 1 | 2 | 1 | нужен rejection sampling |
-| Сфера $S^2$ | 1 | 0 | 1 | тест на $H_2$ без $H_1$ |
-| Зацепление Хопфа | **2** | 2 | 0 | см. предупреждение ниже |
-| Бутылка Клейна ($\mathbb{Z}/2$) | 1 | 2 | 1 | **только** над $\mathbb{Z}/2$ |
-| Бутылка Клейна ($\mathbb{Q}$ или $\mathbb{Z}/3$) | 1 | 1 | 0 | при характеристике $\ne 2$ кручение не видно |
+| Circle $S^1$ | 1 | 1 | 0 | basic test |
+| Two disjoint circles | 2 | 2 | 0 | test of $H_0$ |
+| Figure eight (wedge of two circles) | 1 | 2 | 0 | density near the self-intersection |
+| Torus $T^2$ | 1 | 2 | 1 | needs rejection sampling |
+| Sphere $S^2$ | 1 | 0 | 1 | test of $H_2$ without $H_1$ |
+| Hopf link | **2** | 2 | 0 | see the warning below |
+| Klein bottle ($\mathbb{Z}/2$) | 1 | 2 | 1 | **only** over $\mathbb{Z}/2$ |
+| Klein bottle ($\mathbb{Q}$ or $\mathbb{Z}/3$) | 1 | 1 | 0 | in characteristic $\ne 2$ torsion is invisible |
 
-**Предупреждение про зацепление Хопфа.** Две сцепленные окружности имеют ровно те же
-гомологии, что и две разъединённые: $\beta = (2,2,0)$. Зацепление — свойство вложения,
-а не гомотопического типа, и персистентными гомологиями пространства оно не различается.
-Поэтому набор используется как **геометрический стресс-тест** (пайплайн не должен
-преждевременно склеивать две компоненты, проходящие близко друг к другу), а не как
-источник отдельной топологической подписи. Ожидать здесь $\beta_0 = 1$ — ошибка.
+**Warning about the Hopf link.** Two linked circles have exactly the same homology as two unlinked
+ones: $\beta = (2,2,0)$. Linking is a property of the embedding, not of the homotopy type, and
+persistent homology of the space does not distinguish it. So the dataset is used as a **geometric
+stress test** (the pipeline must not prematurely glue together two components passing close to
+each other), not as a source of a separate topological signature. Expecting $\beta_0 = 1$ here is
+an error.
 
-**Предупреждение про поле коэффициентов.** Бутылка Клейна над $\mathbb{Z}/2$ даёт
-$(1,2,1)$, над $\mathbb{Q}$ — $(1,1,0)$. Причина — кручение в $H_1$: у бутылки Клейна есть
-петля, которая сама границей не является, но пройденная дважды — становится ею. Над
-$\mathbb{Z}/2$ коэффициент 2 равен нулю, и эта петля видна как отдельный класс; при
-характеристике поля, отличной от 2, она не обнаруживается. Ни один из ответов не
-«правильнее» — они отвечают на разные вопросы.
+**Warning about the coefficient field.** The Klein bottle over $\mathbb{Z}/2$ gives $(1,2,1)$, over
+$\mathbb{Q}$ $(1,1,0)$. The reason is torsion in $H_1$: the Klein bottle has a loop that is not
+itself a boundary but becomes one when traversed twice. Over $\mathbb{Z}/2$ the coefficient 2 is
+zero, and this loop is visible as a separate class; in a field of characteristic other than 2 it is
+not detected. Neither answer is "more correct" — they answer different questions.
 
-**Важно для реализации:** ripser и gudhi считают только над $\mathbb{Z}/p$ для простого
-$p$; рациональных коэффициентов у них нет. Проверять строку «$\mathbb{Q}$» напрямую нельзя.
-Вместо этого берётся $p = 3$: при характеристике $\ne 2$ кручение не проявляется, и ответ
-совпадает с рациональным.
+**Important for the implementation:** ripser and gudhi compute only over $\mathbb{Z}/p$ for prime
+$p$; they have no rational coefficients. The "$\mathbb{Q}$" row cannot be checked directly. Instead
+$p = 3$ is used: in characteristic $\ne 2$ torsion does not show, and the answer coincides with the
+rational one.
 
-**Решение по эталону (принято, не пересматривать без обсуждения).** Эталонная реализация
-слоя 1 работает **только над $\mathbb{Z}/2$**: сложение строк — XOR, деление не нужно,
-код остаётся коротким и прозрачным, а это его единственное назначение. Обобщение на
-произвольное $p$ потребовало бы гауссова исключения с обратными элементами по модулю $p$
-и усложнило бы ровно тот компонент, простота которого и делает его заслуживающим доверия.
+**Decision on the reference (adopted, not to be revisited without discussion).** The reference
+implementation of layer 1 works **only over $\mathbb{Z}/2$**: row addition is XOR, no division is
+needed, the code stays short and transparent, and that is its only purpose. Generalising to an
+arbitrary $p$ would require Gaussian elimination with inverses modulo $p$ and would complicate
+exactly the component whose simplicity makes it trustworthy.
 
-Следствие: **случай $p = 3$ проверяется только основным пайплайном (ripser), без
-независимого подтверждения.** Это осознанная потеря. Она допустима, потому что $p=3$
-играет здесь вспомогательную роль — показать, что ответ зависит от поля, — тогда как
-рабочее поле проекта $\mathbb{Z}/2$ покрыто двойной проверкой полностью. Тест при $p=3$
-трактуется как проверка *согласованности* (параметр поля действительно доходит до
-вычислений), а не как независимое подтверждение чисел Бетти. В докстринге эталона это
-ограничение указывается явно; при попытке вызвать его с $p \ne 2$ — явная ошибка,
-а не молчаливый расчёт над $\mathbb{Z}/2$.
+Consequence: **the case $p = 3$ is checked only by the main pipeline (ripser), without independent
+confirmation.** This is a deliberate loss. It is acceptable because $p=3$ plays an auxiliary role
+here — to show that the answer depends on the field — while the project's working field
+$\mathbb{Z}/2$ is fully covered by the double check. The test at $p=3$ is treated as a check of
+*consistency* (the field parameter does reach the computation), not as an independent confirmation
+of the Betti numbers. The reference's docstring states this limitation explicitly; an attempt to
+call it with $p \ne 2$ is an explicit error, not a silent computation over $\mathbb{Z}/2$.
 
-Поле фиксируется в `config.yaml` (`topology_check.coeff_field`), а ожидаемые значения
-хранятся с указанием поля. Датасет бутылки Клейна обязан валидироваться против таблицы
-для своего поля.
+The field is fixed in `config.yaml` (`topology_check.coeff_field`), and the expected values are
+stored with the field indicated. The Klein bottle dataset must be validated against the table for
+its field.
 
-### 1.2a. Критерий значимости: почему нормировка на diam неверна
+### 1.2a. Significance criterion: why normalising by diam is wrong
 
-Правило «бар значим, если $d - b \ge \texttt{significance\_ratio} \times \mathrm{diam}(X)$»
-оказалось систематически смещённым и даёт ошибки **в обе стороны**. Это установлено
-измерением, а не соображениями; числа ниже воспроизводимы.
+The rule "a bar is significant if $d - b \ge \texttt{significance\_ratio} \times \mathrm{diam}(X)$"
+turned out to be systematically biased, with errors **in both directions**. This was established by
+measurement, not by argument; the numbers below are reproducible.
 
-**Ложные отрицания на анизотропных объектах.** У тора $R{=}2.0$, $r{=}0.8$ полость $H_2$
-живёт на масштабе малого радиуса $r$, а порог нормирован на $\mathrm{diam}(X) = 2(R+r)$.
-При 400 точках бар $H_2$ равен 0.257 при пороге 0.851 — не проходит, хотя признак есть.
-Наращивание точек помогает медленно: 0.421 при 600, 0.738 при 1500. То же на бутылке
-Клейна над $\mathbb{Z}/2$ при 900 точках: бар 0.853 при пороге 0.857 — не проходит
-с запасом в полпроцента.
+**False negatives on anisotropic objects.** For the torus $R{=}2.0$, $r{=}0.8$ the $H_2$ cavity
+lives at the scale of the small radius $r$, while the threshold is normalised by
+$\mathrm{diam}(X) = 2(R+r)$. At 400 points the $H_2$ bar is 0.257 against a threshold of 0.851 —
+it fails, although the feature is there. More points help slowly: 0.421 at 600, 0.738 at 1500. The
+same on the Klein bottle over $\mathbb{Z}/2$ at 900 points: a bar of 0.853 against a threshold of
+0.857 — it fails by half a percent.
 
-**Ложные срабатывания на компактных объектах.** У сферы $S^2$ (400 точек) диаметр мал
-(2.12), порог равен 0.32, и шумовые бары в $H_1$ длиной 0.260, 0.256 и 0.254 стоят
-вплотную к нему; на части сидов они его проходят, и получается $(1,1,1)$ или $(1,2,1)$
-вместо $(1,0,1)$ — петли там, где их нет.
+**False positives on compact objects.** For the sphere $S^2$ (400 points) the diameter is small
+(2.12), the threshold is 0.32, and noise bars in $H_1$ of length 0.260, 0.256 and 0.254 sit right
+against it; on some seeds they pass, giving $(1,1,1)$ or $(1,2,1)$ instead of $(1,0,1)$ — loops
+where there are none.
 
-**Диаметр не разделяет сигнал и шум в принципе.** Шумовой бар сферы составляет 0.123
-диаметра, а полезный бар $H_2$ тора при 400 точках — 0.045 диаметра, то есть **втрое
-меньше шумового**. Диапазоны перекрываются, поэтому
-**никакой** общий порог, нормированный на диаметр, не даст верного ответа на обоих
-объектах одновременно. Это не вопрос настройки константы.
+**The diameter does not separate signal and noise in principle.** A noise bar of the sphere is
+0.123 of the diameter, while the useful $H_2$ bar of the torus at 400 points is 0.045 of the
+diameter, i.e. **three times smaller than the noise bar**. The ranges overlap, so **no** common
+threshold normalised by the diameter will give the right answer on both objects at once. This is
+not a matter of tuning a constant.
 
-**Разрыв в спектре разделяет их уверенно.** Если отсортировать персистентности внутри
-одной размерности по убыванию, у настоящего признака после него следует резкий обрыв,
-а шум идёт ровной лесенкой. Измеренные спектры при **рабочем** числе точек — тор
-$R{=}2$, $r{=}0.8$, 900 точек; сфера 400 (значения из `n_points_by_generator`):
+**A gap in the spectrum separates them confidently.** If the persistences within one dimension are
+sorted in decreasing order, a real feature is followed by a sharp drop, while noise goes in an even
+staircase. Spectra measured at the **working** number of points — torus $R{=}2$, $r{=}0.8$, 900
+points; sphere 400 (values from `n_points_by_generator`):
 
-| Размерность | Спектр | Отношения соседних |
+| Dimension | Spectrum | Ratios of neighbours |
 |---|---|---|
-| Тор $H_1$ (ожид. 2) | 1.813 1.034 0.477 0.431 | 1.75x **2.17x** 1.11x |
-| Тор $H_2$ (ожид. 1) | 0.641 0.107 0.095 0.095 | **6.01x** 1.12x 1.00x |
-| Сфера $H_1$ (ожид. 0) | 0.260 0.256 0.254 0.206 | 1.02x 1.01x 1.24x |
+| Torus $H_1$ (exp. 2) | 1.813 1.034 0.477 0.431 | 1.75x **2.17x** 1.11x |
+| Torus $H_2$ (exp. 1) | 0.641 0.107 0.095 0.095 | **6.01x** 1.12x 1.00x |
+| Sphere $H_1$ (exp. 0) | 0.260 0.256 0.254 0.206 | 1.02x 1.01x 1.24x |
 
-Таблица намеренно снята на рабочем размере, а не на 600 точках, как в первой редакции:
-при 600 наибольший разрыв в $H_1$ тора стоит на позиции 1 (1.76x против 1.54x), то есть
-на этом размере правило дало бы $\beta_1 = 1$. Это тот самый отказ, из-за которого ниже
-и принято 900 точек, — иллюстрировать им работу критерия было нельзя.
+The table was deliberately taken at the working size rather than at 600 points as in the first
+edition: at 600 the largest gap in the torus's $H_1$ stands at position 1 (1.76x against 1.54x),
+i.e. at that size the rule would give $\beta_1 = 1$. This is the very failure for which 900 points
+are adopted below — it could not be used to illustrate the criterion working.
 
-Наибольший разрыв стоит ровно на позиции, равной ожидаемому $\beta_k$; у сферы, где
-признаков нет, выраженного разрыва нет вовсе. С ростом числа точек разрыв усиливается
-(в $H_2$ тора: 3.99x при 600, 6.01x при 900, 7.18x при 1500).
+The largest gap stands exactly at the position equal to the expected $\beta_k$; for the sphere, which
+has no features, there is no pronounced gap at all. As the number of points grows the gap gets
+stronger (in the torus's $H_2$: 3.99x at 600, 6.01x at 900, 7.18x at 1500).
 
-**Почему нужен пол: наивное правило проваливается в хвосте.** Правило «резать по
-наибольшему разрыву во всём спектре», без отсечки пыли, непригодно. Среди сотен шумовых
-баров с длинами порядка $10^{-3}$ и мельче отношение соседних легко достигает пятикратного
-просто по случайности, и наибольший разрыв всего спектра оказывается глубоко в хвосте.
-Правило честно режет там и рапортует сотни признаков: измерено 398 при одном настоящем.
-Пол убирает пыль из конкурса, оставляя разрывы только между осмысленными кандидатами.
+**Why a floor is needed: the naive rule fails in the tail.** The rule "cut at the largest gap in the
+whole spectrum", without cutting off the dust, is unusable. Among hundreds of noise bars of length
+$10^{-3}$ and smaller, the ratio of neighbours easily reaches fivefold by chance alone, and the
+largest gap of the whole spectrum ends up deep in the tail. The rule honestly cuts there and reports
+hundreds of features: 398 measured against one real one. The floor removes the dust from the
+competition, leaving gaps only between meaningful candidates.
 
-**Случай $\beta_k = 0$: решён шагом в пыль.** Правило «резать по наибольшему разрыву»
-всегда возвращает не меньше одного признака, поэтому нужен механизм, дающий ноль на
-объекте без признаков. Он получается не добавлением отдельного порога, а расширением
-самого спектра: бары ниже шумового пола откладываются, и **шаг от последнего выжившего
-бара вниз, к первому отложенному, тоже считается разрывом**. Тогда спектр из $k$
-признаков, за которыми идёт пыль, имеет наибольший разрыв ровно на позиции $k$; спектр
-из одной ровной лесенки шума не имеет выраженного разрыва нигде, и правило возвращает
-ноль. Пол — доля диаметра, но это не возврат к старому правилу: при 0.07 диаметра он
-убирает лишь заведомую пыль, а полость тора и шумовые петли сферы его переживают, так
-что различает по-прежнему масштабно-инвариантная часть.
+**The case $\beta_k = 0$: solved by the step into the dust.** The rule "cut at the largest gap"
+always returns at least one feature, so a mechanism is needed that gives zero on an object without
+features. It is obtained not by adding a separate threshold but by extending the spectrum itself:
+bars below the noise floor are set aside, and **the step from the last surviving bar down to the
+first set-aside one also counts as a gap**. Then a spectrum of $k$ features followed by dust has its
+largest gap exactly at position $k$; a spectrum consisting of an even staircase of noise has no
+pronounced gap anywhere, and the rule returns zero. The floor is a fraction of the diameter, but this
+is not a return to the old rule: at 0.07 of the diameter it removes only obvious dust, while the
+torus's cavity and the sphere's noise loops survive it, so the scale-invariant part still does the
+discriminating.
 
-Без этого шага правило проваливает **две непересекающиеся окружности**: над полом
-остаются ровно два почти равных бара (1.473 и 1.453, отношение 1.01), разрыва между ними
-нет, и правило,
-смотрящее только на промежутки между выжившими, возвращает ноль петель вместо двух.
-Измерено: 18 промахов из 54 против нуля с учётом шага в пыль.
+Without this step the rule fails on **two disjoint circles**: exactly two nearly equal bars remain
+above the floor (1.473 and 1.453, ratio 1.01), there is no gap between them, and a rule looking only
+at gaps between survivors returns zero loops instead of two. Measured: 18 misses out of 54 against
+zero with the step into the dust.
 
-**Устойчивость разрыва требует 900 точек, а не 600.** При 600 точках позиция
-наибольшего разрыва в $H_1$ неустойчива по сидам: у тора отношения на позициях 1 и 2
-равны 1.73x и 1.62x, то есть наибольшим оказывается ложный, и $\beta_1$ выходит 1
-вместо 2; у бутылки Клейна над $\mathbb{Z}/2$ отношения 1.34x, 1.36x, 1.56x дают
-$\beta_1 = 3$. При 900 точках истинный разрез даёт 2.0–2.35x против случайных 1.3–1.65x
-на всех трёх калибровочных сидах. Различение сферы в $H_1$ (ожидается 0) от бутылки
-Клейна над $\mathbb{Z}/3$ (ожидается 1), которое при 400–600 точках было почти
-невозможно, при 900 разрешается тем же механизмом.
+**Stability of the gap requires 900 points, not 600.** At 600 points the position of the largest gap
+in $H_1$ is unstable across seeds: for the torus the ratios at positions 1 and 2 are 1.73x and 1.62x,
+i.e. the false one is largest, and $\beta_1$ comes out 1 instead of 2; for the Klein bottle over
+$\mathbb{Z}/2$ the ratios 1.34x, 1.36x, 1.56x give $\beta_1 = 3$. At 900 points the true cut gives
+2.0–2.35x against random 1.3–1.65x on all three calibration seeds. Telling the sphere in $H_1$
+(expected 0) from the Klein bottle over $\mathbb{Z}/3$ (expected 1), which was almost impossible at
+400–600 points, is resolved at 900 by the same mechanism.
 
-**Итог калибровки.** Правило верно на **всех 54 комбинациях** таблицы
-`docs/validation.md`, раздел 2 (9 случаев × 3 сида × 2 уровня шума). Принятые параметры
-взяты из центра области нулевых промахов, а не с её края: нуль держится при
-`gap_noise_floor_ratio` от 0.05 до 0.10 и `gap_min_ratio` от 1.45 до 1.62; принято
-0.07 и 1.55. Старое правило на той же таблице даёт 9 промахов.
+**Calibration result.** The rule is correct on **all 54 combinations** of the table in
+`docs/validation.md`, section 2 (9 cases × 3 seeds × 2 noise levels). The adopted parameters are
+taken from the centre of the zero-miss region, not from its edge: zero holds for
+`gap_noise_floor_ratio` from 0.05 to 0.10 and `gap_min_ratio` from 1.45 to 1.62; 0.07 and 1.55 were
+adopted. The old rule gives 9 misses on the same table.
 
-Плато по `gap_min_ratio` узкое — примерно $\pm 5\%$ вокруг принятого значения. Поэтому
-при добавлении в семейство 1 новых объектов критерий надо перепроверять: запас
-невелик, и новый объект способен сузить область до пустой. **Не зафиксировано, какие
-именно случаи задают каждую границу плато** — это следует дописать здесь при ближайшем
-прогоне калибровки. Знание того, какой объект упирается снизу, а какой сверху, — самое
-полезное, что можно иметь при расширении набора: оно сразу показывает, где сломается.
+The plateau in `gap_min_ratio` is narrow — about $\pm 5\%$ around the adopted value. So when new
+objects are added to family 1 the criterion must be rechecked: the margin is small, and a new object
+can shrink the region to nothing. **It is not recorded which cases set each boundary of the plateau**
+— this should be added here at the next calibration run. Knowing which object pushes from below and
+which from above is the most useful thing to have when extending the set: it shows at once where it
+will break.
 
-**У ветви $\beta_k = 0$ есть ненулевая частота ложных срабатываний.** Это первая настоящая
-проверка «шага в пыль» — той части правила, которая введена ради случая отсутствия
-признаков и до S8 ни на чём не проверялась. Измерено на равномерных облаках в
-$\mathbb{R}^3$, **на потоке случайности самого генератора**, 200 испытаний
-(10 сидов × `n_realizations`), ожидание $(1,0,0)$:
+**The $\beta_k = 0$ branch has a non-zero false positive rate.** This is the first real test of the
+"step into the dust" — the part of the rule introduced for the no-feature case, which before S8 had
+not been checked on anything. Measured on uniform clouds in $\mathbb{R}^3$, **on the generator's own
+random stream**, 200 trials (10 seeds × `n_realizations`), expectation $(1,0,0)$:
 
-| $n$ | Промахов | Частота | 95% сверху (Уилсон) |
+| $n$ | Misses | Rate | 95% upper (Wilson) |
 |---|---|---|---|
 | 200 | 12/200 | 6.0% | 10.2% |
 | 400 | 3/200 | **1.5%** | 4.3% |
 
-**Предостережение о размере выборки при калибровке.** Первая оценка была снята на
-60 испытаниях и на постороннем потоке и дала «плато около 2%, переход с 200 на 400 ничего
-не даёт». И то и другое оказалось шумом: при 60 испытаниях 1/60 и 4/60 статистически
-неразличимы, а на потоке генератора те же 200 точек дают 6%, то есть вчетверо больше, чем
-400. Правило то же, что и для самого критерия: **оценка частоты, снятая на десятках
-испытаний, ничего не показывает**, а поток, на котором она снята, обязан совпадать с тем,
-который потом строит наборы, — иначе измеряется другая выборка.
+**A caution about sample size in calibration.** The first estimate was taken on 60 trials and on a
+foreign stream and gave "a plateau around 2%, going from 200 to 400 gives nothing". Both turned out
+to be noise: at 60 trials 1/60 and 4/60 are statistically indistinguishable, and on the generator's
+stream the same 200 points give 6%, i.e. four times more than 400. The rule is the same as for the
+criterion itself: **a rate estimate taken on tens of trials shows nothing**, and the stream it is
+taken on must coincide with the one that then builds the datasets — otherwise a different sample is
+measured.
 
-Ориентировочно по разведочному прогону (60 испытаний, посторонний поток) частота при
-$n=60$ порядка 40% в $\mathbb{R}^3$ и 58% в $\mathbb{R}^2$; в плоскости та же частота
-требует примерно вдвое больше точек, чем в пространстве. Эти числа не уточнялись, потому
-что рабочий размер лежит далеко от них.
+Roughly, from an exploratory run (60 trials, foreign stream), the rate at $n=60$ is of order 40% in
+$\mathbb{R}^3$ and 58% in $\mathbb{R}^2$; in the plane the same rate needs about twice as many points
+as in space. These numbers were not refined, because the working size lies far from them.
 
-**Механизм остаточного отказа отличается от отказов при малом $n$.** При $n=60$ это лишние
-петли $(1,k,0)$ — обычный шум, который додавливается числом точек. Выживающий при $n=200$
-случай — лишняя полость $(1,0,1)$, и устроена она иначе: единственный бар $H_2$ имеет
-персистентность 0.110 при поле 0.108, то есть проходит пол на 2%, и **конкурента
-в своей размерности у него нет**. Правило разрыва сравнивает соседние значения; когда над
-полом остался ровно один бар, сравнивать не с чем, и одинокий выживший значим по
-построению. Для сравнения, в $H_1$ на том же облаке над полом стоят четыре бара
-с отношениями 1.09, 1.00, 1.01 — все ниже `gap_min_ratio`, и эта размерность честно даёт
-ноль.
+**The mechanism of the residual failure differs from the failures at small $n$.** At $n=60$ these are
+extra loops $(1,k,0)$ — ordinary noise, pushed down by the number of points. The case surviving at
+$n=200$ is an extra cavity $(1,0,1)$, and it works differently: the only $H_2$ bar has persistence
+0.110 against a floor of 0.108, i.e. it passes the floor by 2%, and **it has no competitor in its
+dimension**. The gap rule compares neighbouring values; when exactly one bar remains above the floor
+there is nothing to compare with, and the lone survivor is significant by construction. For
+comparison, in $H_1$ on the same cloud four bars stand above the floor with ratios 1.09, 1.00, 1.01 —
+all below `gap_min_ratio`, and this dimension honestly gives zero.
 
-То есть отказ возникает не там, где шума много, а там, где его ровно столько, что уцелел
-один-единственный бар. Это цена конструкции «шаг в пыль», а не дефект реализации:
-требование, чтобы одинокий выживший тоже проходил разрыв в `gap_min_ratio` раз, убрало бы
-этот случай, но изменило бы откалиброванный критерий и потребовало бы перепрогона всей
-таблицы из `docs/validation.md` §2 — с риском для бара $H_2$ тора, который там и так
-самый тесный.
+That is, the failure arises not where there is a lot of noise but where there is exactly enough of it
+for one single bar to survive. This is the price of the "step into the dust" construction, not an
+implementation defect: requiring the lone survivor to pass a gap of `gap_min_ratio` too would remove
+this case, but would change the calibrated criterion and require rerunning the whole table of
+`docs/validation.md` §2 — at a risk to the torus's $H_2$ bar, which is the tightest there already.
 
-**Практическое следствие.** Нулевой набор не может утверждать «ноль промахов»; он
-позволяет частоту измерить. Порог в `config.yaml`
-(`null_models.max_false_positive_rate`) взят выше 95%-границы истинной частоты (4.3%),
-а не выше наблюдённого на калибровочных сидах нуля: на 60 испытаниях ноль промахов
-совместим с частотой в несколько процентов, и порог, поставленный по нему, был бы
-утверждением, которого измерение не подтверждает.
+**Practical consequence.** A null dataset cannot claim "zero misses"; it allows the rate to be
+measured. The threshold in `config.yaml` (`null_models.max_false_positive_rate`) is set above the
+95% bound of the true rate (4.3%), not above the zero observed on the calibration seeds: at 60 trials
+zero misses is compatible with a rate of several percent, and a threshold set by it would be a claim
+the measurement does not support.
 
-**Область применимости параметров: только семейство 1.** Значения 0.07 и 1.55
-откалиброваны на облаках точек в $\mathbb{R}^3$ и $\mathbb{R}^4$ с известной топологией.
-Переносить их на другие типы данных без повторной калибровки нельзя, и в первую очередь
-это касается Задачи 3, где тот же аппарат поедет на функциональные коннектомы:
+**Scope of the parameters: family 1 only.** The values 0.07 and 1.55 were calibrated on point clouds
+in $\mathbb{R}^3$ and $\mathbb{R}^4$ with known topology. They must not be transferred to other data
+types without recalibration, and this concerns above all Task 3, where the same apparatus is applied
+to functional connectomes:
 
-- распределение попарных расстояний у матрицы связности принципиально иное, чем
-  у выборки с гладкого многообразия, поэтому и доля диаметра, отделяющая пыль, будет
-  другой;
-- сам приём калибровки там недоступен: на реальном коннектоме нет известного
-  $\beta_k$, относительно которого проверялось бы, что разрез встал на верную позицию.
+- the distribution of pairwise distances for a connectivity matrix is fundamentally different from
+  that of a sample from a smooth manifold, so the fraction of the diameter that separates dust will
+  be different too;
+- the calibration technique itself is unavailable there: a real connectome has no known $\beta_k$
+  against which to check that the cut landed at the right position.
 
-Практическое следствие: значения из `topology_check` — параметры **валидационного
-харнесса синтетики**, а не универсальная настройка пайплайна. В Задаче 3 значимость
-определяется по-своему (нулевые модели, перестановочные тесты, сравнение с ансамблем
-случайных графов), и наследовать эти два числа молча — ошибка.
+Practical consequence: the values in `topology_check` are parameters of the **synthetic validation
+harness**, not a universal pipeline setting. In Task 3 significance is determined in its own way
+(null models, permutation tests, comparison with an ensemble of random graphs), and inheriting these
+two numbers silently is an error.
 
-### 1.3. Из облака во взвешенную сеть
+### 1.3. From a cloud to a weighted network
 
-Два способа, оба нужны:
+Two ways, both needed:
 
-- **Гауссово ядро сходства:** $w_{ij} = \exp(-d_{ij}^2 / 2\sigma^2)$ — даёт полносвязную
-  взвешенную сеть, то есть тот же тип объекта, что коннектом (Задача 3).
-- **Взвешенный $k$-NN-граф с геодезической метрикой:** расстояния — кратчайшие пути по
-  $k$-NN-графу с евклидовыми весами рёбер (конструкция Isomap). Это приближение
-  **внутренней метрики многообразия**, а не евклидовой.
+- **Gaussian similarity kernel:** $w_{ij} = \exp(-d_{ij}^2 / 2\sigma^2)$ — gives a fully connected
+  weighted network, i.e. the same type of object as a connectome (Task 3).
+- **Weighted $k$-NN graph with a geodesic metric:** distances are shortest paths in the $k$-NN graph
+  with Euclidean edge weights (the Isomap construction). This approximates the **intrinsic metric of
+  the manifold**, not the Euclidean one.
 
-**$k$-NN — не средство контроля сложности.** Прежняя формулировка («разреженная
-альтернатива для контроля сложности») неверна и заменена. Кратчайшие пути дают
-**плотную** матрицу расстояний $n \times n$, поэтому комплекс Рипса поверх неё ровно
-такого же размера, как на евклидовых расстояниях, — экономии нет. Сложность
-контролируется другими средствами, описанными в 1.2: edge collapse, разреженный Rips,
-ограничение размерности гомологий. Ценность геодезики в другом: на искривлённых
-многообразиях внутренняя метрика отражает их устройство точнее объемлющей.
+**$k$-NN is not a means of controlling complexity.** The earlier wording ("a sparse alternative for
+controlling complexity") is wrong and has been replaced. Shortest paths give a **dense** $n \times n$
+distance matrix, so the Rips complex over it is exactly as large as on Euclidean distances — there is
+no saving. Complexity is controlled by other means described in 1.2: edge collapse, sparse Rips,
+limiting the homology dimension. The value of geodesics is elsewhere: on curved manifolds the
+intrinsic metric reflects their structure more faithfully than the ambient one.
 
-**Параметр $k$ работает в окне, а не «чем больше, тем лучше».** Снизу граф распадается
-на компоненты, и часть геодезических расстояний становится бесконечной. Сверху наступает
-**короткое замыкание** (известный отказ Isomap): появляются рёбра-хорды, срезающие
-поперёк дырок, и внутренняя метрика вырождается в объемлющую. Измерено на торе
-(400 точек, евклидов диаметр 5.71):
+**The parameter $k$ works in a window, not "the larger the better".** From below the graph falls apart
+into components, and some geodesic distances become infinite. From above **short-circuiting** sets in
+(a known failure of Isomap): chord edges cutting across the holes appear, and the intrinsic metric
+degenerates into the ambient one. Measured on the torus (400 points, Euclidean diameter 5.71):
 
 | $k$ | 8 | 15 | 30 | 60 | 120 | 250 |
 |---|---|---|---|---|---|---|
 | $\mathrm{diam}_{geo}$ | 7.72 | 7.26 | 6.97 | 6.52 | 5.99 | 5.72 |
 
-Геодезический диаметр монотонно сползает к евклидову и при $k=250$ совпадает с ним
-с точностью 0.2%: граф стал практически полным. Отсюда дешёвый сторож, не требующий
-персистентных вычислений, — отношение $\mathrm{diam}_{geo}/\mathrm{diam}_{euclid}$:
-приближение к единице означает вырождение метрики.
+The geodesic diameter slides monotonically towards the Euclidean one and at $k=250$ matches it to
+within 0.2%: the graph has become practically complete. Hence a cheap guard that needs no persistent
+computations — the ratio $\mathrm{diam}_{geo}/\mathrm{diam}_{euclid}$: approaching one means the
+metric has degenerated.
 
-**Симметризация.** $k$-NN-граф по природе направленный ($j$ входит в число $k$ ближайших
-к $i$, но не обязательно наоборот). Принято **объединение**: ребро есть, если хотя бы
-один из двух считает другого соседом. Оно даёт связность при меньшем $k$, чем
-пересечение, и потому расширяет рабочее окно снизу. Правило фиксируется в конфиге.
+**Symmetrisation.** A $k$-NN graph is directed by nature ($j$ is among the $k$ nearest to $i$, but not
+necessarily vice versa). **Union** is adopted: an edge exists if at least one of the two considers the
+other a neighbour. It gives connectivity at a smaller $k$ than intersection, and so widens the working
+window from below. The rule is fixed in the config.
 
-**Связность обязательна.** При несвязном графе часть расстояний бесконечна, и
-персистентные вычисления получат мусор. Проверка связности — явная, с внятной ошибкой,
-а не молчаливой заменой бесконечностей большим числом.
+**Connectivity is mandatory.** With a disconnected graph some distances are infinite, and persistent
+computations get garbage. The connectivity check is explicit, with a clear error, not a silent
+replacement of infinities by a large number.
 
-**Геодезическая метрика по k-NN неприменима к несвязным пространствам.** Требование
-связности графа вынуждает соединять компоненты мостами, а $m$ мостов порождают $(m-1)$
-лишних циклов: $\beta_1 = 2 + (m-1)$ для двух циклов. Проверено на флаг-комплексе
-эталонной реализацией — два непересекающихся 6-цикла, мосты между несмежными парами:
+**The geodesic metric over k-NN does not apply to disconnected spaces.** Requiring a connected graph
+forces bridges between components, and $m$ bridges create $(m-1)$ extra cycles: $\beta_1 = 2 + (m-1)$
+for two cycles. Checked on the flag complex by the reference implementation — two disjoint 6-cycles,
+bridges between non-adjacent pairs:
 
-| Мостов $m$ | 0 | 1 | 2 | 3 | 4 |
+| Bridges $m$ | 0 | 1 | 2 | 3 | 4 |
 |---|---|---|---|---|---|
 | $\beta$ | (2,2,0) | (1,2,0) | (1,3,0) | (1,4,0) | (1,5,0) |
 
-Долговечность этих артефактов определяется тем, насколько близко подходят компоненты:
-у разнесённых объектов они короткоживущие и отсекаются полом, у близко проходящих —
-конкурируют с настоящими признаками. Зацепление Хопфа — предельный случай: компоненты
-проходят вплотную, поэтому **ни одна настройка $k$ не даёт верного ответа**.
+The longevity of these artefacts is determined by how close the components come: for well-separated
+objects they are short-lived and cut off by the floor, for objects passing close they compete with the
+real features. The Hopf link is the limiting case: the components pass right next to each other, so
+**no setting of $k$ gives the right answer**.
 
-Измеренное подтверждение обоих полюсов. Отношение $\mathrm{diam}_{geo}/\mathrm{diam}$ по
-трём калибровочным сидам, оба уровня шума; «разрыв» — граф несвязен, «!» — сработал
-сторож 1.10:
+Measured confirmation of both poles. The ratio $\mathrm{diam}_{geo}/\mathrm{diam}$ over the three
+calibration seeds, both noise levels; "disconnected" means the graph is disconnected, "!" means the
+1.10 guard fired:
 
 | $k$ | 60 | 80 | 100 | 120 |
 |---|---|---|---|---|
-| Две окружности, сид 20260201 | 1.35 / 1.26 | 1.26 / 1.18 | 1.21 / 1.15 | 1.17 / 1.12 |
-| Две окружности, сид 7 | разрыв | 1.27 / 1.19 | 1.21 / 1.15 | 1.14 / **1.09!** |
-| Две окружности, сид 99 | разрыв | 1.28 / 1.20 | 1.22 / 1.15 | 1.15 / **1.09!** |
-| Хопф, сид 20260201 | 1.47 / 1.15 | **1.01!** | **1.00!** | **1.00!** |
-| Хопф, сид 7 | 1.39 / 1.24 | **1.00!** | **1.00!** | **1.00!** |
-| Хопф, сид 99 | 1.38 / 1.23 | **1.02!** | **1.01!** | **1.01!** |
+| Two circles, seed 20260201 | 1.35 / 1.26 | 1.26 / 1.18 | 1.21 / 1.15 | 1.17 / 1.12 |
+| Two circles, seed 7 | disconnected | 1.27 / 1.19 | 1.21 / 1.15 | 1.14 / **1.09!** |
+| Two circles, seed 99 | disconnected | 1.28 / 1.20 | 1.22 / 1.15 | 1.15 / **1.09!** |
+| Hopf, seed 20260201 | 1.47 / 1.15 | **1.01!** | **1.00!** | **1.00!** |
+| Hopf, seed 7 | 1.39 / 1.24 | **1.00!** | **1.00!** | **1.00!** |
+| Hopf, seed 99 | 1.38 / 1.23 | **1.02!** | **1.01!** | **1.01!** |
 
-Две окружности разнесены на 1.0 при радиусе 1.0, поэтому мостовые циклы у них
-короткоживущие: окно $k = 80\ldots100$ существует, принято 100. У зацепления Хопфа
-окружности проходят вплотную, мостовые циклы живут долго, и в $H_1$ появляется третий
-бар 0.44–0.54 при первых двух 1.3–1.8 — лишний класс, который критерий не отличает от
-настоящих. Ни при каком $k$ ответ не становится верным, поэтому набор исключён из
-геодезической таблицы. На евклидовой метрике он проходит: граница здесь принадлежит
-конструкции, а не объекту.
+The two circles are 1.0 apart at radius 1.0, so their bridge cycles are short-lived: a window
+$k = 80\ldots100$ exists, 100 is adopted. In the Hopf link the circles pass right next to each other,
+the bridge cycles live long, and a third bar of 0.44–0.54 appears in $H_1$ next to the first two of
+1.3–1.8 — an extra class the criterion cannot tell from the real ones. At no $k$ does the answer
+become right, so the dataset is excluded from the geodesic table. On the Euclidean metric it passes:
+the limitation belongs to the construction, not to the object.
 
-**Окно по $k$ при рабочем числе точек.** Измерено на торе и бутылке Клейна (900 точек,
-`union`, критерий с евклидовыми параметрами):
+**The window in $k$ at the working number of points.** Measured on the torus and the Klein bottle
+(900 points, `union`, criterion with Euclidean parameters):
 
 | $k$ | 10 | 20 | 40 | 80 | 160 |
 |---|---|---|---|---|---|
-| $\mathrm{diam}_{geo}/\mathrm{diam}$, тор | 1.315 | 1.257 | 1.227 | 1.202 | 1.114 |
-| $\beta$, тор | (1,1,1) | (1,2,1) | (1,2,1) | (1,2,1) | (1,2,1) |
-| $\mathrm{diam}_{geo}/\mathrm{diam}$, Клейн | 1.341 | 1.283 | 1.245 | 1.218 | 1.122 |
-| $\beta$, Клейн | (1,0,1) | (1,2,1) | (1,2,1) | (1,2,1) | (1,2,1) |
+| $\mathrm{diam}_{geo}/\mathrm{diam}$, torus | 1.315 | 1.257 | 1.227 | 1.202 | 1.114 |
+| $\beta$, torus | (1,1,1) | (1,2,1) | (1,2,1) | (1,2,1) | (1,2,1) |
+| $\mathrm{diam}_{geo}/\mathrm{diam}$, Klein | 1.341 | 1.283 | 1.245 | 1.218 | 1.122 |
+| $\beta$, Klein | (1,0,1) | (1,2,1) | (1,2,1) | (1,2,1) | (1,2,1) |
 
-Снизу окно закрывается на $k = 10$: граф ещё связен, но геодезические пути идут в обход,
-и один класс $H_1$ теряется. Сверху сторож срабатывает около $k \approx 180$. Принято
-$k = 40$ — середина окна в логарифмическом масштабе; $k = 20$ верен, но стоит на самом
-краю, а соседнее вдвое меньшее значение уже ошибается.
+From below the window closes at $k = 10$: the graph is still connected, but geodesic paths go the
+long way round, and one $H_1$ class is lost. From above the guard fires around $k \approx 180$.
+$k = 40$ is adopted — the middle of the window on a logarithmic scale; $k = 20$ is correct but sits
+right at the edge, and the neighbouring value half as large is already wrong.
 
-**Параметры критерия значимости не наследуются на геодезику — но прогон показал, что они
-подходят.** Значения 0.07 и 1.55 откалиброваны на евклидовых облаках, а геодезическая
-метрика — не монотонная перепараметризация тех же расстояний, а другая метрика. Поэтому
-таблица раздела 2 `docs/validation.md` прогнана заново на геодезических расстояниях, три
-сида, два уровня шума.
+**The significance criterion parameters are not inherited by the geodesic metric — but a run showed
+that they fit.** The values 0.07 and 1.55 were calibrated on Euclidean clouds, and the geodesic metric
+is not a monotone reparametrisation of the same distances but a different metric. So the table of
+section 2 of `docs/validation.md` was rerun on geodesic distances, three seeds, two noise levels.
 
-Результат: на области применимости конструкции (все объекты, кроме зацепления Хопфа —
-см. ниже) область нулевых промахов есть, она широка — пол от 0.04 до 0.12, разрыв от 1.45
-до 1.8 — и **евклидовы значения 0.07 и 1.55 лежат внутри неё**. Отдельные параметры для
-геодезики не вводятся. Существенно, что это установлено прогоном: совпадение было
-возможным исходом, а не основанием пропустить проверку.
+Result: on the domain of applicability of the construction (all objects except the Hopf link — see
+below) a zero-miss region exists, it is wide — floor from 0.04 to 0.12, gap from 1.45 to 1.8 — and
+**the Euclidean values 0.07 and 1.55 lie inside it**. No separate parameters are introduced for
+geodesics. It matters that this was established by a run: a coincidence was a possible outcome, not
+grounds for skipping the check.
 
-Зацепление Хопфа в этот прогон не входит: оно исключено из геодезической таблицы по
-причине, разобранной выше, — мостовые циклы у вплотную проходящих компонент долговечны
-и неотличимы от настоящих признаков ни при каком $k$.
+The Hopf link is not part of this run: it is excluded from the geodesic table for the reason worked
+out above — bridge cycles of components passing right next to each other are long-lived and
+indistinguishable from real features at any $k$.
 
-Обратный переход в расстояния для фильтрации должен быть **монотонно убывающей** функцией
-сходства: $d = \sqrt{-2\sigma^2\log w}$ (обратна гауссову ядру) или $d = 1 - w$.
-Немонотонное преобразование переставляет рёбра в порядке вхождения и молча меняет ответ.
+The inverse transform into distances for the filtration must be a **monotonically decreasing**
+function of similarity: $d = \sqrt{-2\sigma^2\log w}$ (the inverse of the Gaussian kernel) or
+$d = 1 - w$. A non-monotone transform permutes the order in which edges enter and silently changes the
+answer.
 
-**Но монотонности недостаточно.** Монотонное $\varphi$ сохраняет *структуру* диаграммы:
-классы те же, порядок рождений и гибелей тот же, бары переходят в
-$(\varphi(b), \varphi(d))$. Однако персистентность искажается нелинейно, поскольку
-$\varphi(d) - \varphi(b) \ne \varphi(d - b)$, а критерий значимости сравнивает именно
-персистентности и их отношения. **Критерий не инвариантен относительно перепараметризации
-фильтрации.** Практическое следствие для Задачи 3: выбор между $d = 1-|r|$ и
-$d = \sqrt{2(1-r)}$ по корреляционной матрице — тоже монотонное преобразование, и он
-тоже сдвинет значимость; параметры критерия привязаны не только к типу данных, но и
-к выбранной параметризации (см. «Область применимости» в 1.2a).
+**But monotonicity is not enough.** A monotone $\varphi$ preserves the *structure* of the diagram: the
+classes are the same, the order of births and deaths is the same, bars map to
+$(\varphi(b), \varphi(d))$. But persistence is distorted non-linearly, since
+$\varphi(d) - \varphi(b) \ne \varphi(d - b)$, and the significance criterion compares exactly
+persistences and their ratios. **The criterion is not invariant under reparametrisation of the
+filtration.** Practical consequence for Task 3: the choice between $d = 1-|r|$ and
+$d = \sqrt{2(1-r)}$ for a correlation matrix is also a monotone transform, and it too will shift
+significance; the criterion's parameters are tied not only to the data type but also to the chosen
+parametrisation (see "Scope" in 1.2a).
 
-**Вырожденное ядро: главный источник ошибок здесь.** Ширина $\sigma$ гауссова ядра должна
-быть соизмерима с масштабом данных. При $\sigma = 0.5$ и диаметре тора 5.71 доля весов
-ниже $10^{-6}$ составляет **60%** — почти вся геометрия схлопывается в ноль.
-Преобразование $\sqrt{-2\sigma^2\log w}$ этого не замечает, потому что в точности обратно
-ядру и разворачивает насыщение назад; $1-w$ разворачивать нечем, и оно работает с уже
-уничтоженными данными. Измерено на торе (600 точек, отношения в спектре $H_1$,
-верный разрез — на позиции 2):
+**A degenerate kernel: the main source of errors here.** The width $\sigma$ of the Gaussian kernel must
+be commensurate with the scale of the data. At $\sigma = 0.5$ and a torus diameter of 5.71 the
+fraction of weights below $10^{-6}$ is **60%** — almost all geometry collapses to zero. The transform
+$\sqrt{-2\sigma^2\log w}$ does not notice, because it is exactly inverse to the kernel and unrolls the
+saturation back; $1-w$ has nothing to unroll with and works with already destroyed data. Measured on
+the torus (600 points, ratios in the $H_1$ spectrum, the right cut is at position 2):
 
-| Ширина ядра | $\sqrt{-2\sigma^2\log w}$ | $1 - w$ |
+| Kernel width | $\sqrt{-2\sigma^2\log w}$ | $1 - w$ |
 |---|---|---|
-| $\sigma = 0.5$ | 1.80x **1.87x** 1.17x — верно | 1.02x 1.34x 1.11x — **сломано** |
-| $\sigma = 2.0$ | 1.80x **1.87x** 1.17x — верно | 2.24x **2.32x** 1.20x — верно |
+| $\sigma = 0.5$ | 1.80x **1.87x** 1.17x — right | 1.02x 1.34x 1.11x — **broken** |
+| $\sigma = 2.0$ | 1.80x **1.87x** 1.17x — right | 2.24x **2.32x** 1.20x — right |
 
-Вывод: $1 - w$ исправно и при адекватной ширине разделяет даже чище. Виновато ядро,
-а не преобразование. Поэтому $\sigma$ задаётся по-генераторно в долях медианного
-попарного расстояния, а не абсолютным числом на всё семейство, и сопровождается
-сторожевым тестом на долю схлопнутых весов.
+Conclusion: $1 - w$ works properly and at an adequate width separates even more cleanly. The kernel is
+to blame, not the transform. So $\sigma$ is set per generator as a fraction of the median pairwise
+distance, not as an absolute number for the whole family, and is accompanied by a guard test on the
+fraction of collapsed weights.
 
-**Ни одно из двух преобразований не запрещено.** $1 - w$ — стандартный выбор для
-коннектомов ($d = 1 - |r|$), и именно он поедет в Задачу 3; убрать его из харнесса
-значило бы не проверять ту функцию, которая будет работать на реальных данных.
-$\sqrt{-2\sigma^2\log w}$, наоборот, осмыслен только для гауссова ядра: корреляционная
-матрица гауссовым ядром не является.
+**Neither transform is forbidden.** $1 - w$ is the standard choice for connectomes ($d = 1 - |r|$),
+and it is the one that goes to Task 3; removing it from the harness would mean not testing the very
+function that will run on real data. $\sqrt{-2\sigma^2\log w}$, conversely, makes sense only for a
+Gaussian kernel: a correlation matrix is not a Gaussian kernel.
 
 ---
 
-## 2. Семейство 2: динамические графы с запланированными событиями
+## 2. Family 2: dynamic graphs with scheduled events
 
-### 2.1. Конструкция
+### 2.1. Construction
 
-Планировщик строит последовательность снимков $G_0,\dots,G_{T-1}$ на $N$ узлах и
-одновременно ведёт лог истины. Базовый сценарий жизненного цикла цикла:
+A scheduler builds a sequence of snapshots $G_0,\dots,G_{T-1}$ on $N$ nodes and at the same time keeps
+a truth log. The basic scenario of the life cycle of a cycle:
 
-1. путь без циклов ($\beta_1 = 0$);
-2. замыкание пути ребром → **рождение** класса в $H_1$;
-3. добавление хорды, делящей цикл → **рождение второго** класса в $H_1$;
-4. удаление ребра → **гибель** класса в $H_1$;
-5. разрыв графа на две компоненты → **рождение** класса в $H_0$;
-6. восстановление ребра → **слияние**, т.е. **гибель** класса в $H_0$.
+1. a path without cycles ($\beta_1 = 0$);
+2. closing the path by an edge → **birth** of a class in $H_1$;
+3. adding a chord that splits the cycle → **birth of a second** class in $H_1$;
+4. removing an edge → **death** of a class in $H_1$;
+5. splitting the graph into two components → **birth** of a class in $H_0$;
+6. restoring an edge → **merge**, i.e. **death** of a class in $H_0$.
 
-**Конкретная реализация на $N = 24$.** Путь $0-1-\dots-23$; замыкание ребром $(23,0)$;
-хорда $(0,12)$, делящая 24-цикл на два цикла длины 13; удаление $(6,7)$ на дуге
-$0..12$; удаление $(3,4)$ на висячем пути (отделяется $\{4,5,6\}$, $\beta_1$ не
-меняется); восстановление $(3,4)$. Треугольников не возникает ни на одном снимке —
-иначе флаг-комплекс заполнил бы цикл и событие получилось бы не то, которое записано
-в лог. Изолированных узлов тоже не возникает.
+**The concrete realisation on $N = 24$.** The path $0-1-\dots-23$; closing by the edge $(23,0)$; the
+chord $(0,12)$, splitting the 24-cycle into two cycles of length 13; removing $(6,7)$ on the arc
+$0..12$; removing $(3,4)$ on the dangling path (it detaches $\{4,5,6\}$, $\beta_1$ does not change);
+restoring $(3,4)$. No triangles arise on any snapshot — otherwise the flag complex would fill a cycle
+and the event would differ from the one recorded in the log. No isolated nodes arise either.
 
-**Условие допустимости: обе дуги не короче трёх рёбер.** Конструкция к $N = 24$ не
-привязана, но и не работает при любом $N$. Хорда $(a,b)$ делит $N$-цикл на дуги длиной
-$b - a$ и $N - b + a$ рёбер; чтобы оба порождённых цикла были циклами флаг-комплекса,
-каждая дуга обязана нести **не меньше трёх рёбер**. При фиксированной хорде $(0,12)$
-дуги равны 12 и $N - 12$, так что условие сводится к $N \ge 15$.
+**Admissibility condition: both arcs at least three edges long.** The construction is not tied to
+$N = 24$, but it does not work for every $N$ either. The chord $(a,b)$ splits the $N$-cycle into arcs
+of $b - a$ and $N - b + a$ edges; for both generated cycles to be cycles of the flag complex, each arc
+must carry **at least three edges**. With the chord fixed at $(0,12)$ the arcs are 12 and $N - 12$, so
+the condition reduces to $N \ge 15$.
 
-Оба нарушения дают не отказ, а молча неверную истину:
+Both violations produce not a failure but silently wrong truth:
 
-| $N$ | Длинная дуга | Что происходит | $\beta_1$ после хорды |
+| $N$ | Long arc | What happens | $\beta_1$ after the chord |
 |---|---|---|---|
-| 13 | 1 ребро | хорда $(0,12)$ совпадает с замыкающим ребром $(0, N-1)$, её добавление — пустая операция | 1 |
-| 14 | 2 ребра | хорда замыкает треугольник $\{0,12,13\}$, флаг-комплекс его заполняет | 1 |
-| $\ge 15$ | $\ge 3$ рёбер | оба цикла живут | 2 |
+| 13 | 1 edge | the chord $(0,12)$ coincides with the closing edge $(0, N-1)$, adding it is a no-op | 1 |
+| 14 | 2 edges | the chord closes the triangle $\{0,12,13\}$, the flag complex fills it | 1 |
+| $\ge 15$ | $\ge 3$ edges | both cycles live | 2 |
 
-В обоих вырожденных случаях $\beta_1$ остаётся 1, тогда как лог по-прежнему заявляет
-рождение второго класса. Это ровно тот отказ, с которого начинается `docs/validation.md`:
-не падение, а правдоподобно выглядящий набор с неверной истиной, который всплыл бы уже
-в Задаче 2. Измерено: при $N = 13$ и $N = 14$ кривая даёт $\beta_1 = 1$ на снимке 27.
+In both degenerate cases $\beta_1$ stays 1, while the log still declares the birth of a second class.
+This is exactly the failure `docs/validation.md` begins with: not a crash but a plausible-looking
+dataset with wrong truth, which would surface only in Task 2. Measured: at $N = 13$ and $N = 14$ the
+curve gives $\beta_1 = 1$ at snapshot 27.
 
-Отсюда требование к генератору: проверять длины дуг и **отказываться строить набор**,
-а не выдавать его молча. Проверка формулируется через дуги, а не как «$N \ge 15$», —
-граница является следствием положения хорды и обязана поехать вместе с ней.
+Hence the requirement on the generator: check the arc lengths and **refuse to build the dataset**
+rather than output it silently. The check is stated in terms of arcs, not as "$N \ge 15$" — the bound
+is a consequence of the chord's position and must move with it.
 
-**Конвенция индекса события.** Запись `snapshot: k` означает, что снимок $G_k$ **уже
-содержит** изменение, а $G_{k-1}$ — ещё нет. Скачок `betti_curve` приходится на переход
-$k-1 \to k$. Альтернативная конвенция («изменение произошло после $k$») даёт сдвиг на
-единицу, невидимый внутри семейства 2 и всплывающий только в Задаче 2, где он выглядит
-как систематическая ошибка алгоритма локализации событий. Поэтому тест согласованности
-проверяет позиции скачков поимённо, а не только их количество.
+**Event index convention.** The record `snapshot: k` means that $G_k$ **already contains** the change
+and $G_{k-1}$ does not yet. The jump of `betti_curve` falls on the transition $k-1 \to k$. The
+alternative convention ("the change happened after $k$") gives an off-by-one shift, invisible inside
+family 2 and surfacing only in Task 2, where it looks like a systematic error of the event localisation
+algorithm. So the consistency test checks the positions of the jumps by name, not only their number.
 
-**Повтор состояния — намеренное свойство.** Восстановление $(3,4)$ возвращает граф ровно
-в то состояние, в котором он был между удалением $(6,7)$ и разрывом, поэтому различных
-графов в сценарии пять, а снимков 60. Совпадение снимков в разные моменты времени — не
-дефект и не повод «починить» дедупликацию: оно проверяет, что зигзаг-конвейер не
-схлопывает состояния по идентичности графа и честно рапортует отдельные рождение и
-гибель $H_0$.
+**A repeated state is an intentional property.** Restoring $(3,4)$ returns the graph exactly to the
+state it was in between removing $(6,7)$ and the split, so there are five distinct graphs in the
+scenario and 60 snapshots. Coinciding snapshots at different times are not a defect and not a reason
+to "fix" deduplication: they check that the zigzag pipeline does not collapse states by graph identity
+and honestly reports the separate birth and death of $H_0$.
 
-**Случайность.** Сценарий детерминирован: `rng` принимается по общему контракту
-генераторов, но не используется. Перестановка меток узлов в сам набор не вносится —
-снимки должны оставаться читаемыми глазом при отладке. Вместо этого ставится **тест**:
-случайная перестановка меток не меняет ни `betti_curve`, ни список событий. Он ловит тот
-же класс багов (молчаливая зависимость от того, что путь идёт $0,1,\dots,23$ по порядку),
-не портя данные.
+**Randomness.** The scenario is deterministic: `rng` is accepted by the common generator contract but
+not used. A permutation of node labels is not applied to the dataset itself — snapshots must stay
+readable by eye when debugging. Instead a **test** is set up: a random permutation of labels changes
+neither `betti_curve` nor the event list. It catches the same class of bugs (a silent dependence on the
+path running $0,1,\dots,23$ in order) without spoiling the data.
 
-### 2.1a. Геометрический вариант (`geometric_loop`)
+### 2.1a. The geometric variant (`geometric_loop`)
 
-Точки на окружности с меняющимся во времени радиусом и управляемым разрывом дуги; на
-каждом кадре — комплекс Рипса. Это единственный набор семейства 2 с **метрической**,
-а не чисто комбинаторной фильтрацией, то есть единственный, где цепочка совпадает
-с реальным динамическим коннектомом. Спецификация, которой не хватало в S6, ниже; все
-числа измерены эталонной реализацией, а не выведены из формул.
+Points on a circle with a radius changing in time and a controlled gap in the arc; a Rips complex on
+each frame. This is the only family-2 dataset with a **metric** rather than purely combinatorial
+filtration, i.e. the only one where the chain matches a real dynamic connectome. The specification that
+was missing in S6 is below; all numbers were measured by the reference implementation, not derived from
+formulas.
 
-**Расположение точек.** $\theta_j = j\,(2\pi - \delta)/(n-1)$, $j = 0,\dots,n-1$, на
-окружности радиуса $R(t)$. Разрыв дуги при фиксированном числе узлов — это и есть
-$\delta$: точки раскладываются по дуге $2\pi - \delta$, а не по всей окружности.
+**Placement of the points.** $\theta_j = j\,(2\pi - \delta)/(n-1)$, $j = 0,\dots,n-1$, on a circle of
+radius $R(t)$. The gap in the arc at a fixed number of nodes is exactly $\delta$: the points are laid
+out along an arc of $2\pi - \delta$, not around the whole circle.
 
-**Закрытое состояние — $\delta = 2\pi/n$, а не ноль.** При $\delta = 0$ формула даёт
-$\theta_{n-1} = 2\pi \equiv \theta_0$, то есть две совпадающие точки. Подстановка
-$\delta = 2\pi/n$ даёт шаг $(2\pi - 2\pi/n)/(n-1) = 2\pi/n$ **точно**, то есть в точности
-равномерную окружность. Формула при этом не меняется — меняется значение, которое
-называется «закрыто».
+**The closed state is $\delta = 2\pi/n$, not zero.** At $\delta = 0$ the formula gives
+$\theta_{n-1} = 2\pi \equiv \theta_0$, i.e. two coinciding points. Substituting $\delta = 2\pi/n$ gives
+a step of $(2\pi - 2\pi/n)/(n-1) = 2\pi/n$ **exactly**, i.e. exactly a uniform circle. The formula does
+not change — what changes is the value called "closed".
 
-Разница не косметическая. При $n=24$, $\varepsilon=0.8$, $R=1$:
+The difference is not cosmetic. At $n=24$, $\varepsilon=0.8$, $R=1$:
 
-| $\delta$ | Грани комплекса | $\beta$ | min расстояние |
+| $\delta$ | Faces of the complex | $\beta$ | min distance |
 |---|---|---|---|
 | $0$ | (24, 76, 84, 36) | (1,1,0) | $2.4\cdot10^{-16}$ |
 | $2\pi/n$ | (24, 72, 72, 24) | (1,1,0) | 0.261 |
 
-**$\beta$ совпадает**, поэтому тест согласованности событий прошёл бы и расхождение
-осталось бы в наборе молча — тот же класс отказа, что недопустимое $N$ в 2.1. Ловится оно
-не по $\beta$, а по вырожденной геометрии: при $\varepsilon = 0.20$ конструкция со
-сдвоенной вершиной даёт $\beta_0 = 23$ (дубль связан всегда) там, где равномерная
-окружность даёт 24. Отсюда требование к тесту: проверять минимальное попарное
-расстояние, а не только числа Бетти.
+**$\beta$ coincides**, so the event consistency test would pass and the discrepancy would stay in the
+dataset silently — the same class of failure as an inadmissible $N$ in 2.1. It is caught not by $\beta$
+but by the degenerate geometry: at $\varepsilon = 0.20$ the construction with a doubled vertex gives
+$\beta_0 = 23$ (the duplicate is always connected) where the uniform circle gives 24. Hence the
+requirement on the test: check the minimum pairwise distance, not only the Betti numbers.
 
-**$\varepsilon$ — не забытая ручка, а параметр, задающий качественный режим.** Два
-обстоятельства.
+**$\varepsilon$ is not a forgotten knob but a parameter that sets a qualitative regime.** Two
+circumstances.
 
-Во-первых, $\mathrm{VR}(S^1; r)$ не становится стягиваемым с ростом относительного
-масштаба: по Адамашеку–Адамсу он гомотопически эквивалентен $S^1$ при геодезическом
-$r < 2\pi/3$ (в хордах: $\varepsilon < R\sqrt{3}$), затем $S^3$, затем $S^5$ и так далее.
-При `max_homology_dim: 2` гибель $\beta_1$ будет видна, а родившийся $\beta_3$ — нет, и
-событие будет выглядеть как «петля просто исчезла» без причины.
+First, $\mathrm{VR}(S^1; r)$ does not become contractible as the relative scale grows: by
+Adamaszek–Adams it is homotopy equivalent to $S^1$ at geodesic $r < 2\pi/3$ (in chords:
+$\varepsilon < R\sqrt{3}$), then to $S^3$, then $S^5$ and so on. At `max_homology_dim: 2` the death of
+$\beta_1$ will be visible, but the born $\beta_3$ will not, and the event will look like "the loop just
+disappeared" for no reason.
 
-Во-вторых, снизу межточечный шаг $2\pi R/n$ растёт вместе с радиусом, и при
-$\varepsilon$ ниже него рост радиуса даёт не разрыв дуги, а рассыпание графа на $n$
-компонент.
+Second, from below the inter-point step $2\pi R/n$ grows with the radius, and at $\varepsilon$ below it
+a growing radius gives not a gap in the arc but a disintegration of the graph into $n$ components.
 
-Отсюда окно: $2\pi R_{\max}/n < \varepsilon < R_{\min}\sqrt{3}$. При $n=24$ и
-$R \in [1.0, 1.4]$ это $(0.367,\ 1.732)$. Обе границы подтверждены измерением:
+Hence the window: $2\pi R_{\max}/n < \varepsilon < R_{\min}\sqrt{3}$. At $n=24$ and $R \in [1.0, 1.4]$
+this is $(0.367,\ 1.732)$. Both bounds are confirmed by measurement:
 
 | $\varepsilon$ | 0.20 | 0.30 | 0.40 | 0.80 | 1.70 | 1.90 |
 |---|---|---|---|---|---|---|
 | $R = 1.0$ | (24,0,0) | (1,1,0) | (1,1,0) | (1,1,0) | (1,1,0) | **(1,0,0)** |
 | $R = 1.4$ | (24,0,0) | **(24,0,0)** | (1,1,0) | (1,1,0) | (1,1,0) | (1,1,0) |
 
-Принято $\varepsilon = 0.8$ — середина окна в логарифмическом масштабе
-($\sqrt{0.367\cdot1.732} = 0.797$), тем же правилом, каким выбрано $k$ в 1.3.
+$\varepsilon = 0.8$ is adopted — the middle of the window on a logarithmic scale
+($\sqrt{0.367\cdot1.732} = 0.797$), by the same rule by which $k$ was chosen in 1.3.
 
-**Ширина разрыва.** Чтобы через разрыв не было ребра, хорда должна превышать
-$\varepsilon$ на **наименьшем** радиусе: $2R_{\min}\sin(\delta/2) > \varepsilon$, откуда
-при принятых значениях $\delta > 0.823$. Граница близко: при $\delta = 0.8$ петля на
-малом радиусе не рвётся и события не происходит. Принято $\delta = 1.2$.
+**Gap width.** For there to be no edge across the gap, the chord must exceed $\varepsilon$ at the
+**smallest** radius: $2R_{\min}\sin(\delta/2) > \varepsilon$, whence at the adopted values
+$\delta > 0.823$. The bound is close: at $\delta = 0.8$ the loop does not break at the small radius and
+no event happens. $\delta = 1.2$ is adopted.
 
-**Интерполяция `radius_schedule`** — кусочно-линейная по индексу снимка, узлы равномерно
-по всей длине последовательности.
+**Interpolation of `radius_schedule`** — piecewise linear in the snapshot index, nodes evenly spread
+over the whole length of the sequence.
 
-**Расписание.** Радиус дышит и событий не порождает; события даёт только разрыв.
+**Schedule.** The radius breathes and generates no events; only the gap generates events.
 
-| Снимки | $\delta$ | $\beta$ |
+| Snapshots | $\delta$ | $\beta$ |
 |---|---|---|
 | 0–19 | $2\pi/n$ | (1, 1, 0) |
 | 20–44 | 1.2 | (1, 0, 0) |
 | 45–59 | $2\pi/n$ | (1, 1, 0) |
 
-**Дыхание радиуса меняет граф, не меняя $\beta$, — и это главный отрицательный контроль
-набора.** Утверждение «радиус меняется каждый кадр, а граф нет» неверно: при принятых
-параметрах граф меняется на снимках 4 ($72 \to 48$ рёбер), 43 ($45 \to 66$) и 56
-($48 \to 72$), и ни на одном из них события не происходит. Различных графов в наборе
-четыре. Тест на отсутствие незапланированных событий должен указывать эти три снимка
-поимённо: проверка «по всему диапазону» прошла бы и на наборе, где комплекс вообще не
-менялся, то есть не проверяла бы ничего.
+**Radius breathing changes the graph without changing $\beta$ — and this is the main negative control
+of the dataset.** The statement "the radius changes every frame but the graph does not" is false: at the
+adopted parameters the graph changes at snapshots 4 ($72 \to 48$ edges), 43 ($45 \to 66$) and 56
+($48 \to 72$), and no event happens at any of them. There are four distinct graphs in the dataset. The
+test for the absence of unscheduled events must name these three snapshots individually: a check "over
+the whole range" would also pass on a dataset where the complex never changed, i.e. it would check
+nothing.
 
-**Запас по границе.** Минимальное $|\text{хорда} - \varepsilon|$ по всем снимкам и парам
-точек равно $9.9\cdot10^{-4}$ (снимок 42) — тринадцать порядков над машинным нулём.
-Побайтовая воспроизводимость снимков между платформами не под угрозой; это проверяется
-до записи sha256 в манифест, а не после.
+**Margin at the boundary.** The minimum $|\text{chord} - \varepsilon|$ over all snapshots and point
+pairs is $9.9\cdot10^{-4}$ (snapshot 42) — thirteen orders of magnitude above machine zero. Byte-level
+reproducibility of the snapshots across platforms is not at risk; this is checked before writing the
+sha256 into the manifest, not after.
 
-**Что набор даёт сверх `cycle_lifecycle`.** Грани (24, 72, 72, 24) — 72 треугольника,
-поэтому $\beta_1 = 1$ при цикломатическом числе $72 - 24 + 1 = 49$. В `cycle_lifecycle`
-треугольников нет по построению, и совпадение $\beta_1$ с цикломатическим числом там —
-следствие конструкции; здесь расхождение в 49 раз на настоящих данных.
+**What the dataset gives beyond `cycle_lifecycle`.** The faces (24, 72, 72, 24) — 72 triangles, so
+$\beta_1 = 1$ while the cyclomatic number is $72 - 24 + 1 = 49$. In `cycle_lifecycle` there are no
+triangles by construction, and the coincidence of $\beta_1$ with the cyclomatic number there is a
+consequence of the construction; here the discrepancy is 49-fold on real data.
 
-### 2.2. Семантика событий: как «слияние» переводится в гомологию
+### 2.2. Semantics of events: how a "merge" translates into homology
 
-Это место, где ошибаются чаще всего. Интуитивные слова и гомологические события — не одно
-и то же, и лог обязан хранить оба уровня.
+This is where mistakes are most frequent. Intuitive words and homological events are not the same, and
+the log must keep both levels.
 
-| Событие на графе | Гомологическое событие | Что происходит с β |
+| Event on the graph | Homological event | What happens to β |
 |---|---|---|
-| Компоненты сливаются | Гибель класса $H_0$ (по правилу старшинства умирает более молодой) | β₀ − 1 |
-| Компонента распадается | Рождение класса $H_0$ | β₀ + 1 |
-| Путь замыкается в цикл | Рождение класса $H_1$ | β₁ + 1 |
-| В цикл добавляется хорда | Рождение нового класса $H_1$ («разделение» цикла) | β₁ + 1 |
-| Цикл заполняется треугольниками | Гибель класса $H_1$ | β₁ − 1 |
-| Удаляется ребро цикла | Гибель класса $H_1$ | β₁ − 1 |
+| Components merge | Death of an $H_0$ class (by the seniority rule the younger one dies) | β₀ − 1 |
+| A component splits | Birth of an $H_0$ class | β₀ + 1 |
+| A path closes into a cycle | Birth of an $H_1$ class | β₁ + 1 |
+| A chord is added to a cycle | Birth of a new $H_1$ class ("splitting" the cycle) | β₁ + 1 |
+| A cycle is filled with triangles | Death of an $H_1$ class | β₁ − 1 |
+| An edge of a cycle is removed | Death of an $H_1$ class | β₁ − 1 |
 
-Обратите внимание на строку про хорду: на языке графов это «разделение» одного цикла на
-два, а на языке гомологий — **рождение**, а не разделение. В штрихкоде нет операции
-разделения класса; есть только рождение и гибель. Поэтому в JSON поле `type` принимает
-только значения `birth` / `death`, а интуитивная формулировка кладётся в `narrative`.
+Note the row about the chord: in the language of graphs it is a "split" of one cycle into two, while in
+the language of homology it is a **birth**, not a split. A barcode has no operation of splitting a
+class; there are only births and deaths. So in JSON the `type` field takes only the values `birth` /
+`death`, and the intuitive wording goes into `narrative`.
 
-### 2.2a. Какой именно класс $H_1$ умирает при удалении ребра
+### 2.2a. Which $H_1$ class dies when an edge is removed
 
-Таблица 2.2 говорит, что $\beta_1$ уменьшается на единицу, но не говорит, с каким
-рождением спарена эта гибель. Ответ выглядит как свободная конвенция и ею не является:
-разложение зигзаг-модуля на интервальные модули однозначно (Крулль–Шмидт для
-представлений колчана типа $A_n$), поэтому парность определена и её нельзя назначить.
+Table 2.2 says that $\beta_1$ decreases by one but not which birth this death is paired with. The
+answer looks like a free convention and is not one: the decomposition of a zigzag module into interval
+modules is unique (Krull–Schmidt for representations of a quiver of type $A_n$), so the pairing is
+determined and cannot be assigned.
 
-**Разбор для сценария `cycle_lifecycle`.** Над $\mathbb{Z}/2$ обозначим: $c_1$ — цикл
-$0-\dots-12$ вместе с хордой, $c_2$ — цикл $12-\dots-23-0$ вместе с хордой,
-$c = c_1 + c_2$ — исходный 24-цикл (хорда входит в сумму дважды и сокращается).
+**Analysis for the `cycle_lifecycle` scenario.** Over $\mathbb{Z}/2$ denote: $c_1$ — the cycle
+$0-\dots-12$ together with the chord, $c_2$ — the cycle $12-\dots-23-0$ together with the chord,
+$c = c_1 + c_2$ — the original 24-cycle (the chord enters the sum twice and cancels).
 
-| Снимки | Граф | $H_1$ |
+| Snapshots | Graph | $H_1$ |
 |---|---|---|
-| 12–26 | 24-цикл | $\langle c \rangle$ |
-| 27–40 | тета-граф | $\langle c_1, c_2 \rangle$ |
-| 41– | удалено $(6,7)$ с дуги $c_1$ | $\langle c_2 \rangle$ |
+| 12–26 | 24-cycle | $\langle c \rangle$ |
+| 27–40 | theta graph | $\langle c_1, c_2 \rangle$ |
+| 41– | $(6,7)$ removed from the arc of $c_1$ | $\langle c_2 \rangle$ |
 
-Все включения снимков инъективны на $H_1$, поэтому union-зигзаг в окрестности 27–41
-устроен как $1 \to 2 \leftarrow 1$ с образами $L_{\text{лев}} = \langle c_1 + c_2 \rangle$
-слева и $L_{\text{прав}} = \langle c_2 \rangle$ справа. Это **различные прямые** в
-двумерном пространстве, следовательно $V_{27} = L_{\text{лев}} \oplus L_{\text{прав}}$,
-и интервалы получаются $[12, 40]$ и $[27, \infty)$.
+All snapshot inclusions are injective on $H_1$, so the union zigzag around 27–41 has the shape
+$1 \to 2 \leftarrow 1$ with images $L_{\text{left}} = \langle c_1 + c_2 \rangle$ on the left and
+$L_{\text{right}} = \langle c_2 \rangle$ on the right. These are **different lines** in a
+two-dimensional space, hence $V_{27} = L_{\text{left}} \oplus L_{\text{right}}$, and the intervals come
+out as $[12, 40]$ and $[27, \infty)$.
 
-**Умирает класс, рождённый при замыкании пути (`h1_a`), а не при добавлении хорды.**
+**The class that dies is the one born when the path closed (`h1_a`), not when the chord was added.**
 
-Что это не конвенция, видно из контрпримера: если удалить не $(6,7)$, а саму хорду,
-выживет $c = c_1 + c_2 = L_{\text{лев}}$, и тогда умрёт как раз класс, рождённый в 27.
-Ответ зависит от того, какое ребро удалено, — значит, он определён геометрией, а не
-выбором базиса. Наоборот, удаление ребра с любой из двух дуг даёт один и тот же ответ:
-$\langle c_1 + c_2 \rangle$ не совпадает ни с $\langle c_1 \rangle$, ни с
-$\langle c_2 \rangle$.
+That this is not a convention is shown by a counterexample: if not $(6,7)$ but the chord itself is
+removed, $c = c_1 + c_2 = L_{\text{left}}$ survives, and then the class born at 27 is the one that dies.
+The answer depends on which edge is removed — so it is determined by geometry, not by a choice of basis.
+Conversely, removing an edge from either of the two arcs gives the same answer:
+$\langle c_1 + c_2 \rangle$ coincides neither with $\langle c_1 \rangle$ nor with $\langle c_2 \rangle$.
 
-**Почему интуиция здесь подводит.** Напрашивается рассуждение «хорда разделила цикл на
-два; ломаем один из них — умирает он, то есть молодой класс». Оно опирается на ощущение,
-что старший класс должен пережить младшего. Правило старшинства из 2.2 сформулировано для
-гибели $H_0$ при слиянии компонент и к гибели $H_1$ по удалению ребра не применяется
-вовсе: здесь нет двух классов, претендующих на одну гибель.
+**Why intuition fails here.** The tempting argument is "the chord split the cycle in two; break one of
+them and it dies, i.e. the young class". It rests on the feeling that the elder class should outlive the
+younger. The seniority rule of 2.2 is stated for the death of $H_0$ when components merge and does not
+apply to the death of $H_1$ by edge removal at all: there are no two classes competing for one death.
 
-**Как это проверяется.** Тест на тождество класса писать не нужно и нельзя — базис
-$H_1$ тета-графа не канонический. Проверяемо и достаточно следующее: вектор 24-цикла над
-$\mathbb{Z}/2$ **не лежит** в $Z_1(G_{41})$, тогда как $c_2$ лежит. Три строки на
-эталонной реализации; ровно та часть утверждения, которая канонична.
+**How it is checked.** A test on the identity of a class need not and must not be written — the basis of
+$H_1$ of the theta graph is not canonical. What is checkable and sufficient: the vector of the 24-cycle
+over $\mathbb{Z}/2$ **does not lie** in $Z_1(G_{41})$, while $c_2$ does. Three lines on the reference
+implementation; exactly the part of the claim that is canonical.
 
-**Цена ошибки.** Лог истины с инвертированной парностью не ломает ни один тест внутри
-семейства 2: `betti_curve` от парности не зависит. Ошибка всплывёт в Задаче 2, где
-корректный зигзаг-алгоритм будет систематически рапортовать «неверную» пару рождение —
-гибель, и отладка пойдёт в алгоритм, а не в лог.
+**The cost of the error.** A truth log with an inverted pairing breaks no test inside family 2:
+`betti_curve` does not depend on pairing. The error would surface in Task 2, where a correct zigzag
+algorithm would systematically report the "wrong" birth–death pair, and debugging would go into the
+algorithm, not the log.
 
-### 2.3. Комплекс, к которому относится истина
+### 2.3. The complex the truth refers to
 
-Истина определяется для **флаг-комплекса (клик-комплекса)** порогованного графа, потому
-что именно он используется в пайплайне. Правило построения: каждая клика графа объявляется
-симплексом. Никакой информации сверх графа при этом не вводится.
+The truth is defined for the **flag complex (clique complex)** of the thresholded graph, because that is
+what the pipeline uses. The construction rule: every clique of the graph is declared a simplex. No
+information beyond the graph is introduced.
 
-**Конвенция порога:** ребро существует при $w_{ij} > t$, строго. Вес, равный порогу, порогом
-не превышен; при $t = 0$ нестрогое сравнение сделало бы граф полным, превратив отсутствующие
-рёбра (нулевые веса) в существующие.
+**Threshold convention:** an edge exists when $w_{ij} > t$, strictly. A weight equal to the threshold
+does not exceed it; at $t = 0$ a non-strict comparison would make the graph complete, turning absent
+edges (zero weights) into existing ones.
 
-**Правил ребра два, и они противоположны по направлению.** Приведённая конвенция —
-про **сходство**: чем больше вес, тем сильнее связь, ребро появляется сверху.
-У метрического набора (2.1a) на диске лежат **расстояния**, и ребро появляется снизу:
-$d_{ij} \le \varepsilon$. Сравнение здесь нестрогое, потому что $\varepsilon$ — радиус
-включения, а не порог превышения.
+**There are two edge rules, and they point in opposite directions.** The convention above is about
+**similarity**: the larger the weight, the stronger the connection, an edge appears from above. For the
+metric dataset (2.1a) the disk holds **distances**, and an edge appears from below:
+$d_{ij} \le \varepsilon$. The comparison is non-strict here, because $\varepsilon$ is an inclusion
+radius, not an exceedance threshold.
 
-| Правило | Условие ребра | Что лежит в снимке |
+| Rule | Edge condition | What a snapshot holds |
 |---|---|---|
-| `weight_above` | $w_{ij} > t$, строго | сходства (`cycle_lifecycle`, коннектом) |
-| `distance_within` | $d_{ij} \le \varepsilon$, нестрого | расстояния (`geometric_loop`) |
+| `weight_above` | $w_{ij} > t$, strict | similarities (`cycle_lifecycle`, connectome) |
+| `distance_within` | $d_{ij} \le \varepsilon$, non-strict | distances (`geometric_loop`) |
 
-Направление **не выводится из семейства и не является конвенцией по умолчанию**: оно
-записывается в `ground_truth.json` полем `edge_rule`, вместе со значением порога
-в `edge_threshold` (`docs/data.md`, §4). Потребитель, применивший к метрическому набору
-правило сходства, получит **дополнение** графа — и получит его молча, потому что
-дополнение разреженного графа тоже связно и тоже даёт правдоподобные числа Бетти.
-Внутри пакета такая ошибка не всплывает вовсе: генератор считает `betti_curve` своим
-путём. Всплывёт она в Задаче 2, на чужом коде.
+The direction **is not inferred from the family and is not a default convention**: it is written into
+`ground_truth.json` in the `edge_rule` field, together with the threshold value in `edge_threshold`
+(`docs/data.md`, §4). A consumer that applies the similarity rule to a metric dataset gets the
+**complement** of the graph — and gets it silently, because the complement of a sparse graph is also
+connected and also gives plausible Betti numbers. Inside the package such an error does not surface at
+all: the generator computes `betti_curve` its own way. It would surface in Task 2, in someone else's
+code.
 
-Практическое следствие: правило применяется **одной функцией** на весь проект, а не
-переписывается сравнением в каждом месте использования.
+Practical consequence: the rule is applied by **one function** for the whole project, not rewritten as
+a comparison at every place of use.
 
-**Следствие 1: $\beta_1 \ne m - n + c$.** Цикломатическое число графа не равно $\beta_1$
-флаг-комплекса, поскольку треугольники заполняются и убивают соответствующие циклы.
-Считать $\beta_1$ как цикломатическое число — типичная и молчаливая ошибка. Треугольник
-из трёх рёбер даёт $\beta_1 = 0$, а не 1.
+**Consequence 1: $\beta_1 \ne m - n + c$.** The cyclomatic number of the graph is not equal to $\beta_1$
+of the flag complex, since triangles are filled and kill the corresponding cycles. Computing $\beta_1$
+as the cyclomatic number is a typical and silent error. A triangle of three edges gives $\beta_1 = 0$,
+not 1.
 
-**Следствие 2: комплекс строится до размерности $k_{\max}+1$.** Для $\beta_2$ нужны
-3-симплексы: $\beta_2 = \dim\ker\partial_2 - \operatorname{rank}\partial_3$, и при обрыве
-на размерности 2 слагаемое $\operatorname{rank}\partial_3$ обнуляется, а каждая замкнутая
-2-цепь ошибочно засчитывается как полость. При `max_homology_dim: 2` комплекс строится
-до размерности 3. Параметра «обрывать на 2» в API быть не должно — его единственное
-назначение было бы включить неверный режим.
+**Consequence 2: the complex is built up to dimension $k_{\max}+1$.** $\beta_2$ needs 3-simplices:
+$\beta_2 = \dim\ker\partial_2 - \operatorname{rank}\partial_3$, and with a cut-off at dimension 2 the
+term $\operatorname{rank}\partial_3$ vanishes, and every closed 2-chain is wrongly counted as a cavity.
+At `max_homology_dim: 2` the complex is built up to dimension 3. There must be no "cut off at 2"
+parameter in the API — its only purpose would be to enable a wrong mode.
 
-**Следствие 3: комплекс замкнут относительно граней.** Если клика размера $k+1$ входит
-в комплекс, все её подмножества тоже входят. Перечислять нужно **все** клики каждого
-размера, а не только максимальные. Флаг-комплекс $K_4$ содержит 4 вершины, 6 рёбер,
-4 треугольника и 1 тетраэдр — треугольники не «поглощаются» тетраэдром, а живут в своей
-размерности и образуют строки матрицы $\partial_3$.
+**Consequence 3: the complex is closed under faces.** If a clique of size $k+1$ is in the complex, all
+its subsets are too. **All** cliques of each size must be enumerated, not only maximal ones. The flag
+complex of $K_4$ contains 4 vertices, 6 edges, 4 triangles and 1 tetrahedron — the triangles are not
+"absorbed" by the tetrahedron but live in their own dimension and form the rows of the matrix
+$\partial_3$.
 
-`networkx.find_cliques` возвращает только **максимальные** клики (алгоритм Брона–Кербоша)
-и для этой задачи не подходит: на $K_4$ он даст один тетраэдр без рёбер и треугольников,
-граничные матрицы не сойдутся по размерностям, а $\beta_1$ вырастет с 0 до 3. Правильный
-способ — перебор `itertools.combinations` по всем подмножествам с проверкой попарной
-смежности. Медленнее, но эталону скорость не нужна.
+`networkx.find_cliques` returns only **maximal** cliques (the Bron–Kerbosch algorithm) and does not fit
+this task: on $K_4$ it gives one tetrahedron without edges and triangles, the boundary matrices do not
+match in dimensions, and $\beta_1$ grows from 0 to 3. The right way is to iterate
+`itertools.combinations` over all subsets, checking pairwise adjacency. Slower, but the reference does
+not need speed.
 
-Контрольные примеры (проверено против ripser):
+Control examples (checked against ripser):
 
-| Граф | Флаг-комплекс | $\beta$ |
+| Graph | Flag complex | $\beta$ |
 |---|---|---|
-| $K_3$ (треугольник) | Заполненная грань | $(1,0,0)$ |
-| $K_4$ | Сплошной тетраэдр | $(1,0,0)$ |
-| $K_{2,2,2}$ (октаэдр) | Граница $S^2$, 3-симплексов нет | $(1,0,1)$ |
+| $K_3$ (triangle) | A filled face | $(1,0,0)$ |
+| $K_4$ | A solid tetrahedron | $(1,0,0)$ |
+| $K_{2,2,2}$ (octahedron) | The boundary of $S^2$, no 3-simplices | $(1,0,1)$ |
 
-ripser с `maxdim=2` внутри перечисляет симплексы до размерности 3 и на $K_4$ даёт
-$\beta_2 = 0$ — эталонная реализация обязана согласовываться с этим поведением.
+ripser with `maxdim=2` internally enumerates simplices up to dimension 3 and gives $\beta_2 = 0$ on
+$K_4$ — the reference implementation must agree with this behaviour.
 
 ---
 
-## 3. Семейство 3: динамическая SBM и связанные осцилляторы
+## 3. Family 3: dynamic SBM and coupled oscillators
 
-### 3.1. Динамическая SBM
+### 3.1. Dynamic SBM
 
-Стохастическая блочная модель с меняющейся во времени блочной матрицей $B(t)$:
-сообщества сливаются и делятся по расписанию. Генерация — `networkx.stochastic_block_model`
-в цикле по времени с общим `rng`. Истина: **метки сообществ по времени и расписание
-слияний/делений**, и ничего сверх того.
+A stochastic block model with a time-varying block matrix $B(t)$: communities merge and split according
+to a schedule. Generation — `networkx.stochastic_block_model` in a loop over time with a shared `rng`.
+Truth: **community labels over time and the schedule of merges/splits**, and nothing beyond that.
 
-**Исправление: слияние сообществ не является гомологическим событием.** Прежняя редакция
-этого раздела обещала, что набор «проверяет $\beta_0$ и его связь с модулярностью». Это
-неверно, и неверно измеримо. При `p_in: 0.35`, `p_out: 0.02` и блоках по 15 узлов
-межблочных рёбер на снимке выходит от 7 до 41 (три калибровочных сида) — блоки прошиты
-между собой десятками рёбер, никогда не являются отдельными компонентами, и слияние двух
-сообществ не меняет ни числа компонент, ни вообще чего-либо в гомологиях.
+**Correction: a community merge is not a homological event.** An earlier edition of this section
+promised that the dataset "checks $\beta_0$ and its relation to modularity". This is false, and
+measurably so. At `p_in: 0.35`, `p_out: 0.02` and blocks of 15 nodes there are 7 to 41 inter-block
+edges per snapshot (three calibration seeds) — the blocks are stitched together by dozens of edges,
+they are never separate components, and merging two communities changes neither the number of
+components nor anything in homology at all.
 
-Что $\beta_0$ при этом всё же двигается, делу не помогает, а мешает. По ряду из 60 снимков
-он принимает значения 1 и 2 на **каждом** калибровочном сиде, и причина не в сообществах,
-а в **изолированных вершинах**: вероятность того, что узел не вытянет ни одного ребра,
-равна $(1-p_{in})^{14}(1-p_{out})^{45} \approx 9.7\cdot10^{-4}$, что на наборе
-$60\times60$ даёт ожидаемых 3.5 таких вершины; измерено 2, 3 и 2. То есть $\beta_0$ здесь
-отслеживает случайный недобор рёбер у одного узла, а не структуру сообществ, и его
-экскурсии не привязаны к расписанию.
+That $\beta_0$ does move nonetheless does not help but hinders. Over a series of 60 snapshots it takes
+the values 1 and 2 on **every** calibration seed, and the cause is not communities but **isolated
+vertices**: the probability that a node draws no edge at all is
+$(1-p_{in})^{14}(1-p_{out})^{45} \approx 9.7\cdot10^{-4}$, which on a $60\times60$ dataset gives 3.5
+such vertices expected; 2, 3 and 2 measured. That is, $\beta_0$ here tracks a random shortfall of edges
+at one node, not community structure, and its excursions are not tied to the schedule.
 
-Устойчивое утверждение выглядит иначе: **после удаления изолированных вершин граф связен
-на всех снимках**, и это не меняется ни при слиянии, ни при делении. Именно оно и стоит
-тестом, а не равенство $\beta_0$ до и после слияния: последнее держится на измеренных
-сидах, но опирается на отсутствие изолированной вершины ровно на этих двух снимках.
+The robust statement looks different: **after removing isolated vertices the graph is connected on
+every snapshot**, and this does not change at the merge or the split. That is what the test asserts,
+not equality of $\beta_0$ before and after the merge: the latter holds on the measured seeds but rests
+on the absence of an isolated vertex on exactly those two snapshots.
 
-**Два режима не совмещаются в одном наборе.** $\beta_0$ становится осмысленной истиной
-только при $p_{out} \to 0$, когда блоки действительно распадаются на компоненты; связь
-с модулярностью, наоборот, требует $p_{out} > 0$, иначе связывать не с чем. Это два
-разных объекта, и попытка получить оба из одного — источник путаницы, а не экономия.
+**The two regimes do not combine in one dataset.** $\beta_0$ becomes meaningful truth only at
+$p_{out} \to 0$, when the blocks really fall apart into components; a relation to modularity, on the
+contrary, requires $p_{out} > 0$, otherwise there is nothing to relate. These are two different
+objects, and trying to get both from one is a source of confusion, not economy.
 
-**Отвергнутые способы дать SBM топологическую истину** (зафиксировано, чтобы вопрос не
-открывался заново):
+**Rejected ways of giving SBM topological truth** (recorded so that the question is not reopened):
 
-- *Записать измеренную эталоном кривую Бетти.* Это истина как выход пайплайна. То, что
-  считает её независимая реализация, дела не меняет: у семейства 2 кривая **ещё и
-  предсказана конструкцией**, и тест сверяет два источника. У SBM предсказания нет,
-  сверять не с чем, и в `ground_truth.json` ляжет регрессионная фикстура под именем
-  истины. Как фикстура она законна, но тогда и хранить её надо отдельно.
-- *Опустить $p_{out}$ до режима распада.* Распадение блоков остаётся случайным, и «ответ
-  известен заранее» вырождается в «известен с большой вероятностью»: плохой сид молча
-  даёт набор с неверной истиной. Детерминированный вариант существует ($p_{out} = 0$
-  плюс вшитый остов в каждом блоке, тогда $\beta_0$ равно числу блоков точно), но это
-  уже другой набор, а не этот.
+- *Record the Betti curve measured by the reference.* This is truth as pipeline output. That it is
+  computed by an independent implementation does not change matters: for family 2 the curve is **also
+  predicted by the construction**, and the test compares two sources. SBM has no prediction, there is
+  nothing to compare with, and `ground_truth.json` would receive a regression fixture under the name of
+  truth. As a fixture it is legitimate, but then it must also be stored separately.
+- *Lower $p_{out}$ to the disintegration regime.* The disintegration of the blocks stays random, and
+  "the answer is known in advance" degenerates into "known with high probability": a bad seed silently
+  gives a dataset with wrong truth. A deterministic variant exists ($p_{out} = 0$ plus a spanning tree
+  wired into each block, then $\beta_0$ equals the number of blocks exactly), but that is a different
+  dataset, not this one.
 
-Поэтому у SBM `truth_kind: partition` (`docs/data.md`, §4): истина — разбиение и
-расписание, полностью известные заранее, а поля `betti_curve` и `events` не пишутся.
+So the SBM has `truth_kind: partition` (`docs/data.md`, §4): the truth is a partition and a schedule,
+fully known in advance, and the fields `betti_curve` and `events` are not written.
 
-### 3.1a. Что такое режим связи
+### 3.1a. What a coupling regime is
 
-Раздел, которого не хватало: расписание $A(t)$ упоминалось во всех формулах ниже, но нигде
-не было сказано, чем именно задаётся один режим.
+A section that was missing: the schedule $A(t)$ was mentioned in all the formulas below, but nowhere was
+it said what exactly defines one regime.
 
-**Режим — это разбиение каналов на блоки.** Матрица связи режима блочно-диагональна:
-$A_{ij} = 1$, если $i$ и $j$ лежат в одном блоке и $i \ne j$, иначе 0. Симметрична, с нулём
-на диагонали. Хранится в `coupling.npy` формы `(T_schedule, n_channels, n_channels)`,
-по одной матрице на режим.
+**A regime is a partition of the channels into blocks.** The coupling matrix of a regime is block
+diagonal: $A_{ij} = 1$ if $i$ and $j$ lie in the same block and $i \ne j$, otherwise 0. Symmetric, with
+a zero diagonal. Stored in `coupling.npy` of shape `(T_schedule, n_channels, n_channels)`, one matrix
+per regime.
 
-**Разбиения обязаны быть связаны измельчением.** Это и есть содержание слова
-«слияние/деление» из дорожной карты, и оно не выполняется автоматически: переход
-$[15,15] \to [10,10,10]$ — не слияние и не деление, потому что ни одно разбиение не
-измельчает другое; блоки просто перенарезаны. Прежние обозначения режимов вида `block_2`
-и `block_3` это скрывали, называя числом блоков то, что должно задаваться их составом.
+**The partitions must be related by refinement.** This is the content of the word "merge/split" in the
+roadmap, and it does not hold automatically: the transition $[15,15] \to [10,10,10]$ is neither a merge
+nor a split, because neither partition refines the other; the blocks are simply recut. The earlier
+regime names of the form `block_2` and `block_3` hid this, naming by the number of blocks what must be
+defined by their composition.
 
-Принятое расписание при 30 каналах:
+The adopted schedule at 30 channels:
 
 $$[10,10,10] \;\longrightarrow\; [20,10] \;\longrightarrow\; [10,10,10]$$
 
-Первый переход — **слияние** (два блока по 10 становятся одним из 20), второй —
-**деление** (обратно). Каждая пара соседних разбиений связана измельчением, поэтому событие
-на графе описывается одним словом, а не «перенарезкой».
+The first transition is a **merge** (two blocks of 10 become one of 20), the second a **split** (back
+again). Each pair of neighbouring partitions is related by refinement, so the event on the graph is
+described by one word, not a "recut".
 
-**Переходный процесс отбрасывается, и это физика, а не бухгалтерия.** Рёсслер стартует вне
-аттрактора, и первые сотни шагов — это спуск на него, а не динамика связанной системы.
-Окно, попавшее на этот участок, даёт корреляции, не имеющие отношения к $A(t)$, и роняет
-проверку согласия из `docs/validation.md`. Поэтому интегрируется
-`transient_length` шагов под матрицей **первого** режима, они отбрасываются, и только
-затем пишутся `regime_length` шагов на каждый режим.
+**The transient is discarded, and this is physics, not bookkeeping.** Rössler starts off the attractor,
+and the first hundreds of steps are a descent onto it, not the dynamics of the coupled system. A window
+falling on this stretch gives correlations unrelated to $A(t)$ and fails the agreement check of
+`docs/validation.md`. So `transient_length` steps are integrated under the matrix of the **first**
+regime, discarded, and only then `regime_length` steps are written for each regime.
 
-Отсюда жёсткое соотношение, которое проверяется в конфиге:
+Hence a hard relation, checked in the config:
 
 $$n_{\text{timepoints}} = \texttt{regime\_length} \times |\texttt{regimes}|$$
 
-Без него `coupling.npy` и ряд разъезжаются: окно, посчитанное по индексу времени, будет
-сопоставлено не с тем режимом, и ошибка будет выглядеть как плохое восстановление
-связности, а не как рассинхронизация.
+Without it `coupling.npy` and the series drift apart: a window computed by time index would be matched
+with the wrong regime, and the error would look like poor recovery of connectivity rather than a
+desynchronisation.
 
-### 3.2. Модель Курамото
+### 3.2. Kuramoto model
 
 $$\dot\theta_i = \omega_i + \frac{K}{N}\sum_{j} A_{ij}(t)\,\sin(\theta_j - \theta_i),$$
-где $\omega_i$ — собственные частоты (например $\mathcal{N}(0,1)$), $A(t)$ — известное
-расписание связи. Наблюдаемая: $x_i(t) = \sin\theta_i(t)$.
+where $\omega_i$ are the natural frequencies (e.g. $\mathcal{N}(0,1)$) and $A(t)$ is a known coupling
+schedule. Observable: $x_i(t) = \sin\theta_i(t)$.
 
-### 3.3. Связанные системы Рёсслера
+### 3.3. Coupled Rössler systems
 
 $$\dot x_i = -y_i - z_i + \varepsilon\sum_j A_{ij}(t)(x_j - x_i),\quad
 \dot y_i = x_i + a y_i,\quad \dot z_i = b + z_i(x_i - c)$$
-со стандартными $a=0.2$, $b=0.2$, $c=5.7$. Интегрирование — `scipy.integrate.solve_ivp`
-с фиксированной сеткой вывода (`t_eval`), метод RK45 или LSODA, допуски в `config.yaml`.
+with the standard $a=0.2$, $b=0.2$, $c=5.7$. Integration — `scipy.integrate.solve_ivp` with a fixed
+output grid (`t_eval`), method RK45 or LSODA, tolerances in `config.yaml`.
 
-**Интегрировать надо по одному режиму за вызов, а не весь ряд одним.** $A(t)$
-кусочно-постоянна, то есть правая часть разрывна на границах режимов. Адаптивный шаг RK45
-об этом не знает: шаг, перешагнувший границу, усредняет две разные правые части, контроль
-ошибки на нём считается по неверной оценке, и результат зависит от того, куда именно попал
-шаг. Страдают обе вещи сразу — и точность, и воспроизводимость, ради которой весь этот
-раздел и написан.
+**Integrate one regime per call, not the whole series in one.** $A(t)$ is piecewise constant, i.e. the
+right-hand side is discontinuous at regime boundaries. The adaptive RK45 step does not know this: a step
+that straddles a boundary averages two different right-hand sides, error control on it is computed from
+a wrong estimate, and the result depends on where exactly the step fell. Both things suffer at once —
+accuracy and reproducibility, for whose sake this whole section is written.
 
-Поэтому `solve_ivp` вызывается по разу на режим: конечное состояние предыдущего вызова
-становится начальным для следующего. Тогда каждый вызов интегрирует гладкую систему, а
-разрыв приходится ровно на стык, где он и должен быть.
+So `solve_ivp` is called once per regime: the final state of the previous call becomes the initial state
+of the next. Then each call integrates a smooth system, and the discontinuity falls exactly at the
+junction, where it belongs.
 
-**Связь $\varepsilon$ работает в окне, а не «чем больше, тем лучше».** Диффузная связь на
-полном блоке размера $m$ даёт поперечную связь порядка $\varepsilon m$, и выше некоторого
-значения наступает **полная синхронизация**: каналы внутри блока становятся побитово
-одинаковыми, $|r|$ внутри блока равен ровно единице, а внутри блока не остаётся никакой
-изменчивости. Как аналог фМРТ такой набор бессмыслен — восстанавливать нечего.
+**The coupling $\varepsilon$ works in a window, not "the larger the better".** Diffusive coupling on a
+complete block of size $m$ gives a transverse coupling of order $\varepsilon m$, and above a certain
+value **complete synchronisation** sets in: the channels within a block become bitwise identical, $|r|$
+within the block equals exactly one, and no variability remains within the block. As an fMRI analogue
+such a dataset is meaningless — there is nothing to recover.
 
-Снизу связь просто не проявляется. Измерено при 30 каналах и блоках по 10 (разрыв между
-средним $|r|$ внутри блока и между блоками):
+From below the coupling simply does not show. Measured at 30 channels and blocks of 10 (gap between the
+mean $|r|$ within a block and between blocks):
 
 | $\varepsilon$ | 0.002 | 0.005 | 0.01 | 0.02 | 0.04 | 0.15 |
 |---|---|---|---|---|---|---|
-| Разрыв $\lvert r\rvert$ | 0.090 | 0.440 | **0.542** | 0.445 | 0.334 | 0.348 |
-| Разброс внутри блока | 19.0 | 8.80 | 6.67 | 5.89 | $2.7\cdot10^{-9}$ | 0 |
+| Gap in $\lvert r\rvert$ | 0.090 | 0.440 | **0.542** | 0.445 | 0.334 | 0.348 |
+| Within-block spread | 19.0 | 8.80 | 6.67 | 5.89 | $2.7\cdot10^{-9}$ | 0 |
 
-При $\varepsilon \ge 0.04$ разброс внутри блока обращается в машинный ноль — это и есть
-полная синхронизация; разрыв при этом остаётся ненулевым только за счёт межблочных
-корреляций и вводит в заблуждение. Принято $\varepsilon = 0.01$, середина окна
-$[0.005,\ 0.02]$ в логарифмическом масштабе — тем же правилом, каким выбраны $k$ в 1.3 и
-$\varepsilon$ в 2.1a.
+At $\varepsilon \ge 0.04$ the within-block spread drops to machine zero — this is complete
+synchronisation; the gap meanwhile stays non-zero only thanks to between-block correlations and is
+misleading. $\varepsilon = 0.01$ is adopted, the middle of the window $[0.005,\ 0.02]$ on a logarithmic
+scale — by the same rule by which $k$ in 1.3 and $\varepsilon$ in 2.1a were chosen.
 
-**Про воспроизводимость Рёсслера отдельно.** При $c = 5.7$ система хаотична, и траектории
-расходятся экспоненциально от любого возмущения. Требование «те же начальные условия и
-`t_eval` → тот же ряд» выполняется, потому что вычисление детерминировано, но набор **не**
-устойчив к смене версии scipy, метода или допусков: при них ряд поедет целиком, а не
-чуть-чуть. Это ограничение записывается в `notes` набора, а не считается дефектом.
+**On Rössler reproducibility separately.** At $c = 5.7$ the system is chaotic, and trajectories diverge
+exponentially from any perturbation. The requirement "the same initial conditions and `t_eval` → the
+same series" holds because the computation is deterministic, but the dataset is **not** robust to a
+change of scipy version, method or tolerances: under them the series moves entirely, not slightly. This
+limitation is recorded in the dataset's `notes`, not considered a defect.
 
-### 3.4. Скользящее окно
+### 3.4. Sliding window
 
-Окно длины $L$ с шагом $s$; в каждом окне — матрица корреляций Пирсона. Результат —
-последовательность взвешенных полносвязных графов, то есть динамический граф.
+A window of length $L$ with step $s$; in each window a Pearson correlation matrix. The result is a
+sequence of weighted fully connected graphs, i.e. a dynamic graph.
 
-**Знак корреляции: сходство — это $|r|$.** В расстояния идёт $d = 1 - |r|$ с занулённой
-диагональю. Модуль здесь не косметика: $1 - r$ при $r < 0$ превышает единицу, а проверка
-матрицы расстояний требует неотрицательности и нулей на диагонали. Содержательно
-антикорреляция — это тоже связь, и по абсолютной величине она сильная; отбрасывать её
-знаком значило бы объявить сильно антикоррелированные каналы несвязанными.
+**The sign of correlation: similarity is $|r|$.** Distances are $d = 1 - |r|$ with a zeroed diagonal.
+The absolute value is not cosmetic here: $1 - r$ at $r < 0$ exceeds one, and the distance matrix check
+requires non-negativity and zeros on the diagonal. In substance, anticorrelation is also a connection,
+and a strong one in absolute value; discarding it by sign would declare strongly anticorrelated channels
+unconnected.
 
-**Преобразование Фишера — не на пути к расстояниям.** $z = \operatorname{arctanh} r$
-нужно там, где корреляции складывают, усредняют или сравнивают статистически: у него
-приблизительно постоянная дисперсия, чего у $r$ нет. Но $z$ не ограничено сверху,
-$\operatorname{arctanh}(1) = \infty$ на диагонали, и $1 - z$ не лежит в $[0,1]$ и метрикой
-не является. Поэтому корреляция употребляется здесь **двумя разными способами**, и
-смешивать их нельзя:
+**The Fisher transform is not on the way to distances.** $z = \operatorname{arctanh} r$ is needed where
+correlations are added, averaged or compared statistically: it has an approximately constant variance,
+which $r$ does not. But $z$ is unbounded above, $\operatorname{arctanh}(1) = \infty$ on the diagonal, and
+$1 - z$ does not lie in $[0,1]$ and is not a metric. So correlation is used here **in two different
+ways**, and they must not be mixed:
 
-| Употребление | Величина | Зачем |
+| Use | Quantity | Why |
 |---|---|---|
-| Вес ребра, затем расстояние | $|r|$, затем $1 - |r|$ | вход фильтрации |
-| Статистика согласия с $A(t)$ | $z = \operatorname{arctanh} r$ | сравнение восстановленной связности с истинной |
+| Edge weight, then distance | $|r|$, then $1 - |r|$ | input of the filtration |
+| Statistic of agreement with $A(t)$ | $z = \operatorname{arctanh} r$ | comparing recovered connectivity with the true one |
 
-Флаг `fisher_z` в конфиге относится ко второму и только к нему.
+The `fisher_z` flag in the config refers to the second and only to it.
 
-**Окно ограничено с двух сторон, а не с одной.** Прежняя редакция называла только верхнюю
-границу; нижней не было, и конфиг её нарушал в шесть раз.
+**The window is bounded on both sides, not one.** An earlier edition named only the upper bound; there
+was no lower one, and the config violated it sixfold.
 
-$$\text{период колебания} \;\ll\; L\,\Delta t \;\ll\; \text{длительность режима}$$
+$$\text{oscillation period} \;\ll\; L\,\Delta t \;\ll\; \text{regime duration}$$
 
-Сверху: если окно длиннее интервала между сменами режима, событие размазывается и его
-нельзя локализовать. Снизу: если окно короче нескольких периодов, корреляция измеряет не
-связь, а общий тренд — за долю периода любые две гладкие синусоиды похожи. Измерено при
-$K = 6$, 30 каналов, блоки по 10:
+From above: if the window is longer than the interval between regime changes, the event is smeared and
+cannot be localised. From below: if the window is shorter than several periods, the correlation measures
+not coupling but a common trend — over a fraction of a period any two smooth sinusoids look alike.
+Measured at $K = 6$, 30 channels, blocks of 10:
 
-| $\Delta t$ | Периодов в окне | $\lvert r\rvert$ внутри блока | между блоками | Согласие |
+| $\Delta t$ | Periods per window | $\lvert r\rvert$ within block | between blocks | Agreement |
 |---|---|---|---|---|
 | 0.01 | 0.16 | 0.946 | 0.936 | 0.067 |
 | 0.05 | 0.80 | 0.833 | 0.764 | 0.144 |
@@ -927,186 +896,180 @@ $K = 6$, 30 каналов, блоки по 10:
 | 0.2 | 3.18 | 0.721 | 0.483 | 0.347 |
 | 0.4 | 6.37 | 0.717 | 0.408 | 0.463 |
 
-При 0.16 периода внутриблочная и межблочная корреляции равны 0.946 и 0.936 — связь не
-восстанавливается вовсе, и никакой порог согласия этого не спасает. Принято
-$\Delta t = 0.2$, то есть около трёх периодов в окне при 10% длительности режима.
+At 0.16 periods the within-block and between-block correlations are 0.946 and 0.936 — coupling is not
+recovered at all, and no agreement threshold can save this. $\Delta t = 0.2$ is adopted, i.e. about
+three periods per window at 10% of the regime duration.
 
-**Второе условие — надпороговая связь.** У Курамото эффективная связь внутри блока равна
-$(K/N)(\lvert\text{блок}\rvert - 1)$, и она должна превышать критическую
-$K_c \approx 1.6\,\sigma_\omega$. При $K = 1.2$, $N = 30$ и блоках по 10 это $0.36$ против
-$1.6$ — система ниже порога синхронизации. Принято $K = 6$, то есть $1.8$ против $1.6$.
-Оба условия независимы: подъём $K$ без исправления окна не помогает (при $K = 60$ согласие
-всё ещё 0.712, потому что ограничение по окну доминирует).
+**The second condition is supercritical coupling.** For Kuramoto the effective coupling within a block
+equals $(K/N)(\lvert\text{block}\rvert - 1)$, and it must exceed the critical
+$K_c \approx 1.6\,\sigma_\omega$. At $K = 1.2$, $N = 30$ and blocks of 10 this is $0.36$ against $1.6$ —
+the system is below the synchronisation threshold. $K = 6$ is adopted, i.e. $1.8$ against $1.6$. The two
+conditions are independent: raising $K$ without fixing the window does not help (at $K = 60$ the
+agreement is still 0.712, because the window limitation dominates).
 
-**Чего статистика согласия не делает: она не различает режимы.** Согласие с *чужим*
-режимом доходит до 0.440 при истинном минимуме 0.383, то есть классы перекрываются, и
-никакой порог их не разделит. Это не дефект, а следствие вложенности разбиений из 3.1a:
-$[20,10]$ — огрубление $[10,10,10]$, и соседние режимы совпадают большей частью структуры.
-Честный нулевой контроль здесь — **перестановка меток каналов**: она даёт от $-0.039$ до
-$0.068$ против истинных $0.383\ldots0.878$, и разрыв чистый.
+**What the agreement statistic does not do: it does not distinguish regimes.** Agreement with *another*
+regime reaches 0.440 against a true minimum of 0.383, i.e. the classes overlap, and no threshold will
+separate them. This is not a defect but a consequence of the nesting of partitions in 3.1a: $[20,10]$ is
+a coarsening of $[10,10,10]$, and neighbouring regimes share most of their structure. The honest null
+control here is **a permutation of channel labels**: it gives $-0.039$ to $0.068$ against the true
+$0.383\ldots0.878$, and the gap is clean.
 
-Практическое следствие: `min_coupling_agreement` подтверждает, что окно восстанавливает
-связь, и **не** является инструментом локализации смены режима. Для локализации нужен
-другой аппарат, и это работа Задачи 2, а не проверка генератора.
+Practical consequence: `min_coupling_agreement` confirms that the window recovers coupling and is
+**not** a tool for localising a regime change. Localisation needs a different apparatus, and that is the
+work of Task 2, not a check of the generator.
 
 ---
 
-## 4. Семейство 4: шум и нулевые модели
+## 4. Family 4: noise and null models
 
-**Контролируемый шум** к эталонным наборам, каждый — с уровнем как параметром:
+**Controlled noise** on the reference datasets, each with its level as a parameter:
 
-- гауссов джиттер весов рёбер: $w' = \operatorname{clip}(w + \mathcal{N}(0,\sigma^2))$
-  в допустимый диапазон;
-- ложные рёбра: доля $p^+$ от числа отсутствующих рёбер, веса берутся из эмпирического
-  распределения существующих;
-- пропущенные рёбра: доля $p^-$ удаляемых рёбер;
-- джиттер положения точек в облаке: $\sigma$ в объемлющем пространстве.
+- Gaussian jitter of edge weights: $w' = \operatorname{clip}(w + \mathcal{N}(0,\sigma^2))$ into the
+  admissible range;
+- spurious edges: a fraction $p^+$ of the absent edges, weights drawn from the empirical distribution of
+  existing ones;
+- missing edges: a fraction $p^-$ of edges removed;
+- jitter of point positions in a cloud: $\sigma$ in the ambient space.
 
-**Нулевые модели:** Erdős–Rényi $G(n,p)$ и равномерные облака точек. Требование:
-алгоритм временных диаграмм НЕ должен обнаруживать событий там, где их нет — контроль
-доли ложных срабатываний. Разбор того, что это требование означает для самого набора,
-а что относится к Задаче 2, — в 4.2.
+**Null models:** Erdős–Rényi $G(n,p)$ and uniform point clouds. Requirement: the temporal diagram
+algorithm must NOT detect events where there are none — control of the false positive rate. What this
+requirement means for the dataset itself and what belongs to Task 2 is worked out in 4.2.
 
-**Как это используется в результате 6:** bottleneck-расстояние между диаграммой «чистого»
-набора и диаграммами зашумлённых версий как функция уровня шума, с сопоставлением теореме
-устойчивости (Cohen-Steiner, Edelsbrunner, Harer). Считается сборкой по флагу `--results`
-и кладётся в `results/stability.json`; состав объектов и число точек — в 4.2a.
+**How this is used in Result 6:** the bottleneck distance between the diagram of the "clean" dataset and
+the diagrams of its noisy versions as a function of the noise level, compared with the stability theorem
+(Cohen-Steiner, Edelsbrunner, Harer). Computed by the build with the `--results` flag and stored in
+`results/stability.json`; the choice of objects and number of points — in 4.2a.
 
-### 4.1. Граница устойчивости для Рипса: множитель 2, а не 1
+### 4.1. The stability bound for Rips: a factor of 2, not 1
 
-Наивная запись $d_B \le d_H$ **неверна** и отвергается измерением. Верно
+The naive form $d_B \le d_H$ is **wrong** and is rejected by measurement. The right one is
 $$d_B \le 2\,d_{GH} \le 2\,d_H .$$
 
-Двойка не подгонка под замер, она следует из параметризации. Значение фильтрации симплекса
-в комплексе Рипса — его **диаметр**, а не радиус. Если каждая точка сдвинута не более чем
-на $\delta$, то для любого симплекса $\sigma$
+The two is not fitted to the measurement; it follows from the parametrisation. The filtration value of a
+simplex in the Rips complex is its **diameter**, not its radius. If each point is moved by at most
+$\delta$, then for any simplex $\sigma$
 $$\Bigl|\max_{i,j\in\sigma} d(x_i,x_j) - \max_{i,j\in\sigma} d(y_i,y_j)\Bigr|
 \;\le\; 2\max_i \lVert x_i - y_i\rVert \;\le\; 2\delta,$$
-потому что сдвигаются оба конца пары, реализующей максимум. То есть две фильтрации
-$2\delta$-перемежаются, и теорема Коэн-Штайнера даёт $d_B \le 2\delta$. Запись без двойки
-соответствовала бы фильтрации, параметризованной **радиусом** (комплекс Чеха с шарами
-радиуса $r$), а не диаметром.
+because both ends of the pair realising the maximum move. That is, the two filtrations are
+$2\delta$-interleaved, and the Cohen-Steiner theorem gives $d_B \le 2\delta$. The form without the two
+would correspond to a filtration parametrised by **radius** (the Čech complex with balls of radius $r$),
+not by diameter.
 
-Проверено на окружности, 400 точек, гауссов джиттер, три калибровочных сида, по $H_1$.
-**Поток случайности — `rng_for(seed, "stability")`**, тот же, что в
-`test_the_stability_theorem_holds_with_the_factor_two`: без указания потока замер
-невоспроизводим, и первая редакция этой таблицы именно поэтому разошлась с прогоном.
+Checked on the circle, 400 points, Gaussian jitter, three calibration seeds, on $H_1$. **The random
+stream is `rng_for(seed, "stability")`**, the same as in
+`test_the_stability_theorem_holds_with_the_factor_two`: without specifying the stream the measurement is
+not reproducible, and the first edition of this table diverged from the run for exactly this reason.
 
 | $\sigma$ | $d_B / d_H$ | $d_B \le d_H$ | $d_B \le 2 d_H$ |
 |---|---|---|---|
-| 0.02 | **1.05** / 0.73 / 0.96 | **нет** | да |
-| 0.05 | **1.14** / 0.97 / **1.07** | **нет** | да |
-| 0.10 | **1.33** / **1.03** / **1.15** | **нет** | да |
-| 0.15 | **1.24** / **1.03** / **1.29** | **нет** | да |
+| 0.02 | **1.05** / 0.73 / 0.96 | **no** | yes |
+| 0.05 | **1.14** / 0.97 / **1.07** | **no** | yes |
+| 0.10 | **1.33** / **1.03** / **1.15** | **no** | yes |
+| 0.15 | **1.24** / **1.03** / **1.29** | **no** | yes |
 
-Девять из двенадцати комбинаций нарушают $d_B \le d_H$, отношение доходит до 1.33; границу
-$2 d_H$ не нарушает ни одна (максимум по $H_1$ — 1.33 при допустимых 2.0). Отношение
-растёт с уровнем шума, то есть это не краевой эффект малых возмущений.
+Nine of twelve combinations violate $d_B \le d_H$, the ratio reaches 1.33; none violates the $2 d_H$
+bound (the maximum over $H_1$ is 1.33 against the admissible 2.0). The ratio grows with the noise level,
+i.e. this is not an edge effect of small perturbations.
 
-**Ловушка при написании теста.** В $H_0$ граница $d_B \le d_H$ не нарушается нигде, потому
-что нульмерные бары рождаются все в нуле и bottleneck по ним ведёт себя мягче. Тест,
-написанный только по $H_0$, прошёл бы и оставил неверную границу в документе; отказ виден
-исключительно в $H_1$.
+**A trap in writing the test.** In $H_0$ the bound $d_B \le d_H$ is never violated, because
+zero-dimensional bars are all born at zero and bottleneck behaves more gently on them. A test written on
+$H_0$ alone would pass and leave a wrong bound in the document; the failure is visible only in $H_1$.
 
 ---
 
-### 4.2a. Кривая устойчивости считается не на одной окружности
+### 4.2a. The stability curve is not computed on one circle
 
-Результат 6 — это $d_B$ как функция уровня шума, и объект, на котором она снята, решает,
-что она вообще утверждает. Окружности недостаточно, и это следует из истории критерия
-в 1.2a: старое правило теряло $H_2$ на торе и бутылке Клейна и **выдумывало** петли на
-сфере, то есть анизотропные и компактные объекты ошибались в разные стороны. Утверждение
-«диаграммы устойчивы к шуму», подкреплённое одной окружностью с $\beta_1 = 1$, про $H_2$
-не говорит ничего — а $H_2$ самое хрупкое место пайплайна.
+Result 6 is $d_B$ as a function of the noise level, and the object it is taken on decides what it claims
+at all. A circle is not enough, and this follows from the history of the criterion in 1.2a: the old rule
+lost $H_2$ on the torus and the Klein bottle and **invented** loops on the sphere, i.e. anisotropic and
+compact objects erred in different directions. The statement "diagrams are stable under noise", backed
+by a single circle with $\beta_1 = 1$, says nothing about $H_2$ — and $H_2$ is the most fragile part of
+the pipeline.
 
-Принятый состав — **окружность, тор, сфера**. Измерено при 400 точках, джиттер точек,
-среднее по 10 повторам:
+The adopted set is **circle, torus, sphere**. Measured at 400 points, point jitter, mean over 10 repeats:
 
-| Объект | $H_1$ при $\sigma = 0 \ldots 0.10$ | $H_2$ при $\sigma = 0 \ldots 0.10$ |
+| Object | $H_1$ at $\sigma = 0 \ldots 0.10$ | $H_2$ at $\sigma = 0 \ldots 0.10$ |
 |---|---|---|
-| Окружность | 0 → 0.357 | плоско, около 0.02 |
-| Сфера | почти плоско, 0.036 → 0.054 | 0 → **0.299** |
-| Тор | 0 → 0.231 | 0 → **0.121** |
+| Circle | 0 → 0.357 | flat, about 0.02 |
+| Sphere | almost flat, 0.036 → 0.054 | 0 → **0.299** |
+| Torus | 0 → 0.231 | 0 → **0.121** |
 
-Одна окружность дала бы плоскую $H_2$ около 0.02 и не сказала бы о второй размерности
-ничего; сигнал в $H_2$ несут сфера и тор. Обратное тоже верно: у сферы $\beta_1 = 0$,
-и её $H_1$ почти не двигается — то есть каждый объект информативен ровно в своей
-размерности, и набор из одного объекта информативен наполовину.
+A single circle would give a flat $H_2$ at about 0.02 and would say nothing about the second dimension;
+the signal in $H_2$ is carried by the sphere and the torus. The converse is also true: the sphere has
+$\beta_1 = 0$, and its $H_1$ barely moves — that is, each object is informative exactly in its own
+dimension, and a set of one object is informative by half.
 
-**Число точек здесь — не то, что при восстановлении чисел Бетти.** Тор настроен на 900
-точек, чтобы его бар $H_2$ отделялся от шума; кривая меряет другое — насколько сдвигается
-диаграмма, а это определено для любого бара, значим он или нет. При 900 точках одна
-диаграмма стоит 25 секунд и кривая заняла бы четверть часа. Использованное число точек
-записывается в сам артефакт, чтобы числа оставались читаемыми.
+**The number of points here is not the same as for recovering Betti numbers.** The torus is set to 900
+points so that its $H_2$ bar separates from noise; the curve measures something else — how far the
+diagram moves, and this is defined for any bar, significant or not. At 900 points one diagram costs 25
+seconds and the curve would take a quarter of an hour. The number of points used is written into the
+artefact itself so that the numbers stay readable.
 
-### 4.2. Нулевой набор измеряет частоту ложных срабатываний, а не утверждает ноль
+### 4.2. A null dataset measures the false positive rate rather than claiming zero
 
-Формулировка «у нулевой модели нет значимых долгоживущих баров» выглядит естественной
-и **невыполнима**. Случайный граф честно имеет циклы; это не артефакт вычисления и не шум,
-который можно отсечь порогом, — это и есть нулевое распределение, относительно которого
-измеряется всё остальное.
+The wording "the null model has no significant long-lived bars" looks natural and is **impossible to
+satisfy**. A random graph honestly has cycles; this is not an artefact of computation and not noise that
+can be cut off by a threshold — it is the null distribution against which everything else is measured.
 
-Измерено на ER, $n = 24$, флаг-комплекс эталонной реализацией, 5 реализаций на плотность,
-поток `rng_for(seed, "er_density", repeat)`.
+Measured on ER, $n = 24$, flag complex by the reference implementation, 5 realisations per density,
+stream `rng_for(seed, "er_density", repeat)`.
 
-**Приводится разброс по пяти реализациям, а не «типичное» значение.** Первая редакция
-таблицы держала первую реализацию из пяти под именем типичной, и это оказалось
-статистикой, которая переворачивается от смены потока: при $m = 180$ первая реализация
-даёт $(1,0,0)$, тогда как у двух из пяти $\beta_2 = 2$. Разброс от такой замены
-не страдает и говорит ровно то, ради чего таблица нужна.
+**The spread over five realisations is given, not a "typical" value.** The first edition of the table
+kept the first realisation of five under the name of typical, and that turned out to be a statistic that
+flips with a change of stream: at $m = 180$ the first realisation gives $(1,0,0)$, while two of five have
+$\beta_2 = 2$. The spread does not suffer from such a substitution and says exactly what the table is
+needed for.
 
-| $m$ рёбер | 12 | 24 | 36 | 60 | 100 | 180 | 220 |
+| $m$ edges | 12 | 24 | 36 | 60 | 100 | 180 | 220 |
 |---|---|---|---|---|---|---|---|
 | $p$ | 0.043 | 0.087 | 0.130 | 0.217 | 0.362 | 0.652 | 0.797 |
 | $\beta_0$ | 12–14 | 4–5 | 1–3 | 1 | 1 | 1 | 1 |
 | $\beta_1$ | 0–1 | 2–5 | 8–12 | 13–22 | 3–7 | 0 | 0 |
 | $\beta_2$ | 0 | 0 | 0 | 0 | **3–6** | **0–2** | 0 |
-| чистых $(1,0,0)$ из 5 | 0 | 0 | 0 | 0 | 0 | 3 | 5 |
+| clean $(1,0,0)$ out of 5 | 0 | 0 | 0 | 0 | 0 | 3 | 5 |
 
-Снизу граф рассыпан на компоненты. Выше порога связности $p \approx \ln n / n = 0.13$ он
-связен, но несёт от 8 до 22 независимых циклов; в середине появляется ещё и $\beta_2$.
-Надёжно чисто становится только при $p \gtrsim 0.8$: при $p = 0.652$ чисты уже три
-реализации из пяти, но у остальных двух держится $\beta_2 = 2$, то есть режим ещё не
-вышел из области, где признаки появляются сами. Плотность `cycle_lifecycle`
-(24 ребра из 276) даёт $\beta_0 = 4\ldots5$ и $\beta_1 = 2\ldots5$ — рабочий режим
-набора лежит глубоко внутри области, где циклы есть всегда.
+From below the graph is scattered into components. Above the connectivity threshold
+$p \approx \ln n / n = 0.13$ it is connected but carries 8 to 22 independent cycles; in the middle
+$\beta_2$ appears as well. It becomes reliably clean only at $p \gtrsim 0.8$: at $p = 0.652$ three
+realisations of five are already clean, but the other two keep $\beta_2 = 2$, i.e. the regime has not
+yet left the region where features appear by themselves. The density of `cycle_lifecycle` (24 edges out
+of 276) gives $\beta_0 = 4\ldots5$ and $\beta_1 = 2\ldots5$ — the working regime of the dataset lies deep
+inside the region where cycles are always present.
 
-**Отсюда истина нулевого набора: расписания нет, список событий пуст.** Это утверждение
-о конструкции, оно проверяемо на уровне генератора и не зависит от того, что покажет
-персистентность. Наблюдённая кривая Бетти считается эталоном, но **в `ground_truth.json`
-не пишется**: измеренная кривая под именем истины — это истина как выход пайплайна, ровно
-та развилка, что разобрана для SBM в 3.1, и решается она так же.
+**Hence the truth of the null dataset: there is no schedule, the event list is empty.** This is a
+statement about the construction, it is checkable at the generator level and does not depend on what
+persistence shows. The observed Betti curve is computed by the reference but **is not written into
+`ground_truth.json`**: a measured curve under the name of truth is truth as pipeline output, exactly the
+fork worked out for SBM in 3.1, and it is resolved the same way.
 
-Частота ложных срабатываний — величина, которую нулевой набор позволяет **измерить**,
-а не свойство, которым он обладает. Измеряется она алгоритмом локализации событий, то есть
-в Задаче 2, и публикуется в Результате 6.
+The false positive rate is a quantity that the null dataset allows one to **measure**, not a property it
+has. It is measured by the event localisation algorithm, i.e. in Task 2, and published in Result 6.
 
-**Следствие для конструкции.** У фильтрации Рипса по облаку точек параметра плотности нет
-вообще: фильтрация проходит все пороги. Плотность осмысленна только для порогованного
-графа. Поэтому нулевые модели разведены по двум пайплайнам проекта:
+**Consequence for the construction.** A Rips filtration on a point cloud has no density parameter at
+all: the filtration goes through every threshold. Density makes sense only for a thresholded graph. So
+the null models are split between the project's two pipelines:
 
-| Нулевая модель | Пайплайн | Плотность |
+| Null model | Pipeline | Density |
 |---|---|---|
-| Равномерное облако в кубе | семейство 1: облако → Рипс | не определена и не нужна |
-| Erdős–Rényi | семейство 2: снимки → флаг-комплекс | равна плотности `cycle_lifecycle` |
+| Uniform cloud in a cube | family 1: cloud → Rips | undefined and unnecessary |
+| Erdős–Rényi | family 2: snapshots → flag complex | equal to the density of `cycle_lifecycle` |
 
 ---
 
-## 5. Известные артефакты, которые НЕ являются багами
+## 5. Known artefacts that are NOT bugs
 
-- **Комплекс Рипса окружности при росте масштаба** последовательно гомотопически
-  эквивалентен $S^1, S^3, S^5,\dots$ (Adamaszek–Adams). Значит, на больших масштабах
-  закономерно появляются паразитные классы в нечётных размерностях. Это ожидаемо;
-  «чинить» это не нужно, достаточно ограничить диапазон значимости.
-- **Числа Бетти по зашумлённой выборке восстанавливаются только как персистентные**,
-  то есть через число долгоживущих баров, а не точно. Требовать точного совпадения
-  при $\sigma > 0$ бессмысленно.
-- **$H_0$ всегда содержит один бесконечный бар.** При подсчёте компонент его нужно
-  учитывать явно, иначе получится $\beta_0$ на единицу меньше.
-- **Двойной подсчёт при симметричной матрице весов** — источник тихой ошибки в
-  плотности и в долях $p^\pm$: считать по верхнему треугольнику.
+- **The Rips complex of a circle as the scale grows** is successively homotopy equivalent to
+  $S^1, S^3, S^5,\dots$ (Adamaszek–Adams). So at large scales spurious classes in odd dimensions
+  naturally appear. This is expected; it does not need "fixing" — it is enough to limit the range of
+  significance.
+- **Betti numbers from a noisy sample are recovered only as persistent ones**, i.e. through the number
+  of long-lived bars, not exactly. Requiring an exact match at $\sigma > 0$ is meaningless.
+- **$H_0$ always contains one infinite bar.** When counting components it must be accounted for
+  explicitly, otherwise $\beta_0$ comes out one smaller.
+- **Double counting with a symmetric weight matrix** is a source of a silent error in density and in the
+  fractions $p^\pm$: count over the upper triangle.
 
-## Литература
+## References
 
 - Edelsbrunner, Harer. Computational Topology: An Introduction.
 - Carlsson, de Silva. Zigzag persistence.

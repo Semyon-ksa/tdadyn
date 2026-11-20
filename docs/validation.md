@@ -1,349 +1,348 @@
-# Критерии корректности
+# Correctness criteria
 
-Главный риск в этом коде — не падение, а правдоподобно выглядящий набор данных с
-неверной истиной. Такая ошибка не проявится здесь: она проявится в Задаче 2, где
-алгоритм будет валидироваться против испорченного эталона, и обнаружится в лучшем
-случае на рецензировании.
+The main risk in this code is not a crash but a plausible-looking dataset with wrong truth.
+Such an error does not show up here: it shows up in Task 2, where the algorithm will be
+validated against a corrupted reference, and at best it is discovered in peer review.
 
-## 1. Принцип независимой проверки
+## 1. The principle of independent verification
 
-Ожидаемые числа Бетти в тестах берутся **из таблицы в `docs/method.md`**, а не из
-результата работы кода. Проверка выполняется двумя независимыми путями:
+Expected Betti numbers in the tests are taken **from the table in `docs/method.md`**, not from
+the output of the code. Verification runs along two independent paths:
 
-- **путь A (основной пайплайн):** ripser/gudhi по матрице расстояний;
-- **путь B (эталон):** независимая реализация в `src/tdadyn/reference/`,
-  вычисляющая числа Бетти через ранги граничных матриц над Z/2 напрямую (numpy),
-  без использования библиотек персистентности.
+- **path A (main pipeline):** ripser/gudhi on the distance matrix;
+- **path B (reference):** an independent implementation in `src/tdadyn/reference/` that
+  computes Betti numbers directly from ranks of boundary matrices over Z/2 (numpy), without
+  any persistence library.
 
-Путь B заведомо медленный и применим только к малым комплексам (N ≤ 30 узлов) —
-именно поэтому динамические сценарии проектируются на малое число узлов. Тест требует
-согласия A, B и таблицы ожиданий. Совпадение двух реализаций из трёх источников —
-то, что отличает проверку от самоподтверждения.
+Path B is deliberately slow and applies only to small complexes (N ≤ 30 nodes) — that is why
+the dynamic scenarios are designed on few nodes. A test requires agreement of A, B and the
+table of expectations. Agreement of two implementations out of three sources is what tells a
+check apart from self-confirmation.
 
-### 1.1. Как путь B применяется к семейству 1
+### 1.1. How path B applies to family 1
 
-Семейство 1 — облака в сотни точек, а путь B ограничен `reference_max_nodes`. Прямое
-сравнение невозможно, поэтому проверка расщепляется на два **разных** теста, которые
-нельзя смешивать.
+Family 1 consists of clouds of hundreds of points, while path B is limited by
+`reference_max_nodes`. A direct comparison is impossible, so verification splits into two
+**different** tests that must not be mixed.
 
-**Тест 1 — восстановление топологии многообразия.** Полное облако (400 точек), путь A,
-сравнение с таблицей ожиданий из `docs/method.md` по числу значимых баров. Путь B здесь
-не участвует принципиально: на малой выборке зазоры между соседними точками случайны,
-и масштаба, дающего табличный ответ, может не существовать вообще. Требовать таблицу от
-малого облака — значит вынуждать себя подбирать масштаб, пока не сойдётся, то есть
-подгонять истину.
+**Test 1 — recovering the topology of the manifold.** The full cloud (400 points), path A,
+comparison with the table of expectations in `docs/method.md` by the number of significant
+bars. Path B does not take part in principle: on a small sample the gaps between neighbouring
+points are random, and a scale giving the table answer may not exist at all. Requiring the
+table from a small cloud means forcing yourself to tune the scale until it fits — i.e. fitting
+the truth.
 
-**Тест 2 — согласие двух реализаций.** Подвыборка из того же облака размером
-`cross_check_n_points` (порядка 18–20 точек), несколько фиксированных масштабов, оба пути
-считают числа Бетти **одного и того же комплекса**. Ожидаемое значение здесь — не таблица,
-а взаимное согласие: что бы ни выдали реализации, они обязаны выдать одно и то же.
-Табличный ответ на большинстве масштабов не появится, и это не ошибка.
+**Test 2 — agreement of the two implementations.** A subsample of the same cloud of size
+`cross_check_n_points` (around 18–20 points), several fixed scales, both paths compute the Betti
+numbers **of one and the same complex**. The expected value here is not the table but mutual
+agreement: whatever the implementations produce, they must produce the same thing. The table
+answer will not appear at most scales, and that is not an error.
 
-Механика сравнения (иначе сравнивается несравнимое):
+Mechanics of the comparison (otherwise incomparable things get compared):
 
-- ripser возвращает **персистентные** гомологии по всем масштабам, эталон — числа Бетти
-  **одного** комплекса при фиксированном пороге. Чтобы привести к общему виду, из штрихкода
-  берётся $\beta_k(\varepsilon) = \#\{$бары с $b \le \varepsilon < d\}$. Интервал
-  полуоткрытый: при $\varepsilon = d$ бар уже мёртв.
-- ripser вызывается с `thresh=inf`, иначе бары обрезаются порогом и счёт разойдётся
-  на больших $\varepsilon$.
-- Масштабы берутся **серединами между соседними различными попарными расстояниями**,
-  а не самими расстояниями: на самом значении расстояния симплекс входит в комплекс, и
-  сравнение упирается в равенство чисел с плавающей точкой. Середины от этого свободны.
-- Число точек подвыборки ограничено сверху не только `reference_max_nodes`, но и
-  стоимостью $\partial_3$: 3-симплексов до $\binom{n}{4}$.
+- ripser returns **persistent** homology over all scales, the reference returns the Betti
+  numbers of **one** complex at a fixed threshold. To bring them to a common form, the barcode
+  gives $\beta_k(\varepsilon) = \#\{$bars with $b \le \varepsilon < d\}$. The interval is
+  half-open: at $\varepsilon = d$ the bar is already dead.
+- ripser is called with `thresh=inf`, otherwise bars are clipped by the threshold and the count
+  diverges at large $\varepsilon$.
+- Scales are taken as **midpoints between neighbouring distinct pairwise distances**, not the
+  distances themselves: at the value of a distance the simplex enters the complex, and the
+  comparison comes down to equality of floating-point numbers. Midpoints are free of this.
+- The subsample size is bounded above not only by `reference_max_nodes` but also by the cost of
+  $\partial_3$: up to $\binom{n}{4}$ 3-simplices.
 
-**Ограничение пути B: только $\mathbb{Z}/2$.** Эталон намеренно не обобщён на произвольное
-$p$ (см. `docs/method.md`, раздел 1.2). Поэтому двойная проверка действует для рабочего
-поля проекта $\mathbb{Z}/2$ и не действует при $p = 3$: там доступен только путь A.
-Тесты при $p = 3$ формулируются как проверка согласованности, а не как подтверждение
-чисел Бетти, и это различие должно быть видно в названии теста и в его докстринге.
+**Limitation of path B: $\mathbb{Z}/2$ only.** The reference is deliberately not generalised to
+arbitrary $p$ (see `docs/method.md`, section 1.2). So the double check holds for the project's
+working field $\mathbb{Z}/2$ and not at $p = 3$: only path A is available there. Tests at
+$p = 3$ are stated as consistency checks, not as confirmation of Betti numbers, and this
+distinction must be visible in the test name and its docstring.
 
-## 2. Определение значимого бара
+## 2. Definition of a significant bar
 
-Персистентные числа Бетти при $\sigma > 0$ не точны, поэтому нужен критерий отделения
-настоящих признаков от шумовых баров.
+Persistent Betti numbers at $\sigma > 0$ are not exact, so a criterion is needed to separate
+real features from noise bars.
 
-**Статус: критерий откалиброван и принят.** Прежнее правило — персистентность не меньше
-`significance_ratio` × $\mathrm{diam}(X)$ — измерением признано непригодным: оно даёт
-ложные отрицания на анизотропных объектах (тор, бутылка Клейна: теряется $H_2$) и ложные
-срабатывания на компактных (сфера: лишние петли в $H_1$), причём диапазоны сигнала и шума
-в долях диаметра перекрываются, так что настройкой константы это не лечится. Обоснование
-с числами — `docs/method.md`, раздел 1.2a.
+**Status: the criterion is calibrated and adopted.** The earlier rule — persistence at least
+`significance_ratio` × $\mathrm{diam}(X)$ — was found unfit by measurement: it gives false
+negatives on anisotropic objects (torus, Klein bottle: $H_2$ is lost) and false positives on
+compact ones (sphere: extra loops in $H_1$), and the signal and noise ranges in fractions of the
+diameter overlap, so tuning the constant cannot fix it. Justification with numbers —
+`docs/method.md`, section 1.2a.
 
-**Область применимости.** Параметры откалиброваны на облаках точек семейства 1 и
-действуют только для него. На другие типы данных — и прежде всего на функциональные
-коннектомы Задачи 3 — они не наследуются: там иное распределение расстояний, а главное,
-нет известного $\beta_k$, относительно которого можно было бы откалибровать разрез.
-Подробнее — `docs/method.md`, раздел 1.2a.
+**Scope.** The parameters were calibrated on family-1 point clouds and hold only for it. They
+are not inherited by other data types — above all by the functional connectomes of Task 3:
+there the distance distribution differs, and above all there is no known $\beta_k$ against which
+the cut could be calibrated. More — `docs/method.md`, section 1.2a.
 
-**Принятое правило — разрыв в спектре с шагом в пыль.** Внутри каждой размерности:
+**The adopted rule — a gap in the spectrum with a step into the dust.** Within each dimension:
 
-1. персистентности сортируются по убыванию, бесконечные бары учитываются отдельно и
-   значимы всегда;
-2. бары ниже `gap_noise_floor_ratio` × $\mathrm{diam}(X)$ откладываются как пыль;
-3. ищется наибольшее отношение соседних значений, **включая шаг от последнего выжившего
-   бара к первому отложенному** — без этого шага объект, у которого над полом остаются
-   только настоящие признаки (две окружности: 1.473 и 1.453), даёт ноль вместо двух;
-4. если наибольшее отношение меньше `gap_min_ratio`, признаков нет — так получается
-   $\beta_k = 0$, ради которого шаг в пыль и введён;
-5. иначе $\beta_k$ равно позиции этого разрыва.
+1. persistences are sorted in decreasing order, infinite bars are counted separately and are
+   always significant;
+2. bars below `gap_noise_floor_ratio` × $\mathrm{diam}(X)$ are set aside as dust;
+3. the largest ratio of neighbouring values is sought, **including the step from the last
+   surviving bar to the first set-aside one** — without this step an object that has only real
+   features above the floor (two circles: 1.473 and 1.453) gives zero instead of two;
+4. if the largest ratio is below `gap_min_ratio`, there are no features — this is how
+   $\beta_k = 0$ arises, for which the step into the dust was introduced;
+5. otherwise $\beta_k$ equals the position of that gap.
 
-**Результат калибровки.** Правило верно на всех 54 комбинациях таблицы ниже
-(9 случаев × 3 сида × 2 уровня шума). Параметры взяты из **центра** области нулевых
-промахов, а не с края: нуль держится при поле от 0.05 до 0.10 и разрыве от 1.45 до 1.62;
-принято 0.07 и 1.55. Старое правило на той же таблице даёт 9 промахов.
+**Calibration result.** The rule is correct on all 54 combinations of the table below
+(9 cases × 3 seeds × 2 noise levels). The parameters are taken from the **centre** of the
+zero-miss region, not from its edge: zero holds for floor from 0.05 to 0.10 and gap from 1.45 to
+1.62; 0.07 and 1.55 were adopted. The old rule gives 9 misses on the same table.
 
-| Случай | Ожидание | Чем труден |
+| Case | Expectation | What makes it hard |
 |---|---|---|
-| Окружность, две окружности, восьмёрка | (1,1,0), (2,2,0), (1,2,0) | две окружности ловят правило без шага в пыль |
-| Тор $R{=}2.0$, $r{=}0.8$ | (1,2,1) | $H_2$ на масштабе $r$; при 400 точках не разделяется |
-| Сфера | (1,0,1) | $\beta_1 = 0$: проверка на ложные срабатывания |
-| Бутылка Клейна, $p{=}2$ | (1,2,1) | $H_2$ слабый, как у тора |
-| Бутылка Клейна, $p{=}3$ | (1,1,0) | при 600 точках неотличим от шума сферы; при 900 разделяется |
-| Зацепление Хопфа | (2,2,0) | компоненты не должны склеиться |
-| Нулевая модель (равномерный куб) | (1,0,0) | контроль ложных срабатываний |
+| Circle, two circles, figure eight | (1,1,0), (2,2,0), (1,2,0) | two circles catch the rule without the step into the dust |
+| Torus $R{=}2.0$, $r{=}0.8$ | (1,2,1) | $H_2$ at scale $r$; not separated at 400 points |
+| Sphere | (1,0,1) | $\beta_1 = 0$: a check for false positives |
+| Klein bottle, $p{=}2$ | (1,2,1) | weak $H_2$, like the torus |
+| Klein bottle, $p{=}3$ | (1,1,0) | at 600 points indistinguishable from sphere noise; separated at 900 |
+| Hopf link | (2,2,0) | components must not stick together |
+| Null model (uniform cube) | (1,0,0) | control of false positives |
 
-Критерий принимается, только если верен на **всех** строках. Правило разбирается по
-позиции наибольшего разрыва, а не по подобранному под датасет числу.
+The criterion is accepted only if it is correct on **every** row. The rule is read off the
+position of the largest gap, not off a number tuned to the dataset.
 
-**Оговорка про нулевую модель.** Строка нулевой модели проверяется на минимальном
-заменителе — равномерных точках в кубе — внутри харнесса калибровки, потому что
-семейство 4 появляется только в S8. Ожидание записано как (1,0,0), а не «нули во всех
-размерностях»: бесконечный бар в $H_0$ значим всегда, поэтому «признаков нет» означает
-одну компоненту и ничего сверх неё. Полноценные ER и случайные геометрические графы
-прогоняются через ту же таблицу в S8.
+**Note on the null model.** The null-model row is checked on a minimal substitute — uniform
+points in a cube — inside the calibration harness, because family 4 appears only in S8. The
+expectation is written as (1,0,0), not "zeros in every dimension": the infinite bar in $H_0$ is
+always significant, so "no features" means one component and nothing beyond it. Proper ER and
+random geometric graphs go through the same table in S8.
 
-Бесконечный бар в $H_0$ всегда значим и учитывается при подсчёте $\beta_0$.
+The infinite bar in $H_0$ is always significant and is counted in $\beta_0$.
 
-Тест: число значимых баров в размерности $k$ равно `expected_betti[k]`.
+Test: the number of significant bars in dimension $k$ equals `expected_betti[k]`.
 
-**Запрещено:** подбирать параметры критерия отдельно под датасет, чтобы тест прошёл.
-Параметры едины для всего семейства. Если при общих параметрах тест не проходит, причина
-одна из: недостаточно точек, слишком большой шум, неравномерное сэмплирование, ошибка
-в параметризации — или сам критерий непригоден. Первые четыре чинятся в генераторе;
-последнее — только правкой этого раздела с обоснованием в `method.md` и перепроверкой
-всей таблицы выше, но никогда подстройкой под один объект.
+**Forbidden:** tuning the criterion parameters per dataset to make a test pass. The parameters
+are common to the whole family. If a test fails with common parameters, the cause is one of:
+too few points, too much noise, non-uniform sampling, an error in the parametrisation — or the
+criterion itself is unfit. The first four are fixed in the generator; the last only by revising
+this section with a justification in `method.md` and rechecking the whole table above, but never
+by tuning to one object.
 
-## 3. Обязательные тесты по семействам
+## 3. Mandatory tests by family
 
-### Общие (для всех генераторов)
+### Common (for every generator)
 
-| Тест | Что проверяет |
+| Test | What it checks |
 |---|---|
-| Детерминизм | Два вызова с одинаково засеянным `rng` дают побитово равные массивы |
-| Независимость от глобального seed | `np.random.seed(...)` снаружи не меняет результат |
-| Формы и dtype | Соответствие таблице осей из `docs/data.md` |
-| Симметрия | Матрицы весов симметричны, диагональ корректна |
-| Валидность схемы | `ground_truth.json` проходит валидацию схемы, `format_version` актуален |
-| Round-trip | Сохранение и загрузка возвращают идентичный объект |
+| Determinism | Two calls with an identically seeded `rng` give bitwise equal arrays |
+| Independence from the global seed | `np.random.seed(...)` outside does not change the result |
+| Shapes and dtype | Conformance to the axis table of `docs/data.md` |
+| Symmetry | Weight matrices are symmetric, the diagonal is correct |
+| Schema validity | `ground_truth.json` passes schema validation, `format_version` is current |
+| Round trip | Saving and loading return an identical object |
 
-### Семейство 1 — статические облака
+### Family 1 — static clouds
 
-- **Тест 1:** числа Бетти полного облака при $\sigma = 0$ и достаточном $N$ совпадают
-  с таблицей (только путь A, см. раздел 1.1). Число точек задаётся по-генераторно:
-  400 для плоских объектов, **не менее 600 для тора и бутылки Клейна** — измерено, что
-  при 400 разрыв в $H_1$ тора встаёт не на ту позицию, а при 600 и выше — на верную.
-- Числа Бетти при малом $\sigma$ из конфига остаются теми же.
-- **Тест 2:** на подвыборке из `cross_check_n_points` точек пути A и B дают одинаковые
-  $\beta_0, \beta_1, \beta_2$ на всех масштабах из `cross_check_n_scales`. Ожидание —
-  согласие, а не таблица; несовпадение с таблицей на отдельном масштабе ошибкой не является.
-- **Тест равномерности сэмплирования бутылки Клейна:** распределение $v$ согласуется
-  с плотностью $\propto \sqrt{(a + b\cos v)^2 + b^2\sin^2 v/4}$ (критерий
-  Колмогорова–Смирнова). Та же ошибка, что на торе, и так же незаметна.
-- **Тест равномерности сэмплирования тора:** распределение $\varphi$ согласуется с
-  плотностью $\propto (R + r\cos\varphi)$ (критерий Колмогорова–Смирнова). Отдельный тест,
-  потому что именно здесь наивная реализация выглядит правдоподобно и молча ломает $\beta_2$.
-- **Тест равномерности на сфере:** отсутствие сгущения у полюсов.
-- **Бутылка Клейна:** тест параметризован по полю и гоняется по значениям $p = 2$ и
-  $p = 3$. Ожидания: $\mathbb{Z}/2 \to (1,2,1)$, $\mathbb{Z}/3 \to (1,1,0)$. Статус
-  проверок разный: при $p=2$ работают оба пути (A и B), при $p=3$ — только путь A.
-  Совпадение обоих ответов означает, что параметр поля до вычислений не доходит, —
-  типичный баг, при котором `coeff_field` читается из конфига, но не передаётся в ripser.
-  Рациональные коэффициенты в ripser и gudhi недоступны, поэтому $\mathbb{Q}$ проверяется
-  через $p = 3$ (см. `docs/method.md`, раздел 1.2).
-- **Зацепление Хопфа:** $\beta_0 = 2$. Тест на то, что компоненты не склеились.
-- Монотонность преобразования сходство → расстояние проверяется явно.
+- **Test 1:** the Betti numbers of the full cloud at $\sigma = 0$ and sufficient $N$ match the
+  table (path A only, see section 1.1). The number of points is set per generator: 400 for
+  planar objects, **at least 600 for the torus and the Klein bottle** — measured: at 400 the gap
+  in $H_1$ of the torus lands on the wrong position, at 600 and above on the right one.
+- The Betti numbers stay the same at the small $\sigma$ from the config.
+- **Test 2:** on a subsample of `cross_check_n_points` points paths A and B give the same
+  $\beta_0, \beta_1, \beta_2$ at all scales from `cross_check_n_scales`. The expectation is
+  agreement, not the table; a mismatch with the table at an individual scale is not an error.
+- **Klein bottle sampling uniformity test:** the distribution of $v$ agrees with the density
+  $\propto \sqrt{(a + b\cos v)^2 + b^2\sin^2 v/4}$ (Kolmogorov–Smirnov test). The same error as
+  on the torus, and just as invisible.
+- **Torus sampling uniformity test:** the distribution of $\varphi$ agrees with the density
+  $\propto (R + r\cos\varphi)$ (Kolmogorov–Smirnov test). A separate test, because this is
+  exactly where a naive implementation looks plausible and silently breaks $\beta_2$.
+- **Sphere uniformity test:** no clustering at the poles.
+- **Klein bottle:** the test is parametrised by field and run at $p = 2$ and $p = 3$.
+  Expectations: $\mathbb{Z}/2 \to (1,2,1)$, $\mathbb{Z}/3 \to (1,1,0)$. The status of the checks
+  differs: at $p=2$ both paths (A and B) work, at $p=3$ only path A. If both answers coincide,
+  the field parameter does not reach the computation — a typical bug in which `coeff_field` is
+  read from the config but not passed to ripser. Rational coefficients are unavailable in ripser
+  and gudhi, so $\mathbb{Q}$ is checked via $p = 3$ (see `docs/method.md`, section 1.2).
+- **Hopf link:** $\beta_0 = 2$. A test that the components did not stick together.
+- Monotonicity of the similarity → distance transform is checked explicitly.
 
-### Семейство 2 — динамические графы
+### Family 2 — dynamic graphs
 
-- Скачки `betti_curve` в точности соответствуют списку `events` (совпадение позиции,
-  размерности и направления). Сравниваются **мультимножества** пар «позиция, направление»,
-  а не количества: иначе сдвиг всех событий на единицу проходит незамеченным. Конвенция
-  индекса — `docs/method.md`, 2.1.
-- `betti_curve` посчитана эталонной реализацией B, а не основным пайплайном, и **по
-  записанным снимкам**, а не по внутреннему состоянию планировщика.
-- Поле `type` принимает только `birth`/`death` — тест схемы.
-- $\beta_1$ флаг-комплекса **не** равен цикломатическому числу там, где есть треугольники:
-  отдельный тест на графе-треугольнике ($\beta_1 = 0$, а цикломатическое число 1).
-- Событий не больше и не меньше запланированного: отсутствие незапланированных изменений β.
-- **Парность рождения и гибели** (`docs/method.md`, 2.2a). Проверяется канонический
-  остаток утверждения: вектор 24-цикла над $\mathbb{Z}/2$ не лежит в $Z_1(G_{41})$, $c_2$
-  лежит, и $\dim Z_1(G_{41}) = 1$. Теста на тождество класса быть не должно — базис $H_1$
-  тета-графа не канонический.
+- The jumps of `betti_curve` correspond exactly to the `events` list (matching position,
+  dimension and direction). **Multisets** of "position, direction" pairs are compared, not
+  counts: otherwise a shift of all events by one goes unnoticed. Index convention —
+  `docs/method.md`, 2.1.
+- `betti_curve` is computed by reference implementation B, not by the main pipeline, and **from
+  the recorded snapshots**, not from the scheduler's internal state.
+- The `type` field takes only `birth`/`death` — a schema test.
+- $\beta_1$ of the flag complex is **not** equal to the cyclomatic number where there are
+  triangles: a separate test on the triangle graph ($\beta_1 = 0$, cyclomatic number 1).
+- No more and no fewer events than scheduled: no unscheduled changes of β.
+- **Pairing of birth and death** (`docs/method.md`, 2.2a). The canonical remainder of the claim
+  is checked: the vector of the 24-cycle over $\mathbb{Z}/2$ does not lie in $Z_1(G_{41})$, $c_2$
+  does, and $\dim Z_1(G_{41}) = 1$. There must be no test on the identity of a class — the basis
+  of $H_1$ of the theta graph is not canonical.
 
-  Этот тест обязателен именно потому, что `betti_curve` парность не видит: измерено, что
-  инверсия пары в логе не роняет ни одну другую проверку семейства 2. Без него ошибка
-  доживёт до Задачи 2 и будет выглядеть как дефект зигзаг-алгоритма.
-- **Отсутствие треугольников на всех снимках** `cycle_lifecycle`. Требование конструкции
-  (`docs/method.md`, 2.1): треугольник заполнил бы цикл, и записанное событие не совпало
-  бы с произошедшим. Заодно это превращает совпадение $\beta_1$ с цикломатическим числом
-  на этом наборе в следствие конструкции, а не в случайность.
-- **Отказ при недопустимом $N$:** генератор не строит набор, если хорда оставляет дугу
-  короче трёх рёбер (`docs/method.md`, 2.1). Тест — отрицательный, на $N = 13$ и $N = 14$:
-  там $\beta_1$ остаётся 1 при заявленном рождении, то есть отказ обязан быть явным,
-  а не молчаливой выдачей набора с неверной истиной.
-- **Правило ребра записано и проверяемо:** применение противоположного `edge_rule` к тем же
-  снимкам даёт другую `betti_curve`. Без этого теста поле можно записать неверно, и внутри
-  пакета никто не заметит — генератор считает кривую своим путём (`docs/method.md`, 2.3).
-- **Метрический сценарий `geometric_loop`** (`docs/method.md`, 2.1a):
-  - закрытое состояние дуги совпадает с равномерной окружностью — проверяется по
-    **минимальному попарному расстоянию**, а не по числам Бетти: при $\delta = 0$ точки
-    0 и $n-1$ совпадают, а $\beta$ этого не видит;
-  - каждый снимок удерживается между обоими порогами режима, причём проверка идёт по
-    фактическим радиусам, а не по узлам расписания: радиус интерполируется;
-  - дыхание радиуса меняет граф и **не** меняет $\beta$ — отрицательный контроль на
-    поимённо названных снимках, а не на диапазоне: диапазонная проверка прошла бы и на
-    наборе, где комплекс вообще не менялся.
-- **Инвариантность к перестановке меток узлов:** `betti_curve` и события не меняются.
-  Метки в данные не рандомизируются (снимки должны читаться глазом), поэтому проверка
-  ставится тестом.
-- **Повтор состояния сохраняется в данных:** снимки после восстановления ребра побайтово
-  равны снимкам до разрыва, различных графов пять при 60 снимках. Мемоизация внутри
-  генератора ускоряет расчёт кривой, но не имеет права схлопывать сами снимки.
+  This test is mandatory precisely because `betti_curve` does not see pairing: measured,
+  inverting the pair in the log breaks no other family-2 check. Without it the error would
+  survive into Task 2 and would look like a defect of the zigzag algorithm.
+- **No triangles on any snapshot** of `cycle_lifecycle`. A requirement of the construction
+  (`docs/method.md`, 2.1): a triangle would fill a cycle, and the recorded event would not match
+  what happened. It also turns the coincidence of $\beta_1$ with the cyclomatic number on this
+  dataset into a consequence of the construction rather than an accident.
+- **Refusal at an inadmissible $N$:** the generator does not build the dataset if the chord
+  leaves an arc shorter than three edges (`docs/method.md`, 2.1). The test is negative, at
+  $N = 13$ and $N = 14$: there $\beta_1$ stays 1 while a birth is declared, so the refusal must be
+  explicit, not a silent output of a dataset with wrong truth.
+- **The edge rule is recorded and checkable:** applying the opposite `edge_rule` to the same
+  snapshots gives a different `betti_curve`. Without this test the field could be written wrong
+  and nobody inside the package would notice — the generator computes the curve its own way
+  (`docs/method.md`, 2.3).
+- **The metric scenario `geometric_loop`** (`docs/method.md`, 2.1a):
+  - the closed state of the arc coincides with the uniform circle — checked by **the minimum
+    pairwise distance**, not by Betti numbers: at $\delta = 0$ points 0 and $n-1$ coincide, and
+    $\beta$ does not see it;
+  - every snapshot stays between both thresholds of the regime, and the check uses the actual
+    radii, not the schedule nodes: the radius is interpolated;
+  - radius breathing changes the graph and does **not** change $\beta$ — a negative control on
+    snapshots named individually, not on a range: a range check would also pass on a dataset
+    where the complex never changed.
+- **Invariance under node relabelling:** `betti_curve` and the events do not change. Labels are
+  not randomised in the data (snapshots must stay readable by eye), so the check is a test.
+- **The repeated state is preserved in the data:** snapshots after the edge is restored are
+  byte-for-byte equal to snapshots before the split; there are five distinct graphs over 60
+  snapshots. Memoisation inside the generator speeds up the curve computation but has no right
+  to collapse the snapshots themselves.
 
-### Семейство 3 — ряды и SBM
+### Family 3 — series and SBM
 
-- При «выключенной» связи ($\varepsilon = 0$, $K = 0$) корреляции каналов статистически
-  неотличимы от нуля — тест на отсутствие ложной связности в самой конструкции.
-- При включённой связи по расписанию восстановленная скользящим окном матрица
-  коррелирует с истинным $A(t)$ выше `sliding_window.min_coupling_agreement`.
-  Статистика — **усреднённая по окнам режима** матрица $|r|$ против $A$ этого режима:
-  по одному окну согласие слишком шумно, чтобы его порогать (измерено: минимум по окнам
-  ходит от $-0.02$ до $0.23$ по сидам). Проверяется на всех трёх калибровочных сидах.
-- **Нулевой контроль — перестановка меток каналов**, а не сравнение с чужим режимом.
-  Чужой режим нулевым контролем не является: разбиения вложены (`method.md`, 3.1a),
-  соседние режимы совпадают большей частью структуры, и согласие с чужим доходит до
-  0.440 при истинном минимуме 0.383 — классы перекрываются. Перестановка меток даёт
-  $-0.039\ldots0.068$, и разрыв чистый.
-- **Окно ограничено с двух сторон** (`method.md`, 3.4): сверху длительностью режима,
-  снизу периодом колебания. Обе границы — проверки конфига, а не данных. Нижняя добавлена
-  после того, как измерение показало: при 0.16 периода в окне корреляция внутри блока
-  (0.946) и между блоками (0.936) неразличимы, и связь не восстанавливается вовсе.
-- **Связь выше порога синхронизации:** эффективная связь внутри блока
-  $(K/N)(|{\rm блок}|-1)$ превышает $K_c \approx 1.6\,\sigma_\omega$. Проверка конфига.
-- **Динамическая SBM: истина — разбиение, а не баркод** (`method.md`, 3.1). Проверяется
-  `truth_kind: partition`, отсутствие `betti_curve` и `events`, метки формы
-  `(n_snapshots, n_nodes)` в int64, и то, что соседние разбиения связаны измельчением.
-- **Связь меток с данными:** внутри сообщества плотность рёбер выше, чем между —
-  иначе `community_labels` мог бы быть любым массивом верной формы.
-- **Слияние сообществ не является гомологическим событием** — тест на устойчивом
-  утверждении: после удаления изолированных вершин граф связен на **всех** снимках.
-  Формулировка «$\beta_0$ не меняется при слиянии» негодна: по ряду из 60 снимков
-  $\beta_0$ принимает и 1, и 2 на каждом сиде, потому что узел иногда не вытягивает ни
-  одного ребра (ожидаемых 3.5 таких вершины на набор, измерено 2, 3 и 2). Проверять
-  надо инвариант, а не отсутствие случайной вершины на двух конкретных снимках.
-- **Предел `reference_max_nodes` к SBM не применяется** — намеренно: он существует ради
-  эталонной проверки кривой Бетти, а у SBM кривой нет. Требование следует роду истины,
-  как и в схеме.
-- Интегратор воспроизводим: те же начальные условия и `t_eval` → тот же ряд. Для Рёсслера
-  это воспроизводимость вычисления, а не устойчивость: при $c = 5.7$ система хаотична, и
-  смена версии scipy, метода или допусков уводит ряд целиком.
+- With coupling "switched off" ($\varepsilon = 0$, $K = 0$) the channel correlations are
+  statistically indistinguishable from zero — a test for the absence of spurious coupling in the
+  construction itself.
+- With coupling on according to the schedule, the matrix recovered by the sliding window
+  correlates with the true $A(t)$ above `sliding_window.min_coupling_agreement`. The statistic is
+  the $|r|$ matrix **averaged over the windows of a regime** against the $A$ of that regime: per
+  single window the agreement is too noisy to threshold (measured: the minimum over windows ranges
+  from $-0.02$ to $0.23$ across seeds). Checked on all three calibration seeds.
+- **The null control is a permutation of channel labels**, not a comparison with another
+  regime. Another regime is not a null control: the partitions are nested (`method.md`, 3.1a),
+  neighbouring regimes share most of their structure, and agreement with another regime reaches
+  0.440 against a true minimum of 0.383 — the classes overlap. Label permutation gives
+  $-0.039\ldots0.068$, and the gap is clean.
+- **The window is bounded on both sides** (`method.md`, 3.4): above by the regime duration,
+  below by the oscillation period. Both bounds are config checks, not data checks. The lower one
+  was added after a measurement showed that at 0.16 periods per window the within-block (0.946)
+  and between-block (0.936) correlations are indistinguishable and coupling is not recovered at
+  all.
+- **Coupling above the synchronisation threshold:** the effective within-block coupling
+  $(K/N)(|{\rm block}|-1)$ exceeds $K_c \approx 1.6\,\sigma_\omega$. A config check.
+- **Dynamic SBM: the truth is a partition, not a barcode** (`method.md`, 3.1). Checked:
+  `truth_kind: partition`, absence of `betti_curve` and `events`, labels of shape
+  `(n_snapshots, n_nodes)` in int64, and that neighbouring partitions are related by
+  refinement.
+- **Labels are tied to the data:** edge density within a community is higher than between —
+  otherwise `community_labels` could be any array of the right shape.
+- **A community merge is not a homological event** — a test on a robust statement: after removing
+  isolated vertices the graph is connected on **every** snapshot. The formulation "$\beta_0$ does
+  not change at the merge" is unfit: over a series of 60 snapshots $\beta_0$ takes both 1 and 2 on
+  every seed, because a node occasionally draws no edge at all (3.5 such vertices expected per
+  dataset, 2, 3 and 2 measured). The invariant must be checked, not the absence of a random vertex
+  on two particular snapshots.
+- **The `reference_max_nodes` limit does not apply to SBM** — deliberately: it exists for the
+  reference check of the Betti curve, and SBM has no curve. The requirement follows the kind of
+  truth, as in the schema.
+- The integrator is reproducible: the same initial conditions and `t_eval` → the same series.
+  For Rössler this is reproducibility of the computation, not robustness: at $c = 5.7$ the system
+  is chaotic, and a change of scipy version, method or tolerances moves the series entirely.
 
-### Семейство 4 — шум и нулевые модели
+### Family 4 — noise and null models
 
-- Монотонность: bottleneck-расстояние между чистой и зашумлённой диаграммами
-  не убывает с ростом уровня шума (в среднем по повторам).
-- **Устойчивость проверяется против $2\,d_H$, а не $d_H$** (`method.md`, 4.1). Множитель
-  следует из параметризации Рипса диаметром. Измерено: без него девять из двенадцати
-  комбинаций нарушают границу при отношении до 1.33. Проверка обязана идти по $H_1$:
-  в $H_0$ обе формы выполняются, и тест по нульмерным барам прошёл бы при неверной
-  теореме в документе.
-- При нулевом уровне шума набор совпадает с исходным **побитово**, и розыгрыш при этом
-  всё равно происходит — иначе поток случайности сдвигается между уровнями и «чистый»
-  набор перестаёт быть тем же объектом, с которым сравниваются зашумлённые.
-- **Проверка нулевого уровня через манифест:** sha256 возмущённого массива равен sha256
-  соответствующего базового. Оба числа уже лежат в `manifest.json`, сравнение стоит ноль,
-  и оно ловит разом неверно подключённую базу, сдвиг потока случайности между уровнями
-  и безусловно применённый `clip` — то, что иначе всплыло бы как необъяснимая ступенька
-  в начале кривой устойчивости. У `weight_jitter` база — облако, его сеть выводится,
-  а не хранится, поэтому эта пара пропускается; тест требует, чтобы сравнённых было
-  больше нуля, иначе пропуск выхолостил бы проверку.
-- **На диск идёт только возмущённый массив** (`docs/data.md`, §1): у `point_jitter` нет
-  сети, у `weight_jitter` нет точек. Проверяется по фактически записанным файлам.
-- Доли $p^+$ и $p^-$ соответствуют фактически изменённому числу рёбер (счёт по верхнему
-  треугольнику). Проверяется на **обоих** сценариях семейства 2: их правила ребра
-  противоположны, и для метрического «добавить ребро» значит уменьшить расстояние.
-- **Нулевые модели: пустой лог событий, а не отсутствие баров.** Прежняя формулировка
-  («отсутствие значимых долгоживущих баров сверх ожидаемого для случайного графа»)
-  требовала невыполнимого: случайный граф честно имеет циклы на всех рабочих плотностях,
-  а $(1,0,0)$ достигается только при $p \gtrsim 0.8$, то есть на почти полном графе
-  (`method.md`, 4.2). Проверяется то, что является утверждением о конструкции: список
-  событий пуст, расписания нет, набор воспроизводим. Частота ложных срабатываний
-  измеряется алгоритмом Задачи 2 на этих данных, а не утверждается генератором.
-- **Кривая устойчивости снимается на окружности, торе и сфере**, а не на одном объекте
-  (`method.md`, 4.2a): у сферы $H_1$ почти не двигается, у окружности $H_2$ плоская, и
-  набор из одного объекта информативен наполовину. Артефакт производит сборка
-  (`--results`), а не тесты: тесты **проверяют** монотонность и границу $2d_H$, отчётные
-  числа Результата 6 **производит** пайплайн.
-- **Равномерное облако как нулевая модель: $(1,0,0)$ на всех реализациях**, а не в среднем.
-  Калибруется на `n_realizations` × калибровочные сиды, а не на трёх сидах: ноль промахов
-  из трёх даёт по правилу трёх верхнюю 95%-границу около 63%, что для набора, вся ценность
-  которого в отсутствии срабатываний, доказательством не является.
+- Monotonicity: the bottleneck distance between the clean and noisy diagrams does not decrease
+  as the noise level grows (on average over repeats).
+- **Stability is checked against $2\,d_H$, not $d_H$** (`method.md`, 4.1). The factor follows
+  from parametrising Rips by diameter. Measured: without it nine of twelve combinations violate
+  the bound with ratios up to 1.33. The check must use $H_1$: in $H_0$ both forms hold, and a
+  test on zero-dimensional bars would pass with a wrong theorem in the document.
+- At zero noise level the dataset coincides with the source **bitwise**, and the draw still
+  happens — otherwise the random stream shifts between levels and the "clean" dataset stops being
+  the same object the noisy ones are compared with.
+- **Zero-level check through the manifest:** the sha256 of the perturbed array equals the sha256
+  of the corresponding base. Both numbers already lie in `manifest.json`, the comparison costs
+  nothing, and it catches at once a wrongly connected base, a shift of the random stream between
+  levels and an unconditionally applied `clip` — what would otherwise surface as an unexplained
+  step at the start of the stability curve. For `weight_jitter` the base is a cloud whose network
+  is derived rather than stored, so that pair is skipped; the test requires the number of
+  compared pairs to be above zero, otherwise the skip would hollow out the check.
+- **Only the perturbed array goes to disk** (`docs/data.md`, §1): `point_jitter` has no network,
+  `weight_jitter` has no points. Checked on the files actually written.
+- The fractions $p^+$ and $p^-$ match the number of edges actually changed (counted over the
+  upper triangle). Checked on **both** family-2 scenarios: their edge rules are opposite, and for
+  the metric one "add an edge" means decrease a distance.
+- **Null models: an empty event log, not the absence of bars.** The earlier formulation ("no
+  significant long-lived bars beyond what is expected for a random graph") demanded the
+  impossible: a random graph honestly has cycles at every working density, and $(1,0,0)$ is
+  reached only at $p \gtrsim 0.8$, i.e. on an almost complete graph (`method.md`, 4.2). What is
+  checked is a statement about the construction: the event list is empty, there is no schedule,
+  the dataset is reproducible. The false positive rate is measured by the Task 2 algorithm on
+  these data, not claimed by the generator.
+- **The stability curve is taken on the circle, torus and sphere**, not on one object
+  (`method.md`, 4.2a): the sphere's $H_1$ barely moves, the circle's $H_2$ is flat, and a set of
+  one object is informative by half. The artefact is produced by the build (`--results`), not by
+  the tests: the tests **check** monotonicity and the $2d_H$ bound, the pipeline **produces** the
+  reported numbers of Result 6.
+- **Uniform cloud as a null model: $(1,0,0)$ on every realisation**, not on average. It is
+  calibrated on `n_realizations` × calibration seeds, not on three seeds: zero misses out of three
+  gives, by the rule of three, a 95% upper bound of about 63%, which for a dataset whose whole
+  value lies in the absence of false positives is no proof.
 
-## 4. Организация тестов
+## 4. Test organisation
 
 ```
 tests/
-├── test_config.py             # загрузчик config.yaml: ключи, типы, диапазоны
-├── test_rng.py                # производные потоки случайности
-├── test_io_roundtrip.py       # сохранение/чтение набора и manifest.json
-├── test_determinism.py        # общий, параметризован по всем генераторам
-├── test_schema.py             # ground-truth и manifest
-├── test_static_betti.py       # slow: топологические проверки семейства 1
+├── test_config.py             # config.yaml loader: keys, types, ranges
+├── test_rng.py                # derived random streams
+├── test_io_roundtrip.py       # saving/reading a dataset and manifest.json
+├── test_determinism.py        # common, parametrised over every generator
+├── test_schema.py             # ground truth and manifest
+├── test_static_betti.py       # slow: topological checks of family 1
 ├── test_sampling_uniformity.py
-├── test_dynamic_events.py     # slow: согласованность events и betti_curve
+├── test_dynamic_events.py     # slow: consistency of events and betti_curve
 ├── test_series.py
 ├── test_noise_models.py
 └── reference/
-    └── test_reference_impl.py # эталонная реализация против известных малых комплексов
+    └── test_reference_impl.py # the reference implementation against known small complexes
 ```
 
-Медленные тесты помечаются `@pytest.mark.slow` и запускаются отдельно, но входят в CI.
-Быстрый прогон (`pytest -q -m "not slow"`) должен укладываться в десятки секунд.
+Slow tests are marked `@pytest.mark.slow` and run separately. The fast run
+(`pytest -q -m "not slow"`) must fit into tens of seconds.
 
-Эталонная реализация из `reference/` сама проверяется на комплексах, чьи гомологии
-известны вручную. Проверка разделена по слоям.
+The reference implementation in `reference/` is itself checked on complexes whose homology is
+known by hand. The check is split by layer.
 
-**Слой 1 — движок гомологий** (принимает явный список симплексов, вопроса об обрыве
-размерности не возникает): точка, две несвязные точки ($\beta_0=2$), отрезок,
-треугольник как 1-скелет ($\beta_1=1$), заполненный треугольник ($\beta_1=0$),
-полый тетраэдр как явно заданный 2-скелет ($\beta_2=1$).
+**Layer 1 — the homology engine** (takes an explicit list of simplices, so the question of
+dimension cut-off does not arise): a point, two disconnected points ($\beta_0=2$), a segment, a
+triangle as a 1-skeleton ($\beta_1=1$), a filled triangle ($\beta_1=0$), a hollow tetrahedron as
+an explicitly given 2-skeleton ($\beta_2=1$).
 
-**Слой 2 — построитель флаг-комплекса** (принимает граф, строит симплексы до
-размерности $k_{\max}+1$):
+**Layer 2 — the flag complex builder** (takes a graph, builds simplices up to dimension
+$k_{\max}+1$):
 
-| Граф | Ожидание | Что ловит |
+| Graph | Expectation | What it catches |
 |---|---|---|
-| Треугольник $K_3$ | $\beta=(1,0,0)$ | $\beta_1$ ≠ цикломатическое число |
-| Полный граф $K_4$ | $\beta=(1,0,0)$ | Обрыв на размерности 2: он даст ошибочное $\beta_2=1$ |
-| Октаэдр $K_{2,2,2}$ | $\beta=(1,0,1)$ | Настоящая полость: максимальная клика равна 3, 3-симплексов нет |
+| Triangle $K_3$ | $\beta=(1,0,0)$ | $\beta_1$ ≠ cyclomatic number |
+| Complete graph $K_4$ | $\beta=(1,0,0)$ | Cut-off at dimension 2: it would give a spurious $\beta_2=1$ |
+| Octahedron $K_{2,2,2}$ | $\beta=(1,0,1)$ | A real cavity: the maximal clique is 3, no 3-simplices |
 
-Плюс структурный тест, не про числа Бетти: **счёт граней $K_4$ по размерностям должен
-дать (4, 6, 4, 1)**. Он ловит перечисление только максимальных клик, при котором получится
-(4, 0, 0, 1) — комплекс, не замкнутый относительно граней. Общее правило теста: для любого
-симплекса из комплекса все его подмножества обязаны в комплексе присутствовать.
+Plus a structural test, not about Betti numbers: **the face count of $K_4$ by dimension must be
+(4, 6, 4, 1)**. It catches enumeration of maximal cliques only, which would give (4, 0, 0, 1) — a
+complex not closed under faces. The general rule of the test: for any simplex in the complex, all
+its subsets must be present in the complex.
 
-Полый тетраэдр **не** используется как тест флаг-комплексов: он не является флаг-комплексом
-никакого графа (флаг-комплекс $K_4$ — сплошной тетраэдр). Хуже того, обрывающая на
-размерности 2 реализация выдала бы на $K_4$ те же $(1,0,1)$, и такой тест прошёл бы при
-неверном коде. Роль честного теста на $H_2$ играет октаэдр.
+The hollow tetrahedron is **not** used as a flag complex test: it is not the flag complex of any
+graph (the flag complex of $K_4$ is the solid tetrahedron). Worse, an implementation cutting off
+at dimension 2 would give the same $(1,0,1)$ on $K_4$, and such a test would pass with wrong code.
+The octahedron plays the role of an honest $H_2$ test.
 
-Без этого «независимый» путь B не заслуживает доверия.
+Without this, the "independent" path B does not deserve trust.
 
-## 5. Чего тесты не проверяют
+## 5. What the tests do not verify
 
-Тесты не подтверждают, что набор данных **научно осмыслен** для задачи — только что он
-соответствует заявленной истине. Осмысленность (достаточно ли реалистична динамика,
-похож ли синтетический аналог рядов на фМРТ по спектру и уровню шума) остаётся предметом
-экспертного решения и обсуждается отдельно.
+The tests do not confirm that a dataset is **scientifically meaningful** for the task — only that
+it matches its declared truth. Meaningfulness (whether the dynamics is realistic enough, whether
+the synthetic series analogue resembles fMRI in spectrum and noise level) remains a matter of
+expert judgement and is discussed separately.
